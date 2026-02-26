@@ -67,17 +67,18 @@ export function normalizePhone(phone) {
     return p
 }
 
-// Register new user
-export async function registerUser(phone, password) {
+// Register new user (with username)
+export async function registerUser(phone, password, username) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
     const existing = await getDoc(userRef)
     if (existing.exists()) {
-        throw new Error('এই number এ আগেই account আছে। Login করো।')
+        throw new Error('🚫 এই number এ আগেই account আছে! Login করো।')
     }
     const hashed = await hashPassword(password)
     await setDoc(userRef, {
         phone: uid,
+        username: username || 'MoneyFlow User',
         passwordHash: hashed,
         createdAt: serverTimestamp(),
     })
@@ -97,6 +98,24 @@ export async function loginUser(phone, password) {
         throw new Error('ভুল password! আবার চেষ্টা করো।')
     }
     return uid
+}
+
+// Forgot/Reset password — phone number দিলেই নতুন password set হবে
+export async function resetPassword(phone, newPassword) {
+    const uid = normalizePhone(phone)
+    const userRef = doc(db, 'users', uid, 'profile', 'info')
+    const snap = await getDoc(userRef)
+    if (!snap.exists()) {
+        throw new Error('এই number এ কোনো account নেই।')
+    }
+    const hashed = await hashPassword(newPassword)
+    await setDoc(userRef, { passwordHash: hashed }, { merge: true })
+}
+
+// Get user profile (username etc.)
+export async function getUserProfile(uid) {
+    const snap = await getDoc(doc(db, 'users', uid, 'profile', 'info'))
+    return snap.exists() ? snap.data() : {}
 }
 
 // Persist session in localStorage
