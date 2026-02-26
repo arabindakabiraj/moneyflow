@@ -2,16 +2,20 @@
  * Settings.jsx — PIN setup, budget manager, user info, logout
  */
 import { useState } from 'react'
-import { Target, LogOut, User, CheckCircle, Flame, Info, Lock, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { Target, LogOut, User, CheckCircle, Flame, Lock, Plus, Trash2, AlertTriangle, Pencil, X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { setupPin, clearPin, isPinSet } from './AppLock'
 
 export default function Settings() {
   const { savingsGoal, setSavingsGoal, user, logout, customCategories, addCategory,
-    budgets, saveBudget, removeBudget, getBudgetAlerts, transactions } = useApp()
+    budgets, saveBudget, removeBudget, getBudgetAlerts,
+    username, updateUsername } = useApp()
 
   const [goalInput, setGoalInput] = useState(savingsGoal)
   const [saved, setSaved] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [nameSaved, setNameSaved] = useState(false)
 
   // PIN state
   const [pinStep, setPinStep] = useState('idle') // idle | setup | change | confirm
@@ -54,46 +58,84 @@ export default function Settings() {
       {/* User profile */}
       {user && (
         <div className="card bg-gradient-to-br from-brand-500 to-emerald-600 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
-                <User size={22} className="text-white" />
-              </div>
-              <div>
-                <p className="font-display font-bold">MoneyFlow User</p>
-                <p className="text-white/70 text-xs font-mono mt-0.5">{user.phoneNumber}</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+              <User size={22} className="text-white" />
             </div>
-            <Flame size={16} className="text-white/70" />
+            <div className="flex-1 min-w-0">
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        updateUsername(nameInput)
+                        setEditingName(false)
+                        setNameSaved(true)
+                        setTimeout(() => setNameSaved(false), 2000)
+                      }
+                      if (e.key === 'Escape') setEditingName(false)
+                    }}
+                    className="flex-1 bg-white/20 rounded-xl px-3 py-1.5 text-white placeholder-white/50 text-sm font-semibold outline-none border border-white/30 focus:border-white/60"
+                    placeholder="নতুন নাম লিখো..."
+                  />
+                  <button onClick={() => { updateUsername(nameInput); setEditingName(false); setNameSaved(true); setTimeout(() => setNameSaved(false), 2000) }}
+                    className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
+                    <CheckCircle size={15} className="text-white" />
+                  </button>
+                  <button onClick={() => setEditingName(false)}
+                    className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+                    <X size={15} className="text-white" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div>
+                    <p className="font-display font-bold text-white">
+                      {nameSaved ? '✅ Saved!' : username || 'MoneyFlow User'}
+                    </p>
+                    <p className="text-white/70 text-xs font-mono mt-0.5 truncate">{user.phoneNumber}</p>
+                  </div>
+                  <button onClick={() => { setNameInput(username); setEditingName(true) }}
+                    className="ml-auto w-7 h-7 rounded-xl bg-white/15 flex items-center justify-center hover:bg-white/25 transition-colors shrink-0">
+                    <Pencil size={13} className="text-white" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Budget Alerts */}
-      {alerts.length > 0 && (
-        <div className="space-y-2">
-          {alerts.map(a => (
-            <div key={a.category} className={`card border flex items-start gap-3 ${a.exceeded
+      {
+        alerts.length > 0 && (
+          <div className="space-y-2">
+            {alerts.map(a => (
+              <div key={a.category} className={`card border flex items-start gap-3 ${a.exceeded
                 ? 'bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/40'
                 : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/40'
-              }`}>
-              <AlertTriangle size={16} className={a.exceeded ? 'text-rose-500 mt-0.5 shrink-0' : 'text-amber-500 mt-0.5 shrink-0'} />
-              <div className="flex-1 min-w-0">
-                <p className={`font-semibold text-sm ${a.exceeded ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'}`}>
-                  {a.exceeded ? '🚨' : '⚠️'} {a.category} budget {a.exceeded ? 'exceeded' : 'almost full'}!
-                </p>
-                <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-1.5 overflow-hidden">
-                  <div className={`h-full rounded-full ${a.exceeded ? 'bg-rose-500' : 'bg-amber-500'}`}
-                    style={{ width: `${Math.min(a.pct, 100)}%` }} />
+                }`}>
+                <AlertTriangle size={16} className={a.exceeded ? 'text-rose-500 mt-0.5 shrink-0' : 'text-amber-500 mt-0.5 shrink-0'} />
+                <div className="flex-1 min-w-0">
+                  <p className={`font-semibold text-sm ${a.exceeded ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                    {a.exceeded ? '🚨' : '⚠️'} {a.category} budget {a.exceeded ? 'exceeded' : 'almost full'}!
+                  </p>
+                  <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-1.5 overflow-hidden">
+                    <div className={`h-full rounded-full ${a.exceeded ? 'bg-rose-500' : 'bg-amber-500'}`}
+                      style={{ width: `${Math.min(a.pct, 100)}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    ₹{a.spent.toLocaleString('en-IN')} / ₹{a.limit.toLocaleString('en-IN')} ({a.pct}%)
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  ₹{a.spent.toLocaleString('en-IN')} / ₹{a.limit.toLocaleString('en-IN')} ({a.pct}%)
-                </p>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )
+      }
 
       {/* Budget Manager */}
       <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
@@ -224,6 +266,6 @@ export default function Settings() {
         className="w-full py-4 rounded-2xl bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/40 text-rose-600 dark:text-rose-400 font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-98">
         <LogOut size={16} /> Logout করো
       </button>
-    </div>
+    </div >
   )
 }

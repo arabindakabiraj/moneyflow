@@ -11,8 +11,8 @@ import { db } from '../firebase'
 import { getSession, clearSession } from '../authUtils'
 
 const AppContext = createContext(null)
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
-const GEMINI_MODEL = 'gemini-2.0-flash'
+const OR_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || ''
+const OR_MODEL = 'google/gemini-2.5-flash'
 
 const DEFAULT_CATEGORIES = ['Tiffin', 'Books', 'Travel', 'Tuition', 'Entertainment', 'Health', 'Rent', 'Others']
 
@@ -34,6 +34,7 @@ export function AppProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('mf_cats') || 'null') || DEFAULT_CATEGORIES }
     catch { return DEFAULT_CATEGORIES }
   })
+  const [username, setUsername] = useState('')
 
   // Dark mode
   useEffect(() => {
@@ -43,6 +44,20 @@ export function AppProvider({ children }) {
 
   // Session load
   useEffect(() => { setUid(getSession()) }, [])
+
+  // Load username from Firestore when uid changes
+  useEffect(() => {
+    if (!uid) { setUsername(''); return }
+    getDoc(doc(db, 'users', uid, 'profile', 'info'))
+      .then(snap => { if (snap.exists()) setUsername(snap.data().username || '') })
+      .catch(console.error)
+  }, [uid])
+
+  const updateUsername = async (newName) => {
+    if (!uid || !newName.trim()) return
+    setUsername(newName.trim())
+    await setDoc(doc(db, 'users', uid, 'profile', 'info'), { username: newName.trim() }, { merge: true })
+  }
 
   // Save custom categories
   useEffect(() => {
@@ -184,21 +199,33 @@ export function AppProvider({ children }) {
 
     setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
 
-    if (!GEMINI_API_KEY) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Gemini API Key সেট নেই।' }])
+    if (!OR_API_KEY) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ OpenRouter API Key সেট নেই। .env এ VITE_OPENROUTER_API_KEY যোগ করো।' }])
       return
     }
 
     try {
       const res = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+        'https://openrouter.ai/api/v1/chat/completions',
         {
-          system_instruction: { parts: [{ text: systemInstruction }] },
-          contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+          model: OR_MODEL,
+          messages: [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: userMessage },
+          ],
+          temperature: 0.7,
+          max_tokens: 1024,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${OR_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://moneyflow-xyz.vercel.app',
+            'X-Title': 'MoneyFlow AI',
+          },
         }
       )
-      const reply = res.data?.candidates?.[0]?.content?.parts?.[0]?.text || 'দুঃখিত, উত্তর পাওয়া যায়নি।'
+      const reply = res.data?.choices?.[0]?.message?.content || 'দুঃখিত, উত্তর পাওয়া যায়নি।'
       setChatMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (err) {
       const msg = err.response?.data?.error?.message || err.message
@@ -209,6 +236,7 @@ export function AppProvider({ children }) {
   const value = {
     uid, setUid, logout,
     user: uid ? { phoneNumber: uid } : null,
+    username, updateUsername,
     darkMode, setDarkMode,
     transactions, loading, error,
     savingsGoal, setSavingsGoal,
