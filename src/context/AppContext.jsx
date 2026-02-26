@@ -1,25 +1,26 @@
 /**
- * AppContext.jsx
- * Global state — Custom Phone+Password auth + Firestore
+ * AppContext.jsx — Global state with budget alerts + anomaly detection + custom categories
  */
 import { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
 import {
   collection, query, orderBy, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
+  addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { getSession, clearSession } from '../authUtils'
 
 const AppContext = createContext(null)
-
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
 const GEMINI_MODEL = 'gemini-2.0-flash'
 
+const DEFAULT_CATEGORIES = ['Tiffin', 'Books', 'Travel', 'Tuition', 'Entertainment', 'Health', 'Rent', 'Others']
+
 export function AppProvider({ children }) {
-  const [uid, setUid] = useState(undefined)  // undefined=loading, null=not logged in
+  const [uid, setUid] = useState(undefined)
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
   const [transactions, setTx] = useState([])
+  const [budgets, setBudgets] = useState({})   // { category: limitAmount }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [savingsGoal, setSavingsGoalState] = useState(() => Number(localStorage.getItem('savingsGoal')) || 1000)
@@ -29,6 +30,10 @@ export function AppProvider({ children }) {
   ])
   const [filterDate, setFilterDate] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
+  const [customCategories, setCustomCats] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('mf_cats') || 'null') || DEFAULT_CATEGORIES }
+    catch { return DEFAULT_CATEGORIES }
+  })
 
   // Dark mode
   useEffect(() => {
@@ -36,34 +41,36 @@ export function AppProvider({ children }) {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  // Load session on mount
-  useEffect(() => {
-    const saved = getSession()
-    setUid(saved)   // null if not logged in
-  }, [])
+  // Session load
+  useEffect(() => { setUid(getSession()) }, [])
 
-  // Firestore real-time listener — runs when uid available
+  // Save custom categories
   useEffect(() => {
-    if (!uid) {
-      setTx([])
-      return
-    }
+    localStorage.setItem('mf_cats', JSON.stringify(customCategories))
+  }, [customCategories])
+
+  const addCategory = (cat) => {
+    if (!customCategories.includes(cat)) setCustomCats(p => [...p, cat])
+  }
+
+  // Firestore — transactions real-time
+  useEffect(() => {
+    if (!uid) { setTx([]); return }
     setLoading(true)
-    const q = query(
-      collection(db, 'users', uid, 'transactions'),
-      orderBy('date', 'desc')
-    )
+    const q = query(collection(db, 'users', uid, 'transactions'), orderBy('date', 'desc'))
     const unsub = onSnapshot(q,
-      snap => {
-        setTx(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-        setLoading(false)
-        setError(null)
-      },
-      err => {
-        console.error(err)
-        setError('Data load করতে সমস্যা হয়েছে।')
-        setLoading(false)
-      }
+      snap => { setTx(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); setError(null) },
+      err => { console.error(err); setError('Data load সমস্যা।'); setLoading(false) }
+    )
+    return unsub
+  }, [uid])
+
+  // Firestore — budgets real-time
+  useEffect(() => {
+    if (!uid) { setBudgets({}); return }
+    const unsub = onSnapshot(doc(db, 'users', uid, 'settings', 'budgets'),
+      snap => { if (snap.exists()) setBudgets(snap.data()) },
+      err => console.error('Budget load err:', err)
     )
     return unsub
   }, [uid])
@@ -72,23 +79,20 @@ export function AppProvider({ children }) {
 
   const addTransaction = async (tx) => {
     if (!uid) return
-    try {
-      await addDoc(col(), { ...tx, amount: Number(tx.amount), createdAt: serverTimestamp() })
-    } catch (e) { console.error(e); setError('Transaction save হয়নি।') }
+    try { await addDoc(col(), { ...tx, amount: Number(tx.amount), createdAt: serverTimestamp() }) }
+    catch (e) { console.error(e); setError('Save সমস্যা।') }
   }
 
   const updateTransaction = async (id, updated) => {
     if (!uid) return
-    try {
-      await updateDoc(doc(db, 'users', uid, 'transactions', id), updated)
-    } catch (e) { console.error(e) }
+    try { await updateDoc(doc(db, 'users', uid, 'transactions', id), updated) }
+    catch (e) { console.error(e) }
   }
 
   const deleteTransaction = async (id) => {
     if (!uid) return
-    try {
-      await deleteDoc(doc(db, 'users', uid, 'transactions', id))
-    } catch (e) { console.error(e) }
+    try { await deleteDoc(doc(db, 'users', uid, 'transactions', id)) }
+    catch (e) { console.error(e) }
   }
 
   const toggleNeedWant = (id) => {
@@ -96,14 +100,56 @@ export function AppProvider({ children }) {
     if (tx) updateTransaction(id, { isWant: !tx.isWant })
   }
 
-  const logout = () => {
-    clearSession()
-    setUid(null)
-    setTx([])
-    setChatMessages([{ role: 'assistant', content: '👋 আমি তোমার AI Financial Advisor!' }])
-    setActiveTab('dashboard')
+  // Budget CRUD
+  const saveBudget = async (category, limit) => {
+    if (!uid) return
+    const newBudgets = { ...budgets, [category]: Number(limit) }
+    setBudgets(newBudgets)
+    await setDoc(doc(db, 'users', uid, 'settings', 'budgets'), newBudgets, { merge: true })
   }
 
+  const removeBudget = async (category) => {
+    if (!uid) return
+    const nb = { ...budgets }
+    delete nb[category]
+    setBudgets(nb)
+    await setDoc(doc(db, 'users', uid, 'settings', 'budgets'), nb)
+  }
+
+  // Budget alerts — categories over limit this month
+  const getBudgetAlerts = () => {
+    const now = new Date().toISOString().slice(0, 7)
+    const monthlySpend = {}
+    transactions
+      .filter(t => t.type === 'debit' && t.date?.startsWith(now))
+      .forEach(t => { monthlySpend[t.category] = (monthlySpend[t.category] || 0) + Number(t.amount) })
+    return Object.entries(budgets)
+      .filter(([cat, limit]) => (monthlySpend[cat] || 0) >= limit * 0.8)
+      .map(([cat, limit]) => ({
+        category: cat,
+        spent: monthlySpend[cat] || 0,
+        limit,
+        exceeded: (monthlySpend[cat] || 0) >= limit,
+        pct: Math.round(((monthlySpend[cat] || 0) / limit) * 100),
+      }))
+  }
+
+  // Anomaly detection — transactions > 2x category average
+  const getAnomalies = () => {
+    const catAvg = {}
+    const catCount = {}
+    transactions.filter(t => t.type === 'debit').forEach(t => {
+      catAvg[t.category] = (catAvg[t.category] || 0) + Number(t.amount)
+      catCount[t.category] = (catCount[t.category] || 0) + 1
+    })
+    Object.keys(catAvg).forEach(c => { catAvg[c] /= catCount[c] })
+    return transactions
+      .filter(t => t.type === 'debit' && Number(t.amount) > catAvg[t.category] * 2)
+      .sort((a, b) => Number(b.amount) - Number(a.amount))
+      .slice(0, 5)
+  }
+
+  const logout = () => { clearSession(); setUid(null); setTx([]); setBudgets({}) }
   const setSavingsGoal = (v) => { setSavingsGoalState(v); localStorage.setItem('savingsGoal', v) }
 
   const getSummary = (txList = transactions) => {
@@ -121,19 +167,25 @@ export function AppProvider({ children }) {
 
   const askGemini = async (userMessage) => {
     const summary = getSummary()
+    const anomalies = getAnomalies()
+    const alerts = getBudgetAlerts()
     const catBreakdown = transactions
       .filter(t => t.type === 'debit')
       .reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + Number(t.amount); return acc }, {})
 
     const systemInstruction = `তুমি MoneyFlow-এর AI Financial Advisor। একজন ছাত্রের সাথে কথা বলছ।
-তথ্য: Balance ₹${summary.balance}, Income ₹${summary.totalCredit}, Expense ₹${summary.totalDebit}
-Category: ${JSON.stringify(catBreakdown)}, Transactions: ${transactions.length}, Goal: ₹${savingsGoal}
-সংক্ষিপ্ত, বন্ধুত্বপূর্ণ পরামর্শ দাও। বাংলা+ইংরেজি মিশিয়ে। Emoji ব্যবহার করো।`
+আর্থিক তথ্য:
+- Balance: ₹${summary.balance}, Income: ₹${summary.totalCredit}, Expense: ₹${summary.totalDebit}
+- Category খরচ: ${JSON.stringify(catBreakdown)}
+- Budget alerts: ${JSON.stringify(alerts)}
+- অস্বাভাবিক খরচ (anomalies): ${JSON.stringify(anomalies.map(a => ({ desc: a.description, amt: a.amount, cat: a.category })))}
+- Savings goal: ₹${savingsGoal}, Transactions: ${transactions.length}
+সংক্ষিপ্ত, বন্ধুত্বপূর্ণ পরামর্শ দাও। বাংলা+English মিশিয়ে। Emoji ব্যবহার করো।`
 
     setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
 
     if (!GEMINI_API_KEY) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Gemini API Key সেট করা নেই।' }])
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Gemini API Key সেট নেই।' }])
       return
     }
 
@@ -150,16 +202,12 @@ Category: ${JSON.stringify(catBreakdown)}, Transactions: ${transactions.length},
       setChatMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (err) {
       const msg = err.response?.data?.error?.message || err.message
-      setChatMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ AI সংযোগে সমস্যা।\n\n**Error:** ${msg}`
-      }])
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `❌ AI error: ${msg}` }])
     }
   }
 
   const value = {
     uid, setUid, logout,
-    // expose phone number from uid for display
     user: uid ? { phoneNumber: uid } : null,
     darkMode, setDarkMode,
     transactions, loading, error,
@@ -168,6 +216,9 @@ Category: ${JSON.stringify(catBreakdown)}, Transactions: ${transactions.length},
     chatMessages, setChatMessages,
     filterDate, setFilterDate,
     filterMonth, setFilterMonth,
+    customCategories, addCategory,
+    budgets, saveBudget, removeBudget,
+    getBudgetAlerts, getAnomalies,
     addTransaction, updateTransaction, deleteTransaction, toggleNeedWant,
     getSummary, getFilteredTransactions,
     askGemini,

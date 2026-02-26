@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react'
 import { PlusCircle, CheckCircle, X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
-const CATEGORIES = ['Tiffin', 'Books', 'Travel', 'Tuition', 'Others']
 const ACCOUNTS = ['Cash', 'Bank']
 
 const defaultForm = {
@@ -50,13 +49,13 @@ function SuccessToast({ data, onClose }) {
       {/* Toast card */}
       <div
         className={`relative pointer-events-auto w-full max-w-sm transition-all duration-500 ease-out ${visible && !exiting
-            ? 'translate-y-0 opacity-100 scale-100'
-            : '-translate-y-8 opacity-0 scale-95'
+          ? 'translate-y-0 opacity-100 scale-100'
+          : '-translate-y-8 opacity-0 scale-95'
           }`}
       >
         <div className={`rounded-3xl p-5 shadow-2xl border ${isCredit
-            ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400/30'
-            : 'bg-gradient-to-br from-rose-500 to-pink-600 border-rose-400/30'
+          ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400/30'
+          : 'bg-gradient-to-br from-rose-500 to-pink-600 border-rose-400/30'
           }`}>
           {/* Close button */}
           <button onClick={dismiss}
@@ -92,7 +91,7 @@ function SuccessToast({ data, onClose }) {
 }
 
 export default function AddTransaction({ editData, onEditDone }) {
-  const { addTransaction, updateTransaction } = useApp()
+  const { addTransaction, updateTransaction, customCategories } = useApp()
   const [form, setForm] = useState(defaultForm)
   const [successData, setSuccessData] = useState(null) // holds submitted tx data for toast
   const [submitting, setSubmitting] = useState(false)
@@ -147,8 +146,8 @@ export default function AddTransaction({ editData, onEditDone }) {
           ].map(({ value, label, color }) => (
             <button key={value} onClick={() => handleChange('type', value)}
               className={`py-3 rounded-xl font-semibold text-sm transition-all duration-200 ${form.type === value
-                  ? `bg-gradient-to-r ${color} text-white shadow-md`
-                  : 'text-gray-500 dark:text-gray-400'
+                ? `bg-gradient-to-r ${color} text-white shadow-md`
+                : 'text-gray-500 dark:text-gray-400'
                 }`}>
               {label}
             </button>
@@ -200,11 +199,11 @@ export default function AddTransaction({ editData, onEditDone }) {
             Category
           </label>
           <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map(cat => (
+            {customCategories.map(cat => (
               <button key={cat} onClick={() => handleChange('category', cat)}
                 className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-150 ${form.category === cat
-                    ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                   }`}>
                 {cat}
               </button>
@@ -221,8 +220,8 @@ export default function AddTransaction({ editData, onEditDone }) {
             {ACCOUNTS.map(acc => (
               <button key={acc} onClick={() => handleChange('account', acc)}
                 className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 ${form.account === acc
-                    ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                   }`}>
                 {acc === 'Cash' ? '💵 Cash' : '🏦 Bank'}
               </button>

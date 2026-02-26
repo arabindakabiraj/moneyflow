@@ -1,32 +1,39 @@
 /**
- * Transactions.jsx - Full transaction history with filters and edit/delete
- * সম্পূর্ণ লেনদেনের ইতিহাস — ফিল্টার ও সম্পাদনা সহ
+ * Transactions.jsx - Full transaction history with search + filters + edit/delete
  */
 import { useState } from 'react'
-import { Calendar, CalendarRange, Filter, X, FileDown } from 'lucide-react'
+import { Calendar, CalendarRange, Filter, X, FileDown, Search } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { TransactionRow } from './Dashboard'
 import { exportToPDF } from '../utils/pdfExport'
 
 export default function Transactions({ onEdit }) {
-  const { 
+  const {
     getFilteredTransactions, deleteTransaction, toggleNeedWant,
     filterDate, setFilterDate, filterMonth, setFilterMonth,
-    getSummary, transactions 
+    getSummary,
   } = useApp()
-  const [filterMode, setFilterMode] = useState('all') // all | day | month
+  const [filterMode, setFilterMode] = useState('all')
+  const [search, setSearch] = useState('')
 
-  const filtered = getFilteredTransactions()
+  const allFiltered = getFilteredTransactions()
+
+  // Search filter on top of date filters
+  const filtered = search.trim()
+    ? allFiltered.filter(tx =>
+      tx.description?.toLowerCase().includes(search.toLowerCase()) ||
+      tx.category?.toLowerCase().includes(search.toLowerCase()) ||
+      String(tx.amount).includes(search)
+    )
+    : allFiltered
+
   const summary = getSummary(filtered)
 
   const clearFilters = () => {
     setFilterDate('')
     setFilterMonth('')
     setFilterMode('all')
-  }
-
-  const handleExportPDF = () => {
-    exportToPDF(filtered, summary, filterMonth || filterDate || 'All')
+    setSearch('')
   }
 
   return (
@@ -34,12 +41,27 @@ export default function Transactions({ onEdit }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Transactions</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{filtered.length} লেনদেন পাওয়া গেছে</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{filtered.length} লেনদেন</p>
         </div>
-        <button onClick={handleExportPDF}
+        <button onClick={() => exportToPDF(filtered, summary, filterMonth || filterDate || 'All')}
           className="flex items-center gap-1.5 btn-primary py-2 px-3 text-xs">
           <FileDown size={14} /> PDF
         </button>
+      </div>
+
+      {/* Search bar */}
+      <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 shadow-sm">
+        <Search size={15} className="text-gray-400 shrink-0" />
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="নাম, category বা amount দিয়ে খোঁজো..."
+          className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X size={14} />
+          </button>
+        )}
       </div>
 
       {/* Filter bar */}
@@ -55,9 +77,8 @@ export default function Transactions({ onEdit }) {
             { mode: 'month', label: 'By Month', Icon: CalendarRange },
           ].map(({ mode, label, Icon }) => (
             <button key={mode} onClick={() => { setFilterMode(mode); if (mode === 'all') clearFilters() }}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                filterMode === mode ? 'bg-brand-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-              }`}>
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterMode === mode ? 'bg-brand-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                }`}>
               {Icon && <Icon size={12} />} {label}
             </button>
           ))}
@@ -70,9 +91,9 @@ export default function Transactions({ onEdit }) {
           <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
             className="input-field bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white text-sm py-2" />
         )}
-        {(filterDate || filterMonth) && (
+        {(filterDate || filterMonth || search) && (
           <button onClick={clearFilters} className="flex items-center gap-1 mt-2 text-xs text-rose-500 font-medium">
-            <X size={12} /> ফিল্টার সরান
+            <X size={12} /> সব ফিল্টার সরান
           </button>
         )}
       </div>
@@ -95,18 +116,15 @@ export default function Transactions({ onEdit }) {
       <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
         {filtered.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-4xl mb-3">📭</p>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">কোনো লেনদেন পাওয়া যায়নি</p>
+            <p className="text-4xl mb-3">{search ? '🔍' : '📭'}</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              {search ? `"${search}" এ কিছু পাওয়া যায়নি` : 'কোনো লেনদেন পাওয়া যায়নি'}
+            </p>
           </div>
         ) : (
           <div className="space-y-1">
             {filtered.map(tx => (
-              <TransactionRow
-                key={tx.id} tx={tx}
-                onEdit={onEdit}
-                onDelete={deleteTransaction}
-                onToggleNeedWant={toggleNeedWant}
-              />
+              <TransactionRow key={tx.id} tx={tx} onEdit={onEdit} onDelete={deleteTransaction} onToggleNeedWant={toggleNeedWant} />
             ))}
           </div>
         )}

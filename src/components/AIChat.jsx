@@ -1,24 +1,26 @@
 /**
- * AIChat.jsx - Gemini/ChatGPT Style Layout
- * ইনপুট সেকশন BottomNav এর ঠিক উপরে ফিক্সড থাকবে, শুধু চ্যাট স্ক্রল হবে।
+ * AIChat.jsx — Gemini AI with voice input + rich prompts + anomaly prompts
  */
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, Sparkles } from 'lucide-react'
+import { Send, Bot, Sparkles, Mic, MicOff } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 const QUICK_PROMPTS = [
-  '💸 আমি কোন বিষয়ে বেশি খরচ করছি?',
-  '🎯 আমার সঞ্চয় কেমন হচ্ছে?',
-  '🤔 Want vs Need কতটুকু?',
-  '📊 এই মাসের রিপোর্ট দাও',
+  '💸 কোন বিষয়ে বেশি খরচ?',
+  '🎯 সঞ্চয় কেমন হচ্ছে?',
+  '📊 এই মাসের summary দাও',
+  '🤖 Smart budget suggest করো',
+  '⚠️ অস্বাভাবিক খরচ দেখাও',
   '💡 খরচ কমানোর টিপস',
 ]
 
 export default function AIChat() {
-  const { chatMessages, askGemini } = useApp()
+  const { chatMessages, askGemini, getAnomalies } = useApp()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [listening, setListening] = useState(false)
   const bottomRef = useRef(null)
+  const recognRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -36,10 +38,36 @@ export default function AIChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
 
+  // Voice input via Web Speech API (Chrome only)
+  const toggleVoice = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { alert('তোমার browser এ voice input support নেই। Chrome ব্যবহার করো।'); return }
+
+    if (listening) {
+      recognRef.current?.stop()
+      setListening(false)
+      return
+    }
+
+    const recog = new SR()
+    recog.lang = 'bn-BD'
+    recog.interimResults = false
+    recog.onresult = (e) => {
+      const transcript = e.results[0][0].transcript
+      setInput(transcript)
+      setListening(false)
+    }
+    recog.onerror = () => setListening(false)
+    recog.onend = () => setListening(false)
+    recognRef.current = recog
+    recog.start()
+    setListening(true)
+  }
+
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 64px - 72px)' }}>
 
-      {/* ১. হেডার ও প্রম্পট — ফিক্সড উপরে */}
+      {/* Header */}
       <div className="flex-shrink-0">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
@@ -51,6 +79,7 @@ export default function AIChat() {
           </div>
         </div>
 
+        {/* Quick prompts */}
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none mb-2 -mx-1 px-1">
           {QUICK_PROMPTS.map((p, i) => (
             <button key={i} onClick={() => sendMessage(p)}
@@ -61,16 +90,14 @@ export default function AIChat() {
         </div>
       </div>
 
-      {/* ২. চ্যাট মেসেজ — শুধু এই অংশ স্ক্রল হবে */}
+      {/* Chat messages */}
       <div className="flex-1 overflow-y-auto pr-1 scrollbar-none space-y-4 pb-4">
         {chatMessages.map((msg, i) => {
           const isError = msg.role === 'assistant' && msg.content.startsWith('❌')
           return (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}>
               {msg.role === 'assistant' && (
-                <div className={`w-7 h-7 rounded-xl flex items-center justify-center mr-2 flex-shrink-0 mt-1 ${isError
-                    ? 'bg-gradient-to-br from-rose-500 to-red-600'
-                    : 'bg-gradient-to-br from-violet-500 to-purple-600'
+                <div className={`w-7 h-7 rounded-xl flex items-center justify-center mr-2 flex-shrink-0 mt-1 ${isError ? 'bg-gradient-to-br from-rose-500 to-red-600' : 'bg-gradient-to-br from-violet-500 to-purple-600'
                   }`}>
                   <Bot size={13} className="text-white" />
                 </div>
@@ -113,20 +140,27 @@ export default function AIChat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* ৩. ফিক্সড ইনপুট — চ্যাটের নিচে, BottomNav এর উপরে */}
+      {/* Input bar */}
       <div className="flex-shrink-0 pt-2 pb-1">
         <div className="flex gap-2 items-end bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-2 shadow-lg">
+          {/* Voice button */}
+          <button onClick={toggleVoice}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${listening
+                ? 'bg-rose-500 text-white animate-pulse'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/30'
+              }`}>
+            {listening ? <MicOff size={16} /> : <Mic size={16} />}
+          </button>
+
           <textarea
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder="তোমার প্রশ্ন লিখো..."
+            value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
+            placeholder={listening ? '🎤 কথা বলো...' : 'তোমার প্রশ্ন লিখো বা বলো...'}
             rows={1}
-            className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 resize-none outline-none py-1.5 px-2 max-h-24 font-body leading-relaxed"
-            style={{ lineHeight: '1.5' }}
+            className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 resize-none outline-none py-1.5 px-2 max-h-24 leading-relaxed"
           />
+
           <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-200 ${loading || !input.trim()
+            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${loading || !input.trim()
                 ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                 : 'bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md active:scale-95'
               }`}>

@@ -1,5 +1,5 @@
 /**
- * App.jsx - Root component with custom phone+password auth gate
+ * App.jsx — Root with PIN lock gate + all 7 tabs
  */
 import { useState } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
@@ -10,18 +10,22 @@ import Transactions from './components/Transactions'
 import AddTransaction from './components/AddTransaction'
 import AIChat from './components/AIChat'
 import Settings from './components/Settings'
+import Charts from './components/Charts'
+import SplitCalculator from './components/SplitCalculator'
 import AuthScreen from './components/AuthScreen'
+import AppLock, { isPinSet } from './components/AppLock'
 
 function AppContent() {
   const { activeTab, setActiveTab, error, uid, setUid } = useApp()
   const [editData, setEditData] = useState(null)
+  const [unlocked, setUnlocked] = useState(!isPinSet()) // skip lock if no PIN
 
-  // Still loading session from localStorage
+  // Loading session
   if (uid === undefined) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-brand-400 to-emerald-600 flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-brand-500/30 animate-pulse">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-brand-400 to-emerald-600 flex items-center justify-center mx-auto mb-4 animate-pulse shadow-2xl shadow-brand-500/30">
             <span className="text-3xl font-bold text-white">₹</span>
           </div>
           <p className="text-gray-400 text-sm">Loading...</p>
@@ -33,6 +37,9 @@ function AppContent() {
   // Not logged in
   if (!uid) return <AuthScreen onAuth={(newUid) => setUid(newUid)} />
 
+  // PIN lock
+  if (!unlocked) return <AppLock onUnlock={() => setUnlocked(true)} />
+
   const handleEdit = (tx) => { setEditData(tx); setActiveTab('add') }
   const handleEditDone = () => { setEditData(null); setActiveTab('transactions') }
 
@@ -41,7 +48,9 @@ function AppContent() {
       case 'dashboard': return <Dashboard />
       case 'transactions': return <Transactions onEdit={handleEdit} />
       case 'add': return <AddTransaction editData={editData} onEditDone={handleEditDone} />
+      case 'charts': return <Charts />
       case 'ai': return <AIChat />
+      case 'split': return <SplitCalculator />
       case 'settings': return <Settings />
       default: return <Dashboard />
     }
