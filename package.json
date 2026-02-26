@@ -12,6 +12,7 @@
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "axios": "^1.6.0",
+    "firebase": "^12.9.0",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.1",
     "lucide-react": "^0.263.1",

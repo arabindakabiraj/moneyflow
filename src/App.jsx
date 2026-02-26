@@ -1,6 +1,6 @@
 /**
  * App.jsx - Root component
- * মূল অ্যাপ কম্পোনেন্ট — সব কিছু এখান থেকে নিয়ন্ত্রিত হয়
+ * মূল অ্যাপ কম্পোনেন্ট — Firebase Auth gate সহ
  */
 import { useState } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
@@ -11,10 +11,28 @@ import Transactions from './components/Transactions'
 import AddTransaction from './components/AddTransaction'
 import AIChat from './components/AIChat'
 import Settings from './components/Settings'
+import AuthScreen from './components/AuthScreen'
 
 function AppContent() {
-  const { activeTab, setActiveTab, error } = useApp()
+  const { activeTab, setActiveTab, error, user } = useApp()
   const [editData, setEditData] = useState(null)
+
+  // Auth loading state (undefined = still checking)
+  if (user === undefined) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-brand-400 to-emerald-600 flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-brand-500/30 animate-pulse">
+            <span className="text-3xl">₹</span>
+          </div>
+          <p className="text-gray-400 text-sm">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Not logged in → show auth screen
+  if (!user) return <AuthScreen />
 
   const handleEdit = (tx) => {
     setEditData(tx)
@@ -48,7 +66,7 @@ function AppContent() {
         </div>
       )}
 
-      {/* Main content — padded for bottom nav, special layout for AI chat */}
+      {/* Main content */}
       <main
         className={`px-4 pt-4 max-w-md mx-auto ${activeTab === 'ai' ? 'pb-0 overflow-hidden' : 'pb-32'
           }`}
