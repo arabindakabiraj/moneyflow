@@ -1,7 +1,7 @@
 /**
- * App.jsx — Root with PIN lock + all tabs including Accounts, Debts
+ * App.jsx — Root with Splash + PIN lock + all tabs including Accounts, Debts
  */
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import Header from './components/Header'
 import BottomNav from './components/BottomNav'
@@ -16,11 +16,17 @@ import Accounts from './components/Accounts'
 import DebtTracker from './components/DebtTracker'
 import AuthScreen from './components/AuthScreen'
 import AppLock, { isPinSet } from './components/AppLock'
+import SplashScreen from './components/SplashScreen'
 
 function AppContent() {
   const { activeTab, setActiveTab, error, uid, setUid } = useApp()
   const [editData, setEditData] = useState(null)
   const [unlocked, setUnlocked] = useState(!isPinSet())
+  const [splashDone, setSplashDone] = useState(() => !!sessionStorage.getItem('mf_splash_done'))
+
+  const onSplashFinish = useCallback(() => setSplashDone(true), [])
+
+  if (!splashDone) return <SplashScreen onFinish={onSplashFinish} />
 
   if (uid === undefined) {
     return (

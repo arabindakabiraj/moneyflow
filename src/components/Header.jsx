@@ -1,50 +1,63 @@
 /**
- * Header.jsx - Top navigation bar
- * উপরের নেভিগেশন বার
+ * Header.jsx — Premium greeting header (like reference design)
+ * "Hello, Username!" + search/notification icons
  */
-import { Moon, Sun, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { Search, Bell, Moon, Sun, RefreshCw } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 export default function Header() {
-  const { darkMode, setDarkMode, isDemo, loading, fetchTransactions } = useApp()
+  const { darkMode, setDarkMode, username, profilePhoto, loading, fetchTransactions, activeTab, setActiveTab } = useApp()
 
   return (
-    <header className="sticky top-0 z-50 px-4 py-3 flex items-center justify-between
-      bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-700/50">
-      
-      {/* Logo */}
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/30">
-          <span className="text-white text-sm font-bold">₹</span>
-        </div>
-        <div>
-          <h1 className="font-display font-bold text-gray-900 dark:text-white leading-none text-base">MoneyFlow</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 leading-none mt-0.5">Smart Tracker</p>
-        </div>
-      </div>
+    <header className="sticky top-0 z-50 px-5 pt-4 pb-3
+      bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-100/50 dark:border-gray-800/50">
 
-      {/* Right actions */}
-      <div className="flex items-center gap-2">
-        {/* Connection status */}
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
-          isDemo 
-            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
-            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-        }`}>
-          {isDemo ? <WifiOff size={11} /> : <Wifi size={11} />}
-          {isDemo ? 'Demo' : 'Live'}
+      <div className="flex items-center justify-between max-w-md mx-auto">
+        {/* Left: Greeting */}
+        <div className="flex items-center gap-3">
+          {/* Profile avatar */}
+          <button onClick={() => setActiveTab('settings')} className="relative flex-shrink-0">
+            {profilePhoto ? (
+              <img src={profilePhoto} alt="" className="w-10 h-10 rounded-2xl object-cover ring-2 ring-brand-500/30" />
+            ) : (
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                <span className="text-white text-sm font-bold">
+                  {username ? username.charAt(0).toUpperCase() : '₹'}
+                </span>
+              </div>
+            )}
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full" />
+          </button>
+
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Hello,</p>
+            <h1 className="font-display font-bold text-gray-900 dark:text-white leading-tight text-lg">
+              {username || 'User'}! 👋
+            </h1>
+          </div>
         </div>
 
-        {/* Refresh */}
-        <button onClick={fetchTransactions} className="btn-ghost p-2 rounded-xl text-gray-600 dark:text-gray-400">
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-        </button>
+        {/* Right: Action icons */}
+        <div className="flex items-center gap-1.5">
+          {/* Refresh */}
+          <button onClick={fetchTransactions}
+            className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-90">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
 
-        {/* Dark mode toggle */}
-        <button onClick={() => setDarkMode(!darkMode)} 
-          className="btn-ghost p-2 rounded-xl text-gray-600 dark:text-gray-400">
-          {darkMode ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
+          {/* Notification bell */}
+          <button onClick={() => setActiveTab('settings')}
+            className="relative p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-90">
+            <Bell size={16} />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
+          </button>
+
+          {/* Dark mode */}
+          <button onClick={() => setDarkMode(!darkMode)}
+            className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-90">
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
       </div>
     </header>
   )
