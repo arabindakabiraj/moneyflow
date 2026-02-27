@@ -2,9 +2,10 @@
  * AddTransaction.jsx - Form to add or edit a transaction
  * নতুন লেনদেন যোগ বা সম্পাদনার ফর্ম
  */
-import { useState, useEffect } from 'react'
-import { PlusCircle, CheckCircle, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { PlusCircle, CheckCircle, X, Sparkles } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { suggestCategory } from '../utils/autoCategory'
 
 const ACCOUNTS = ['Cash', 'Bank', 'UPI']
 
@@ -90,10 +91,13 @@ function SuccessToast({ data, onClose }) {
 }
 
 export default function AddTransaction({ editData, onEditDone }) {
-  const { addTransaction, updateTransaction, customCategories } = useApp()
+  const { addTransaction, updateTransaction, customCategories, transactions } = useApp()
   const [form, setForm] = useState(defaultForm)
   const [successData, setSuccessData] = useState(null) // holds submitted tx data for toast
   const [submitting, setSubmitting] = useState(false)
+  const [suggestion, setSuggestion] = useState(null) // { category, confidence, source }
+  const [suggestionApplied, setSuggestionApplied] = useState(false)
+  const suggestTimer = useRef(null)
 
   // Populate form when editing
   useEffect(() => {
@@ -101,7 +105,18 @@ export default function AddTransaction({ editData, onEditDone }) {
     else setForm(defaultForm)
   }, [editData])
 
-  const handleChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
+  const handleChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+    // Auto-suggest category when description changes (debounced)
+    if (field === 'description') {
+      setSuggestionApplied(false)
+      if (suggestTimer.current) clearTimeout(suggestTimer.current)
+      suggestTimer.current = setTimeout(() => {
+        const result = suggestCategory(value, transactions, customCategories)
+        setSuggestion(result)
+      }, 300)
+    }
+  }
 
   const handleSubmit = async () => {
     const amt = Number(form.amount)
@@ -182,6 +197,17 @@ export default function AddTransaction({ editData, onEditDone }) {
             onChange={e => handleChange('description', e.target.value)}
             className="input-field bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
           />
+          {/* Auto-category suggestion chip */}
+          {suggestion && !suggestionApplied && form.category !== suggestion.category && (
+            <button
+              onClick={() => { handleChange('category', suggestion.category); setSuggestionApplied(true) }}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800/40 animate-fade-in active:scale-95 transition-transform">
+              <Sparkles size={12} className="text-violet-500" />
+              Auto: <span className="font-bold">{suggestion.category}</span>
+              <span className="text-violet-400 dark:text-violet-500">•</span>
+              <span className="text-[10px] text-violet-400 dark:text-violet-500">{suggestion.source === 'history' ? 'from your history' : 'suggested'}</span>
+            </button>
+          )}
         </div>
 
         {/* Date */}

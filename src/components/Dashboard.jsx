@@ -1,7 +1,8 @@
 /**
  * Dashboard.jsx — Premium dashboard with balance card, quick actions, savings ring, recent transactions
  */
-import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, Plus, ArrowDownLeft, ArrowUpRight, CreditCard } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react'
+import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, Plus, ArrowDownLeft, ArrowUpRight, CreditCard, Zap, ArrowDown, ArrowUp } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 const CATEGORY_EMOJI = {
@@ -88,6 +89,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 animate-fade-in">
+
+      {/* ── Today's Snapshot Widget ──────────────────────── */}
+      <TodayWidget />
 
       {/* ── Balance card (prominent, like reference) ──────── */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-500 via-emerald-500 to-teal-600 p-5 shadow-xl shadow-brand-500/20">
@@ -236,46 +240,185 @@ export default function Dashboard() {
 
 export function TransactionRow({ tx, compact = false, onEdit, onDelete, onToggleNeedWant }) {
   const isCredit = tx.type === 'credit'
+  const rowRef = useRef(null)
+  const startX = useRef(0)
+  const currentX = useRef(0)
+  const swiping = useRef(false)
+  const [offset, setOffset] = useState(0)
+  const [showActions, setShowActions] = useState(false)
+
+  const handleTouchStart = useCallback((e) => {
+    if (compact) return
+    startX.current = e.touches[0].clientX
+    currentX.current = 0
+    swiping.current = true
+  }, [compact])
+
+  const handleTouchMove = useCallback((e) => {
+    if (!swiping.current || compact) return
+    const diff = e.touches[0].clientX - startX.current
+    // Only allow left swipe (negative diff), limit max
+    if (diff < 0) {
+      const clamped = Math.max(diff, -120)
+      currentX.current = clamped
+      setOffset(clamped)
+    } else if (showActions) {
+      // Allow right swipe to close
+      const clamped = Math.min(diff, 120)
+      currentX.current = clamped - 120
+      setOffset(Math.min(clamped - 120, 0))
+    }
+  }, [compact, showActions])
+
+  const handleTouchEnd = useCallback(() => {
+    if (!swiping.current || compact) return
+    swiping.current = false
+    // If swiped past threshold, show actions
+    if (currentX.current < -50) {
+      setOffset(-110)
+      setShowActions(true)
+    } else {
+      setOffset(0)
+      setShowActions(false)
+    }
+  }, [compact])
+
+  const closeSwipe = () => { setOffset(0); setShowActions(false) }
+
   return (
-    <div className={`flex items-center gap-3 ${!compact
-      ? 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl'
-      : 'py-2.5 px-1 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors'}`}>
-      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-base flex-shrink-0 shadow-sm
-        ${isCredit ? 'bg-green-100 dark:bg-green-900/30' : 'bg-rose-100 dark:bg-rose-900/30'}`}>
-        {CATEGORY_EMOJI[tx.category] || (isCredit ? '💰' : '💸')}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">{tx.description}</p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-[11px] text-gray-400 dark:text-gray-500">{tx.date}</span>
-          <span className="text-gray-300 dark:text-gray-600">·</span>
-          <span className="text-[11px] text-gray-400 dark:text-gray-500">{tx.category}</span>
-          {tx.type === 'debit' && (
-            <>
-              <span className="text-gray-300 dark:text-gray-600">·</span>
-              <button onClick={() => onToggleNeedWant?.(tx.id)}
-                className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold transition-colors
-                  ${tx.isWant
-                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
-                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                  }`}>
-                {tx.isWant ? '✨ Want' : '✅ Need'}
-              </button>
-            </>
+    <div className="relative overflow-hidden rounded-xl">
+      {/* Action buttons revealed behind */}
+      {!compact && (
+        <div className="absolute inset-y-0 right-0 flex items-center gap-1.5 pr-2">
+          <button onClick={() => { closeSwipe(); onEdit?.(tx) }}
+            className="w-12 h-12 rounded-xl bg-brand-500 text-white flex flex-col items-center justify-center gap-0.5 active:scale-90 transition-transform shadow-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            <span className="text-[9px] font-semibold">Edit</span>
+          </button>
+          <button onClick={() => { closeSwipe(); onDelete?.(tx.id) }}
+            className="w-12 h-12 rounded-xl bg-rose-500 text-white flex flex-col items-center justify-center gap-0.5 active:scale-90 transition-transform shadow-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            <span className="text-[9px] font-semibold">Delete</span>
+          </button>
+        </div>
+      )}
+      {/* Main row content — slides on swipe */}
+      <div
+        ref={rowRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ transform: `translateX(${offset}px)`, transition: swiping.current ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }}
+        className={`relative z-10 flex items-center gap-3 ${!compact
+          ? 'p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl'
+          : 'py-2.5 px-1 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors'}`}
+      >
+        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-base flex-shrink-0 shadow-sm
+          ${isCredit ? 'bg-green-100 dark:bg-green-900/30' : 'bg-rose-100 dark:bg-rose-900/30'}`}>
+          {CATEGORY_EMOJI[tx.category] || (isCredit ? '💰' : '💸')}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">{tx.description}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[11px] text-gray-400 dark:text-gray-500">{tx.date}</span>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
+            <span className="text-[11px] text-gray-400 dark:text-gray-500">{tx.category}</span>
+            {tx.type === 'debit' && (
+              <>
+                <span className="text-gray-300 dark:text-gray-600">·</span>
+                <button onClick={() => onToggleNeedWant?.(tx.id)}
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold transition-colors
+                    ${tx.isWant
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
+                      : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    }`}>
+                  {tx.isWant ? '✨ Want' : '✅ Need'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span className={`font-mono font-bold text-sm ${isCredit ? 'text-green-600 dark:text-green-400' : 'text-rose-500 dark:text-rose-400'}`}>
+            {isCredit ? '+' : '-'}₹{Number(tx.amount).toLocaleString('en-IN')}
+          </span>
+          {!compact && !showActions && (
+            <span className="text-[9px] text-gray-300 dark:text-gray-600">← swipe</span>
           )}
         </div>
       </div>
-      <div className="flex flex-col items-end gap-1">
-        <span className={`font-mono font-bold text-sm ${isCredit ? 'text-green-600 dark:text-green-400' : 'text-rose-500 dark:text-rose-400'}`}>
-          {isCredit ? '+' : '-'}₹{Number(tx.amount).toLocaleString('en-IN')}
+    </div>
+  )
+}
+
+/* ═══════ Today's Snapshot Widget ═══════ */
+export function TodayWidget() {
+  const { transactions, budgets } = useApp()
+  const today = new Date().toISOString().split('T')[0]
+  const todayTx = transactions.filter(t => t.date === today)
+  const todaySpent = todayTx.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
+  const todayEarned = todayTx.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
+
+  // Monthly budget remaining
+  const month = new Date().toISOString().slice(0, 7)
+  const monthlySpent = transactions
+    .filter(t => t.type === 'debit' && t.date?.startsWith(month))
+    .reduce((s, t) => s + Number(t.amount), 0)
+  const totalBudget = Object.values(budgets).reduce((s, v) => s + Number(v), 0)
+
+  if (todayTx.length === 0 && totalBudget === 0) return null
+
+  return (
+    <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm animate-fade-in">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
+          <Zap size={13} className="text-white" />
+        </div>
+        <h3 className="font-semibold text-gray-800 dark:text-white text-sm">Today's Snapshot</h3>
+        <span className="ml-auto text-[10px] font-mono text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md">
+          {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
         </span>
-        {!compact && (
-          <div className="flex gap-1">
-            <button onClick={() => onEdit?.(tx)} className="text-xs text-gray-400 hover:text-brand-500 transition-colors px-1.5 py-0.5 rounded-md hover:bg-brand-50 dark:hover:bg-brand-900/20">Edit</button>
-            <button onClick={() => onDelete?.(tx.id)} className="text-xs text-gray-400 hover:text-rose-500 transition-colors px-1.5 py-0.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20">Del</button>
-          </div>
-        )}
       </div>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-rose-50 dark:bg-rose-900/15 rounded-xl p-2.5 text-center">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <ArrowUp size={10} className="text-rose-500" />
+            <span className="text-[10px] font-semibold text-rose-500/70 uppercase">Spent</span>
+          </div>
+          <p className="font-mono font-bold text-sm text-rose-600 dark:text-rose-400">₹{todaySpent.toLocaleString('en-IN')}</p>
+        </div>
+        <div className="bg-emerald-50 dark:bg-emerald-900/15 rounded-xl p-2.5 text-center">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <ArrowDown size={10} className="text-emerald-500" />
+            <span className="text-[10px] font-semibold text-emerald-500/70 uppercase">Earned</span>
+          </div>
+          <p className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">₹{todayEarned.toLocaleString('en-IN')}</p>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/15 rounded-xl p-2.5 text-center">
+          <div className="flex items-center justify-center gap-1 mb-1">
+            <span className="text-[10px] font-semibold text-blue-500/70 uppercase">Txns</span>
+          </div>
+          <p className="font-mono font-bold text-sm text-blue-600 dark:text-blue-400">{todayTx.length}</p>
+        </div>
+      </div>
+      {totalBudget > 0 && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/60">
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Monthly Budget Used</span>
+            <span className="text-[11px] font-mono font-semibold text-gray-600 dark:text-gray-300">
+              ₹{monthlySpent.toLocaleString('en-IN')} / ₹{totalBudget.toLocaleString('en-IN')}
+            </span>
+          </div>
+          <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${monthlySpent / totalBudget > 0.9 ? 'bg-gradient-to-r from-rose-400 to-rose-500' :
+                monthlySpent / totalBudget > 0.7 ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
+                  'bg-gradient-to-r from-brand-400 to-emerald-500'}`}
+              style={{ width: `${Math.min((monthlySpent / totalBudget) * 100, 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

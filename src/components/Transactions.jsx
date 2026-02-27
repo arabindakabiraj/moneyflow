@@ -1,20 +1,68 @@
 /**
  * Transactions.jsx - Full transaction history with search + filters + edit/delete
  */
-import { useState } from 'react'
-import { Calendar, CalendarRange, Filter, X, FileDown, Search, ArrowLeft } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react'
+import { Calendar, CalendarRange, Filter, X, FileDown, Search, ArrowLeft, Undo2 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { TransactionRow } from './Dashboard'
 import { exportToPDF } from '../utils/pdfExport'
 
+/* ── Undo Toast ── */
+function UndoToast({ tx, onUndo, onDismiss }) {
+  const [exiting, setExiting] = useState(false)
+  const dismiss = () => { setExiting(true); setTimeout(onDismiss, 300) }
+  return (
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-sm animate-fade-in">
+      <div className={`rounded-2xl bg-gray-900 dark:bg-gray-700 shadow-2xl px-4 py-3 flex items-center gap-3 transition-all duration-300 ${exiting ? 'opacity-0 translate-y-4' : 'opacity-100'}`}>
+        <div className="flex-1 min-w-0">
+          <p className="text-white text-sm font-medium truncate">Deleted: {tx.description}</p>
+          <p className="text-gray-400 text-[11px]">₹{Number(tx.amount).toLocaleString('en-IN')} · {tx.category}</p>
+        </div>
+        <button onClick={onUndo}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand-500 text-white text-xs font-bold active:scale-95 transition-transform shadow-sm">
+          <Undo2 size={13} /> Undo
+        </button>
+        <button onClick={dismiss} className="text-gray-500 hover:text-gray-300 transition-colors">
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Transactions({ onEdit }) {
   const {
-    getFilteredTransactions, deleteTransaction, toggleNeedWant,
+    getFilteredTransactions, deleteTransaction, addTransaction, toggleNeedWant,
     filterDate, setFilterDate, filterMonth, setFilterMonth,
     getSummary, setActiveTab,
   } = useApp()
   const [filterMode, setFilterMode] = useState('all')
   const [search, setSearch] = useState('')
+  const [undoTx, setUndoTx] = useState(null)
+  const undoTimer = useRef(null)
+
+  // Delete with undo — saves tx data, deletes from DB, shows toast
+  const handleDelete = useCallback((id) => {
+    const allTx = getFilteredTransactions()
+    const found = allTx.find(t => t.id === id)
+    if (!found) { deleteTransaction(id); return }
+
+    // Save for undo
+    setUndoTx(found)
+    deleteTransaction(id)
+
+    // Auto-dismiss undo after 5s
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    undoTimer.current = setTimeout(() => setUndoTx(null), 5000)
+  }, [deleteTransaction, getFilteredTransactions])
+
+  const handleUndo = useCallback(() => {
+    if (!undoTx) return
+    const { id, ...data } = undoTx
+    addTransaction(data)
+    setUndoTx(null)
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+  }, [undoTx, addTransaction])
 
   const allFiltered = getFilteredTransactions()
 
@@ -130,11 +178,16 @@ export default function Transactions({ onEdit }) {
         ) : (
           <div className="space-y-1">
             {filtered.map(tx => (
-              <TransactionRow key={tx.id} tx={tx} onEdit={onEdit} onDelete={deleteTransaction} onToggleNeedWant={toggleNeedWant} />
+              <TransactionRow key={tx.id} tx={tx} onEdit={onEdit} onDelete={handleDelete} onToggleNeedWant={toggleNeedWant} />
             ))}
           </div>
         )}
       </div>
+
+      {/* Undo Toast */}
+      {undoTx && (
+        <UndoToast tx={undoTx} onUndo={handleUndo} onDismiss={() => setUndoTx(null)} />
+      )}
     </div>
   )
 }
