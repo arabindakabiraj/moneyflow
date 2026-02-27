@@ -2,14 +2,14 @@
  * Settings.jsx — PIN setup, budget manager, user info, logout
  */
 import { useState } from 'react'
-import { Target, LogOut, User, CheckCircle, Flame, Lock, Plus, Trash2, AlertTriangle, Pencil, X } from 'lucide-react'
+import { Target, LogOut, User, CheckCircle, Flame, Lock, Plus, Trash2, AlertTriangle, Pencil, X, Users, List, BarChart2, Calculator, ChevronRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { setupPin, clearPin, isPinSet } from './AppLock'
 
 export default function Settings() {
   const { savingsGoal, setSavingsGoal, user, logout, customCategories, addCategory,
     budgets, saveBudget, removeBudget, getBudgetAlerts,
-    username, updateUsername } = useApp()
+    username, updateUsername, setActiveTab } = useApp()
 
   const [goalInput, setGoalInput] = useState(savingsGoal)
   const [saved, setSaved] = useState(false)
@@ -109,6 +109,75 @@ export default function Settings() {
         </div>
       )}
 
+      {/* Quick Access Links */}
+      <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <p className="font-semibold text-gray-800 dark:text-white text-sm mb-3">📌 Quick Access</p>
+        <div className="space-y-1">
+          {[
+            { id: 'debts', label: 'Debt Tracker', desc: 'ধার হিসাব রাখো', Icon: Users, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-900/20' },
+            { id: 'transactions', label: 'Transaction History', desc: 'সব লেনদেন দেখো', Icon: List, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+            { id: 'charts', label: 'Charts & Analytics', desc: 'গ্রাফ দেখো', Icon: BarChart2, color: 'text-violet-500', bg: 'bg-violet-50 dark:bg-violet-900/20' },
+            { id: 'split', label: 'Split Calculator', desc: 'বিল ভাগ করো', Icon: Calculator, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+          ].map(({ id, label, desc, Icon, color, bg }) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors active:scale-[0.98]">
+              <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+                <Icon size={18} className={color} />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-gray-800 dark:text-white">{label}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">{desc}</p>
+              </div>
+              <ChevronRight size={16} className="text-gray-300 dark:text-gray-600" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* PIN Lock / App Lock */}
+      <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+            <Lock size={16} className="text-violet-600 dark:text-violet-400" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800 dark:text-white text-sm">🔐 App Lock (PIN)</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">App open করতে PIN লাগবে</p>
+          </div>
+        </div>
+
+        {pinStep === 'idle' ? (
+          <div className="flex gap-2">
+            <button onClick={() => setPinStep('setup')}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-800/30 hover:bg-violet-100 transition-colors">
+              {isPinSet() ? '🔄 PIN change করো' : '➕ PIN set করো'}
+            </button>
+            {isPinSet() && (
+              <button onClick={() => { clearPin(); setPinMsg('🔓 PIN removed') }}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-rose-50 dark:bg-rose-900/20 text-rose-600 border border-rose-100 dark:border-rose-800/30">
+                Remove
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <input type="password" inputMode="numeric" maxLength={4} value={pin1} onChange={e => setPin1(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="4-digit নতুন PIN"
+              className="input-field w-full bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white font-mono tracking-widest text-center text-lg" />
+            <input type="password" inputMode="numeric" maxLength={4} value={pin2} onChange={e => setPin2(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              placeholder="PIN আবার দাও"
+              className="input-field w-full bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white font-mono tracking-widest text-center text-lg" />
+            {pinMsg && <p className="text-xs text-center text-brand-600 dark:text-brand-400">{pinMsg}</p>}
+            <div className="flex gap-2">
+              <button onClick={() => { setPinStep('idle'); setPin1(''); setPin2(''); setPinMsg('') }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">বাতিল</button>
+              <button onClick={handleSetPin}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-violet-500 text-white">SET PIN</button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Budget Alerts */}
       {
         alerts.length > 0 && (
@@ -171,7 +240,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Custom Category */}
+      {/* Custom Categories */}
       <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
         <p className="font-semibold text-gray-800 dark:text-white text-sm mb-3">🏷️ Custom Categories</p>
         <div className="flex flex-wrap gap-2 mb-3">
@@ -208,50 +277,6 @@ export default function Settings() {
             {saved ? <><CheckCircle size={14} /> Saved!</> : 'Save'}
           </button>
         </div>
-      </div>
-
-      {/* PIN Lock */}
-      <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-            <Lock size={16} className="text-violet-600 dark:text-violet-400" />
-          </div>
-          <div>
-            <p className="font-semibold text-gray-800 dark:text-white text-sm">🔐 App Lock (PIN)</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">App open করতে PIN লাগবে</p>
-          </div>
-        </div>
-
-        {pinStep === 'idle' ? (
-          <div className="flex gap-2">
-            <button onClick={() => setPinStep('setup')}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-800/30 hover:bg-violet-100 transition-colors">
-              {isPinSet() ? '🔄 PIN change করো' : '➕ PIN set করো'}
-            </button>
-            {isPinSet() && (
-              <button onClick={() => { clearPin(); setPinMsg('🔓 PIN removed') }}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-rose-50 dark:bg-rose-900/20 text-rose-600 border border-rose-100 dark:border-rose-800/30">
-                Remove
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <input type="password" inputMode="numeric" maxLength={4} value={pin1} onChange={e => setPin1(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="4-digit নতুন PIN"
-              className="input-field w-full bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white font-mono tracking-widest text-center text-lg" />
-            <input type="password" inputMode="numeric" maxLength={4} value={pin2} onChange={e => setPin2(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="PIN আবার দাও"
-              className="input-field w-full bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white font-mono tracking-widest text-center text-lg" />
-            {pinMsg && <p className="text-xs text-center text-brand-600 dark:text-brand-400">{pinMsg}</p>}
-            <div className="flex gap-2">
-              <button onClick={() => { setPinStep('idle'); setPin1(''); setPin2(''); setPinMsg('') }}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">বাতিল</button>
-              <button onClick={handleSetPin}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-violet-500 text-white">SET PIN</button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* About */}

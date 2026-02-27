@@ -35,6 +35,9 @@ export function AppProvider({ children }) {
     catch { return DEFAULT_CATEGORIES }
   })
   const [username, setUsername] = useState('')
+  const [profilePhoto, setProfilePhoto] = useState(null) // base64 string
+  const [accounts, setAccounts] = useState({ cash: 0, bank: 0, upi: 0 })
+  const [debts, setDebts] = useState([])
 
   // Dark mode
   useEffect(() => {
@@ -45,11 +48,16 @@ export function AppProvider({ children }) {
   // Session load
   useEffect(() => { setUid(getSession()) }, [])
 
-  // Load username from Firestore when uid changes
+  // Load username + photo from Firestore when uid changes
   useEffect(() => {
-    if (!uid) { setUsername(''); return }
+    if (!uid) { setUsername(''); setProfilePhoto(null); return }
     getDoc(doc(db, 'users', uid, 'profile', 'info'))
-      .then(snap => { if (snap.exists()) setUsername(snap.data().username || '') })
+      .then(snap => {
+        if (snap.exists()) {
+          setUsername(snap.data().username || '')
+          setProfilePhoto(snap.data().photoURL || null)
+        }
+      })
       .catch(console.error)
   }, [uid])
 
@@ -57,6 +65,30 @@ export function AppProvider({ children }) {
     if (!uid || !newName.trim()) return
     setUsername(newName.trim())
     await setDoc(doc(db, 'users', uid, 'profile', 'info'), { username: newName.trim() }, { merge: true })
+  }
+
+  // Load username + profile photo from Firestore
+  const updateProfilePhoto = async (base64) => {
+    if (!uid) return
+    setProfilePhoto(base64)
+    await setDoc(doc(db, 'users', uid, 'profile', 'info'), { photoURL: base64 }, { merge: true })
+  }
+
+  // Push notification helper
+  const sendBudgetNotification = (category, pct) => {
+    if (!('Notification' in window)) return
+    if (Notification.permission === 'granted') {
+      new Notification(`⚠️ Budget Alert — ${category}`, {
+        body: `${category} budget ${pct}% use হয়েছে!`,
+        icon: '/logo192.png',
+      })
+    }
+  }
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return
+    const perm = await Notification.requestPermission()
+    return perm
   }
 
   // Save custom categories
@@ -89,6 +121,38 @@ export function AppProvider({ children }) {
     )
     return unsub
   }, [uid])
+
+  // Firestore — accounts real-time (Cash / Bank / UPI)
+  useEffect(() => {
+    if (!uid) { setAccounts({ cash: 0, bank: 0, upi: 0 }); return }
+    const unsub = onSnapshot(doc(db, 'users', uid, 'settings', 'accounts'),
+      snap => { if (snap.exists()) setAccounts({ cash: 0, bank: 0, upi: 0, ...snap.data() }) },
+      err => console.error('Accounts err:', err)
+    )
+    return unsub
+  }, [uid])
+
+  const updateAccountBalance = async (key, amount) => {
+    if (!uid) return
+    const updated = { ...accounts, [key]: amount }
+    setAccounts(updated)
+    await setDoc(doc(db, 'users', uid, 'settings', 'accounts'), updated)
+  }
+
+  // Firestore — debts real-time
+  useEffect(() => {
+    if (!uid) { setDebts([]); return }
+    const unsub = onSnapshot(
+      query(collection(db, 'users', uid, 'debts'), orderBy('date', 'desc')),
+      snap => setDebts(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error('Debts err:', err)
+    )
+    return unsub
+  }, [uid])
+
+  const addDebt = async (d) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'debts'), { ...d, repaid: false, createdAt: serverTimestamp() }) }
+  const markDebtRepaid = async (id) => { if (!uid) return; await updateDoc(doc(db, 'users', uid, 'debts', id), { repaid: true }) }
+  const deleteDebt = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'debts', id)) }
 
   const col = () => collection(db, 'users', uid, 'transactions')
 
@@ -237,6 +301,7 @@ export function AppProvider({ children }) {
     uid, setUid, logout,
     user: uid ? { phoneNumber: uid } : null,
     username, updateUsername,
+    profilePhoto, updateProfilePhoto,
     darkMode, setDarkMode,
     transactions, loading, error,
     savingsGoal, setSavingsGoal,
@@ -246,7 +311,10 @@ export function AppProvider({ children }) {
     filterMonth, setFilterMonth,
     customCategories, addCategory,
     budgets, saveBudget, removeBudget,
+    accounts, updateAccountBalance,
+    debts, addDebt, markDebtRepaid, deleteDebt,
     getBudgetAlerts, getAnomalies,
+    sendBudgetNotification, requestNotificationPermission,
     addTransaction, updateTransaction, deleteTransaction, toggleNeedWant,
     getSummary, getFilteredTransactions,
     askGemini,

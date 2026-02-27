@@ -1,5 +1,5 @@
 /**
- * App.jsx — Root with PIN lock gate + all 7 tabs
+ * App.jsx — Root with PIN lock + all tabs including Accounts, Debts
  */
 import { useState } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
@@ -12,15 +12,16 @@ import AIChat from './components/AIChat'
 import Settings from './components/Settings'
 import Charts from './components/Charts'
 import SplitCalculator from './components/SplitCalculator'
+import Accounts from './components/Accounts'
+import DebtTracker from './components/DebtTracker'
 import AuthScreen from './components/AuthScreen'
 import AppLock, { isPinSet } from './components/AppLock'
 
 function AppContent() {
   const { activeTab, setActiveTab, error, uid, setUid } = useApp()
   const [editData, setEditData] = useState(null)
-  const [unlocked, setUnlocked] = useState(!isPinSet()) // skip lock if no PIN
+  const [unlocked, setUnlocked] = useState(!isPinSet())
 
-  // Loading session
   if (uid === undefined) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -34,10 +35,7 @@ function AppContent() {
     )
   }
 
-  // Not logged in
   if (!uid) return <AuthScreen onAuth={(newUid) => setUid(newUid)} />
-
-  // PIN lock
   if (!unlocked) return <AppLock onUnlock={() => setUnlocked(true)} />
 
   const handleEdit = (tx) => { setEditData(tx); setActiveTab('add') }
@@ -49,8 +47,10 @@ function AppContent() {
       case 'transactions': return <Transactions onEdit={handleEdit} />
       case 'add': return <AddTransaction editData={editData} onEditDone={handleEditDone} />
       case 'charts': return <Charts />
-      case 'ai': return <AIChat />
+      case 'accounts': return <Accounts />
+      case 'debts': return <DebtTracker />
       case 'split': return <SplitCalculator />
+      case 'ai': return <AIChat />
       case 'settings': return <Settings />
       default: return <Dashboard />
     }
@@ -64,10 +64,8 @@ function AppContent() {
           ⚠️ {error}
         </div>
       )}
-      <main
-        className={`px-4 pt-4 max-w-md mx-auto ${activeTab === 'ai' ? 'pb-0 overflow-hidden' : 'pb-32'}`}
-        style={{ minHeight: activeTab === 'ai' ? undefined : 'calc(100vh - 64px)' }}
-      >
+      <main className={`px-4 pt-4 max-w-md mx-auto ${activeTab === 'ai' ? 'pb-0 overflow-hidden' : 'pb-32'}`}
+        style={{ minHeight: activeTab === 'ai' ? undefined : 'calc(100vh - 64px)' }}>
         {renderTab()}
       </main>
       <BottomNav />

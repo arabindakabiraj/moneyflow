@@ -2,7 +2,7 @@
  * Transactions.jsx - Full transaction history with search + filters + edit/delete
  */
 import { useState } from 'react'
-import { Calendar, CalendarRange, Filter, X, FileDown, Search } from 'lucide-react'
+import { Calendar, CalendarRange, Filter, X, FileDown, Search, ArrowLeft } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { TransactionRow } from './Dashboard'
 import { exportToPDF } from '../utils/pdfExport'
@@ -11,7 +11,7 @@ export default function Transactions({ onEdit }) {
   const {
     getFilteredTransactions, deleteTransaction, toggleNeedWant,
     filterDate, setFilterDate, filterMonth, setFilterMonth,
-    getSummary,
+    getSummary, setActiveTab,
   } = useApp()
   const [filterMode, setFilterMode] = useState('all')
   const [search, setSearch] = useState('')
@@ -39,9 +39,15 @@ export default function Transactions({ onEdit }) {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Transactions</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">{filtered.length} লেনদেন</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setActiveTab('settings')}
+            className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors active:scale-95">
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Transactions</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{filtered.length} লেনদেন</p>
+          </div>
         </div>
         <button onClick={() => exportToPDF(filtered, summary, filterMonth || filterDate || 'All')}
           className="flex items-center gap-1.5 btn-primary py-2 px-3 text-xs">

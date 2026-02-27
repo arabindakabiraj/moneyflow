@@ -3,9 +3,11 @@
  * Total bill কতজনে ভাগ করলে কত হবে
  */
 import { useState } from 'react'
-import { Users, Calculator, Plus, Minus } from 'lucide-react'
+import { Users, Calculator, Plus, Minus, ArrowLeft } from 'lucide-react'
+import { useApp } from '../context/AppContext'
 
 export default function SplitCalculator() {
+    const { setActiveTab } = useApp()
     const [total, setTotal] = useState('')
     const [people, setPeople] = useState(2)
     const [extras, setExtras] = useState([]) // { name, amount }
@@ -20,9 +22,15 @@ export default function SplitCalculator() {
 
     return (
         <div className="space-y-4 animate-fade-in">
-            <div>
-                <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Bill Split 🧮</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">বিল ভাগ করে হিসাব করো</p>
+            <div className="flex items-center gap-3">
+                <button onClick={() => setActiveTab('settings')}
+                    className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors active:scale-95">
+                    <ArrowLeft size={18} />
+                </button>
+                <div>
+                    <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Bill Split 🧮</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">বিল ভাগ করে হিসাব করো</p>
+                </div>
             </div>
 
             {/* Input */}

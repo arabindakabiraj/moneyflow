@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { PlusCircle, CheckCircle, X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
-const ACCOUNTS = ['Cash', 'Bank']
+const ACCOUNTS = ['Cash', 'Bank', 'UPI']
 
 const defaultForm = {
   type: 'debit',
@@ -15,7 +15,6 @@ const defaultForm = {
   date: new Date().toISOString().split('T')[0],
   category: 'Others',
   account: 'Cash',
-  isWant: false,
 }
 
 /* ─── Success Toast Popup ──────────────────────────────────────────────────── */
@@ -80,7 +79,7 @@ function SuccessToast({ data, onClose }) {
                 {isCredit ? '+' : '-'}₹{Number(data.amount).toLocaleString('en-IN')}
               </p>
               <p className="text-white/70 text-xs mt-1 truncate">
-                {data.description} · {data.category} · {data.account === 'Cash' ? '💵 Cash' : '🏦 Bank'}
+                {data.description} · {data.category} · {data.account === 'Cash' ? '💵 Cash' : data.account === 'UPI' ? '📱 UPI' : '🏦 Bank'}
               </p>
             </div>
           </div>
@@ -105,16 +104,21 @@ export default function AddTransaction({ editData, onEditDone }) {
   const handleChange = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
 
   const handleSubmit = async () => {
-    if (!form.amount || !form.description || !form.date) return
+    const amt = Number(form.amount)
+    if (!amt || amt <= 0 || !form.description?.trim()) return
     setSubmitting(true)
-    if (editData) {
-      await updateTransaction(editData.id, form)
-      onEditDone?.()
-    } else {
-      const submitted = { ...form, amount: Number(form.amount) }
-      await addTransaction(submitted)
-      setForm(defaultForm)
-      setSuccessData(submitted) // Show toast with submitted data
+    try {
+      if (editData) {
+        await updateTransaction(editData.id, { ...form, amount: amt, description: form.description.trim() })
+        onEditDone?.()
+      } else {
+        const submitted = { ...form, amount: amt, description: form.description.trim() }
+        await addTransaction(submitted)
+        setForm({ ...defaultForm, date: new Date().toISOString().split('T')[0] })
+        setSuccessData(submitted)
+      }
+    } catch (e) {
+      console.error('Submit error:', e)
     }
     setSubmitting(false)
   }
@@ -216,41 +220,37 @@ export default function AddTransaction({ editData, onEditDone }) {
           <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
             Account Type
           </label>
-          <div className="flex gap-2">
-            {ACCOUNTS.map(acc => (
-              <button key={acc} onClick={() => handleChange('account', acc)}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 ${form.account === acc
-                  ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900'
+          <div className="space-y-2">
+            {/* Cash - full width */}
+            <button onClick={() => handleChange('account', 'Cash')}
+              className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${form.account === 'Cash'
+                ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md shadow-emerald-500/30'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                }`}>
+              💵 Cash
+            </button>
+            {/* Bank & UPI - half half */}
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => handleChange('account', 'Bank')}
+                className={`py-3 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${form.account === 'Bank'
+                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/30'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                   }`}>
-                {acc === 'Cash' ? '💵 Cash' : '🏦 Bank'}
+                🏦 Bank
               </button>
-            ))}
+              <button onClick={() => handleChange('account', 'UPI')}
+                className={`py-3 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${form.account === 'UPI'
+                  ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-500/30'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  }`}>
+                📱 UPI
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Need vs Want toggle (only for debit) */}
-        {form.type === 'debit' && (
-          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
-            <div>
-              <p className="font-semibold text-gray-800 dark:text-white text-sm">
-                {form.isWant ? '✨ Want' : '✅ Need'}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {form.isWant ? 'এটি একটি বিলাসিতার খরচ' : 'এটি একটি প্রয়োজনীয় খরচ'}
-              </p>
-            </div>
-            <button onClick={() => handleChange('isWant', !form.isWant)}
-              className={`w-12 h-6 rounded-full transition-all duration-300 relative ${form.isWant ? 'bg-purple-500' : 'bg-brand-500'
-                }`}>
-              <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-300 ${form.isWant ? 'left-6' : 'left-0.5'
-                }`} />
-            </button>
-          </div>
-        )}
-
         {/* Submit */}
-        <button onClick={handleSubmit} disabled={submitting || !form.amount || !form.description}
+        <button onClick={handleSubmit} disabled={submitting || !form.amount || !form.description?.trim()}
           className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all duration-200 flex items-center justify-center gap-2
             ${submitting ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed' :
               'bg-gradient-to-r from-brand-500 to-emerald-500 text-white shadow-lg shadow-brand-500/30 active:scale-98'}`}>
