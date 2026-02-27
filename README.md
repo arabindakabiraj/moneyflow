@@ -1,93 +1,90 @@
-# 💰 MoneyFlow — Student Financial Tracker
+# 💰 MoneyFlow — Premium Student Financial Tracker
 
-> React + Vite + Tailwind CSS + Google Sheets + Gemini AI
+<div align="center">
+  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
+  <img src="https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=white" />
+  <img src="https://img.shields.io/badge/OpenRouter-7C3AED?style=for-the-badge&logo=google-gemini&logoColor=white" />
+</div>
 
 ---
 
-## 🚀 Quick Start
+## ✨ Features
 
-### Step 1: Project Setup
+### 💎 Premium UI/UX Redesign
+- **Animated Splash Screen**: A professional entry experience with bouncing logos and smooth transitions.
+- **Diamond CTA Navigation**: A modern, rotated diamond "+" button for quick expense entry.
+- **Glassmorphism Design**: Frosted glass effects, vibrant gradients, and premium typography (Sora & DM Sans).
+- **Dynamic Dashboard**: Prominent balance cards, circular savings progress rings, and animated category breakdowns.
+
+### 🤖 AI Financial Advisor
+- Integrated with **Gemini via OpenRouter** to provide personalized financial tips.
+- Analyzes your spending patterns and detects anomalies (e.g., spending > 2x your category average).
+- Real-time budget alerts when you approach 80% of your limit.
+
+### 📶 Smart Offline Sync
+- **Built-in Offline Engine**: Powered by Firebase Firestore's persistent local cache (IndexedDB).
+- **Zero Interruption**: Add transactions even without internet; they sync automatically as soon as you're back online.
+- **Offline Banner**: Real-time connectivity tracking with the `useNetwork` hook.
+
+### 📱 Core Capabilities
+- **Multi-Account Tracking**: Manage Cash, Bank, and UPI balances separately.
+- **Debt Tracker**: Keep track of what you owe or what others owe you.
+- **Split Calculator**: Easily split bills with friends.
+- **PDF Export**: Generate professional monthly expense reports.
+- **PIN Lock**: Secure your data with a 4-digit PIN stored locally.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React (Vite)
+- **Styling**: Tailwind CSS + Lucide Icons
+- **Database**: Firebase Firestore
+- **State Management**: Context API
+- **AI**: OpenRouter (Gemini 2.5 Flash)
+- **Authentication**: Custom Phone + Password auth with SHA-256 hashing
+
+---
+
+## 🚀 Getting Started
+
+### 1. Installation
 ```bash
-# Project ফোল্ডারে যান
+git clone https://github.com/arabindakabiraj/moneyflow-xyz.vercel.app.git
 cd moneyflow
-
-# Dependencies install করুন
 npm install
-
-# .env ফাইল তৈরি করুন
-cp .env.example .env
 ```
 
-### Step 2: Google Sheets Database Setup
-
-1. **নতুন Google Sheet তৈরি করুন**: [sheets.google.com](https://sheets.google.com)
-2. URL থেকে **Spreadsheet ID** নিন:
-   ```
-   https://docs.google.com/spreadsheets/d/[THIS_IS_YOUR_ID]/edit
-   ```
-3. **Extensions → Apps Script** ক্লিক করুন
-4. `google-apps-script/Code.gs` ফাইলের সম্পূর্ণ কোড পেস্ট করুন
-5. কোডে `YOUR_SPREADSHEET_ID_HERE` আপনার ID দিয়ে বদলান
-6. **Save** করুন (Ctrl+S)
-
-### Step 3: Deploy Google Apps Script
-
-1. Apps Script এ **Deploy → New Deployment** ক্লিক করুন
-2. Type: **Web App** সিলেক্ট করুন
-3. Execute as: **Me** সিলেক্ট করুন
-4. Who has access: **Anyone** সিলেক্ট করুন
-5. **Deploy** ক্লিক করুন
-6. **Web App URL** কপি করুন (https://script.google.com/macros/s/.../exec)
-
-### Step 4: Configure .env
-
-`.env` ফাইল খুলুন এবং GAS URL বসান:
+### 2. Environment Variables
+Create a `.env` file in the root:
 ```env
-VITE_GAS_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
+VITE_FIREBASE_API_KEY=YOUR_KEY
+VITE_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
+VITE_OPENROUTER_API_KEY=YOUR_OPENROUTER_KEY
+# ... other Firebase config variables
 ```
 
-### Step 5: Gemini API Key Setup
-
-1. [aistudio.google.com](https://aistudio.google.com) এ যান
-2. **Get API Key → Create API Key** ক্লিক করুন
-3. Key কপি করুন
-4. `.env` ফাইলে যোগ করুন:
-```env
-VITE_GEMINI_API_KEY=AIzaSyYOUR_KEY_HERE
-```
-
-### Step 6: Run the App
+### 3. Run Locally
 ```bash
 npm run dev
 ```
-Browser এ **http://localhost:5173** খুলুন।
 
 ---
 
-## 📱 Features
+## 📸 Screenshots
 
-| Feature | Description |
-|---------|-------------|
-| 💰 Credit/Debit | Income ও Expense ট্র্যাক |
-| 🏦 Account Types | Cash ও Bank আলাদা |
-| 🏷️ Categories | Tiffin, Books, Travel, Tuition, Others |
-| ✅ Need vs Want | প্রতিটি খরচ চিহ্নিত করুন |
-| 🐷 Piggy Bank | মাসিক সঞ্চয়ের লক্ষ্য |
-| 📅 Date Filter | দিন বা মাস অনুযায়ী ফিল্টার |
-| 🤖 AI Advisor | Gemini দিয়ে আর্থিক পরামর্শ |
-| 📄 PDF Export | Monthly statement ডাউনলোড |
-| 🌙 Dark Mode | চোখ আরামদায়ক থিম |
+*(Add your screenshots here)*
 
 ---
 
-## 🔧 Build for Production
-```bash
-npm run build
-npm run preview
-```
+## 🔒 Security
+- **No Firebase Auth needed**: Uses custom SHA-256 password hashing for maximum compatibility across environments.
+- **Data Privacy**: All transaction data is stored securely in your private Firestore instance.
+- **Local App Lock**: PIN protection using browser `localStorage`.
 
-## 🌐 Deploy (Vercel)
-```bash
-npm install -g vercel
-vercel --env VITE_GAS_URL=... --env VITE_GEMINI_API_KEY=...
-```
+---
+
+<div align="center">
+  Made with ❤️ by <b>Arabinda Kabiraj</b>
+</div>

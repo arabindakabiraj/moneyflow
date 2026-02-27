@@ -1,7 +1,3 @@
-/**
- * Header.jsx — Premium greeting header (like reference design)
- * "Hello, Username!" + search/notification icons
- */
 import { Search, Bell, Moon, Sun, RefreshCw } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 

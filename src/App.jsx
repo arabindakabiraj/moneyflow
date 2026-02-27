@@ -17,12 +17,14 @@ import DebtTracker from './components/DebtTracker'
 import AuthScreen from './components/AuthScreen'
 import AppLock, { isPinSet } from './components/AppLock'
 import SplashScreen from './components/SplashScreen'
+import { useNetwork } from './hooks/useNetwork'
 
 function AppContent() {
   const { activeTab, setActiveTab, error, uid, setUid } = useApp()
   const [editData, setEditData] = useState(null)
   const [unlocked, setUnlocked] = useState(!isPinSet())
   const [splashDone, setSplashDone] = useState(() => !!sessionStorage.getItem('mf_splash_done'))
+  const isOnline = useNetwork()
 
   const onSplashFinish = useCallback(() => setSplashDone(true), [])
 
@@ -64,6 +66,12 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="bg-amber-500 text-white text-center py-2 text-xs font-semibold animate-slide-up flex items-center justify-center gap-1.5">
+          ⚠️ You are offline — data will sync automatically when connected
+        </div>
+      )}
       <Header />
       {error && (
         <div className="mx-4 mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-medium animate-slide-up">

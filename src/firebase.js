@@ -1,8 +1,13 @@
 /**
- * firebase.js — Firestore only (No Firebase Auth needed)
+ * firebase.js — Firestore with Offline Persistent Cache
+ * IndexedDB-based local cache → works offline, auto-syncs when back online
  */
 import { initializeApp } from 'firebase/app'
-import { getFirestore } from 'firebase/firestore'
+import {
+    initializeFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager
+} from 'firebase/firestore'
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -14,4 +19,10 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
-export const db = getFirestore(app)
+
+// 🟢 Firestore with persistent offline cache (IndexedDB)
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+    })
+})
