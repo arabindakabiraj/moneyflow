@@ -1,8 +1,8 @@
 /**
  * authUtils.js — Custom auth helpers
  * Phone + Password using pure-JS SHA-256 + Firestore
- * HTTP, HTTPS, local network — সব জায়গায় কাজ করে।
- * Firebase Auth SDK লাগবে না!
+ * Works on HTTP, HTTPS, local network.
+ * No Firebase Auth SDK needed!
  */
 import { db } from './firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
@@ -73,7 +73,7 @@ export async function registerUser(phone, password, username) {
     const userRef = doc(db, 'users', uid, 'profile', 'info')
     const existing = await getDoc(userRef)
     if (existing.exists()) {
-        throw new Error('🚫 এই number এ আগেই account আছে! Login করো।')
+        throw new Error('🚫 An account already exists with this number! Please login.')
     }
     const hashed = await hashPassword(password)
     await setDoc(userRef, {
@@ -91,22 +91,22 @@ export async function loginUser(phone, password) {
     const userRef = doc(db, 'users', uid, 'profile', 'info')
     const snap = await getDoc(userRef)
     if (!snap.exists()) {
-        throw new Error('Account পাওয়া যায়নি। আগে Register করো।')
+        throw new Error('Account not found. Please register first.')
     }
     const hashed = await hashPassword(password)
     if (snap.data().passwordHash !== hashed) {
-        throw new Error('ভুল password! আবার চেষ্টা করো।')
+        throw new Error('Wrong password! Please try again.')
     }
     return uid
 }
 
-// Forgot/Reset password — phone number দিলেই নতুন password set হবে
+// Forgot/Reset password — set new password with phone number
 export async function resetPassword(phone, newPassword) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
     const snap = await getDoc(userRef)
     if (!snap.exists()) {
-        throw new Error('এই number এ কোনো account নেই।')
+        throw new Error('No account found with this number.')
     }
     const hashed = await hashPassword(newPassword)
     await setDoc(userRef, { passwordHash: hashed }, { merge: true })

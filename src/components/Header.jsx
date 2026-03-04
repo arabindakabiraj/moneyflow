@@ -1,8 +1,8 @@
-import { Search, Bell, Moon, Sun, RefreshCw } from 'lucide-react'
+import { Bell, Moon, Sun } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 export default function Header() {
-  const { darkMode, setDarkMode, username, profilePhoto, loading, fetchTransactions, activeTab, setActiveTab } = useApp()
+  const { darkMode, setDarkMode, username, profilePhoto, activeTab, setActiveTab } = useApp()
 
   return (
     <header className="sticky top-0 z-50 px-5 pt-4 pb-3
@@ -35,14 +35,8 @@ export default function Header() {
 
         {/* Right: Action icons */}
         <div className="flex items-center gap-1.5">
-          {/* Refresh */}
-          <button onClick={fetchTransactions}
-            className="p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-90">
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
-
           {/* Notification bell */}
-          <button onClick={() => setActiveTab('settings')}
+          <button onClick={() => setActiveTab('notifications')}
             className="relative p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-90">
             <Bell size={16} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
@@ -58,3 +52,4 @@ export default function Header() {
     </header>
   )
 }
+

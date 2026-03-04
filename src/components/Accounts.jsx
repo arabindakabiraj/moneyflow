@@ -54,12 +54,12 @@ export default function Accounts() {
         <div className="space-y-4 animate-fade-in">
             <div>
                 <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Wallet 💳</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">সব account এর হিসাব এক জায়গায়</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">All accounts in one place</p>
             </div>
 
             {/* Total Balance */}
             <div className="card bg-gradient-to-br from-gray-900 to-gray-800 dark:from-gray-800 dark:to-gray-900 text-white text-center">
-                <p className="text-white/60 text-xs mb-1">মোট Balance</p>
+                <p className="text-white/60 text-xs mb-1">Total Balance</p>
                 <p className="font-display font-bold text-3xl">₹{totalBalance.toLocaleString('en-IN')}</p>
                 <div className="flex items-center justify-center gap-3 mt-3">
                     {Object.entries(ACCOUNT_META).map(([key, { emoji, badge }]) => (
@@ -86,7 +86,7 @@ export default function Accounts() {
                             </div>
                             <div className="flex-1">
                                 <p className="font-semibold text-gray-900 dark:text-white">{emoji} {label}</p>
-                                <p className="text-xs text-gray-400">{txCount} লেনদেন</p>
+                                <p className="text-xs text-gray-400">{txCount} transactions</p>
                             </div>
                             {editing === key ? (
                                 <div className="flex items-center gap-1.5">
@@ -141,7 +141,7 @@ export default function Accounts() {
                 )
             })}
 
-            <p className="text-xs text-gray-400 dark:text-gray-500 text-center">Base balance set করো। Income - Expense auto-calculate হবে।</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 text-center">Set base balance. Income - Expense will auto-calculate.</p>
         </div>
     )
 }

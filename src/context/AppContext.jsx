@@ -26,7 +26,7 @@ export function AppProvider({ children }) {
   const [savingsGoal, setSavingsGoalState] = useState(() => Number(localStorage.getItem('savingsGoal')) || 1000)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', content: '👋 আমি তোমার AI Financial Advisor! জিজ্ঞেস করো!' }
+    { role: 'assistant', content: '👋 I am your AI Financial Advisor! Ask me anything!' }
   ])
   const [filterDate, setFilterDate] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
@@ -38,6 +38,9 @@ export function AppProvider({ children }) {
   const [profilePhoto, setProfilePhoto] = useState(null) // base64 string
   const [accounts, setAccounts] = useState({ cash: 0, bank: 0, upi: 0 })
   const [debts, setDebts] = useState([])
+  const [goals, setGoals] = useState([])
+  const [bills, setBills] = useState([])
+  const [recurringTx, setRecurringTx] = useState([])
 
   // Dark mode
   useEffect(() => {
@@ -79,7 +82,7 @@ export function AppProvider({ children }) {
     if (!('Notification' in window)) return
     if (Notification.permission === 'granted') {
       new Notification(`⚠️ Budget Alert — ${category}`, {
-        body: `${category} budget ${pct}% use হয়েছে!`,
+        body: `${category} budget ${pct}% used!`,
         icon: '/logo192.png',
       })
     }
@@ -107,7 +110,7 @@ export function AppProvider({ children }) {
     const q = query(collection(db, 'users', uid, 'transactions'), orderBy('date', 'desc'))
     const unsub = onSnapshot(q,
       snap => { setTx(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); setError(null) },
-      err => { console.error(err); setError('Data load সমস্যা।'); setLoading(false) }
+      err => { console.error(err); setError('Data load error.'); setLoading(false) }
     )
     return unsub
   }, [uid])
@@ -154,12 +157,55 @@ export function AppProvider({ children }) {
   const markDebtRepaid = async (id) => { if (!uid) return; await updateDoc(doc(db, 'users', uid, 'debts', id), { repaid: true }) }
   const deleteDebt = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'debts', id)) }
 
+  // Firestore — Goals real-time
+  useEffect(() => {
+    if (!uid) { setGoals([]); return }
+    const unsub = onSnapshot(
+      query(collection(db, 'users', uid, 'goals'), orderBy('createdAt', 'desc')),
+      snap => setGoals(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error('Goals err:', err)
+    )
+    return unsub
+  }, [uid])
+
+  const addGoal = async (g) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'goals'), { ...g, createdAt: serverTimestamp() }) }
+  const deleteGoal = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'goals', id)) }
+
+  // Firestore — Bills real-time
+  useEffect(() => {
+    if (!uid) { setBills([]); return }
+    const unsub = onSnapshot(
+      query(collection(db, 'users', uid, 'bills'), orderBy('dueDate', 'asc')),
+      snap => setBills(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error('Bills err:', err)
+    )
+    return unsub
+  }, [uid])
+
+  const addBill = async (b) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'bills'), { ...b, createdAt: serverTimestamp() }) }
+  const deleteBill = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'bills', id)) }
+  const markBillPaid = async (id) => { if (!uid) return; await updateDoc(doc(db, 'users', uid, 'bills', id), { paid: true }) }
+
+  // Firestore — Recurring Transactions real-time
+  useEffect(() => {
+    if (!uid) { setRecurringTx([]); return }
+    const unsub = onSnapshot(
+      collection(db, 'users', uid, 'recurring'),
+      snap => setRecurringTx(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error('Recurring err:', err)
+    )
+    return unsub
+  }, [uid])
+
+  const addRecurring = async (r) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'recurring'), { ...r, createdAt: serverTimestamp() }) }
+  const deleteRecurring = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'recurring', id)) }
+
   const col = () => collection(db, 'users', uid, 'transactions')
 
   const addTransaction = async (tx) => {
     if (!uid) return
     try { await addDoc(col(), { ...tx, amount: Number(tx.amount), createdAt: serverTimestamp() }) }
-    catch (e) { console.error(e); setError('Save সমস্যা।') }
+    catch (e) { console.error(e); setError('Save error.') }
   }
 
   const updateTransaction = async (id, updated) => {
@@ -252,19 +298,72 @@ export function AppProvider({ children }) {
       .filter(t => t.type === 'debit')
       .reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + Number(t.amount); return acc }, {})
 
-    const systemInstruction = `তুমি MoneyFlow-এর AI Financial Advisor। একজন ছাত্রের সাথে কথা বলছ।
-আর্থিক তথ্য:
-- Balance: ₹${summary.balance}, Income: ₹${summary.totalCredit}, Expense: ₹${summary.totalDebit}
-- Category খরচ: ${JSON.stringify(catBreakdown)}
-- Budget alerts: ${JSON.stringify(alerts)}
-- অস্বাভাবিক খরচ (anomalies): ${JSON.stringify(anomalies.map(a => ({ desc: a.description, amt: a.amount, cat: a.category })))}
-- Savings goal: ₹${savingsGoal}, Transactions: ${transactions.length}
-সংক্ষিপ্ত, বন্ধুত্বপূর্ণ পরামর্শ দাও। বাংলা+English মিশিয়ে। Emoji ব্যবহার করো।`
+    // ── Enhanced: monthly trend data for smart chat ──
+    const monthlyData = {}
+    transactions.forEach(t => {
+      const m = t.date?.slice(0, 7)
+      if (!m) return
+      if (!monthlyData[m]) monthlyData[m] = { income: 0, expense: 0 }
+      if (t.type === 'credit') monthlyData[m].income += Number(t.amount)
+      else monthlyData[m].expense += Number(t.amount)
+    })
+    const sortedMonths = Object.keys(monthlyData).sort().slice(-6)
+    const monthlyTrend = sortedMonths.map(m => `${m}: Income ₹${monthlyData[m].income}, Expense ₹${monthlyData[m].expense}`).join(' | ')
+
+    // ── Enhanced: per-category monthly data for comparisons ──
+    const catMonthly = {}
+    transactions.filter(t => t.type === 'debit').forEach(t => {
+      const m = t.date?.slice(0, 7)
+      if (!m) return
+      if (!catMonthly[m]) catMonthly[m] = {}
+      catMonthly[m][t.category] = (catMonthly[m][t.category] || 0) + Number(t.amount)
+    })
+
+    // ── Enhanced: recent transactions for context ──
+    const recentTx = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20)
+      .map(t => `${t.date} ${t.type === 'credit' ? '+' : '-'}₹${t.amount} ${t.description} [${t.category}]`)
+      .join('\n')
+
+    // ── Enhanced: account balances ──
+    const accountInfo = `Cash: ₹${accounts.cash || 0}, Bank: ₹${accounts.bank || 0}, UPI: ₹${accounts.upi || 0}`
+
+    // ── Enhanced: debt info ──
+    const activeDebts = debts.filter(d => !d.repaid)
+    const debtInfo = activeDebts.length > 0
+      ? activeDebts.map(d => `${d.person}: ₹${d.amount} (${d.type})`).join(', ')
+      : 'No active debts'
+
+    const systemInstruction = `You are MoneyFlow's AI Financial Advisor. You are talking to a student user.
+
+══ Financial Data ══
+- Balance: ₹${summary.balance}, Total Income: ₹${summary.totalCredit}, Total Expense: ₹${summary.totalDebit}
+- Accounts: ${accountInfo}
+- Category-wise spending: ${JSON.stringify(catBreakdown)}
+- Budget alerts (≥80% used): ${JSON.stringify(alerts)}
+- Anomalies (>2x avg): ${JSON.stringify(anomalies.map(a => ({ desc: a.description, amt: a.amount, cat: a.category })))}
+- Savings goal: ₹${savingsGoal}, Total Transactions: ${transactions.length}
+- Active debts: ${debtInfo}
+
+══ Monthly Trends (last 6 months) ══
+${monthlyTrend}
+
+══ Recent 20 Transactions ══
+${recentTx}
+
+══ Instructions ══
+- Respond in the SAME LANGUAGE as the user's message. If they write in English, reply in English. If Bengali, reply in Bengali. If mixed, reply mixed.
+- Be concise, friendly, and actionable
+- Use emojis for visual clarity
+- When asked to compare months, use the monthly trend data above
+- When asked about specific categories, use category-wise and monthly data
+- For budget advice, consider actual spending vs budget limits
+- Give specific numbers, not vague advice
+- If user asks to show data as a table/chart, format with clear structure`
 
     setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
 
     if (!OR_API_KEY) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ OpenRouter API Key সেট নেই। .env এ VITE_OPENROUTER_API_KEY যোগ করো।' }])
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ OpenRouter API Key is not set. Add VITE_OPENROUTER_API_KEY to your .env file.' }])
       return
     }
 
@@ -275,10 +374,12 @@ export function AppProvider({ children }) {
           model: OR_MODEL,
           messages: [
             { role: 'system', content: systemInstruction },
+            // Include last 6 chat messages for context continuity
+            ...chatMessages.slice(-6),
             { role: 'user', content: userMessage },
           ],
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 1500,
         },
         {
           headers: {
@@ -289,11 +390,108 @@ export function AppProvider({ children }) {
           },
         }
       )
-      const reply = res.data?.choices?.[0]?.message?.content || 'দুঃখিত, উত্তর পাওয়া যায়নি।'
+      const reply = res.data?.choices?.[0]?.message?.content || 'Sorry, no response received.'
       setChatMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (err) {
       const msg = err.response?.data?.error?.message || err.message
       setChatMessages(prev => [...prev, { role: 'assistant', content: `❌ AI error: ${msg}` }])
+    }
+  }
+
+  /**
+   * askGeminiRaw — Direct prompt → response (no chat history, for internal use)
+   */
+  const askGeminiRaw = async (prompt) => {
+    if (!OR_API_KEY) return null
+    try {
+      const res = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: OR_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.8,
+          max_tokens: 512,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${OR_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://moneyflow-xyz.vercel.app',
+            'X-Title': 'MoneyFlow AI',
+          },
+        }
+      )
+      return res.data?.choices?.[0]?.message?.content || null
+    } catch (e) {
+      console.error('askGeminiRaw error:', e)
+      return null
+    }
+  }
+
+  /**
+   * parseNLPTransaction — Parse natural language in ANY language into transaction fields
+   * E.g. "yesterday spent 200 on bus" → { type: 'debit', amount: 200, description: 'Bus fare', ... }
+   */
+  const parseNLPTransaction = async (text) => {
+    if (!OR_API_KEY || !text.trim()) return null
+
+    const today = new Date().toISOString().split('T')[0]
+    const categories = customCategories.join(', ')
+
+    const prompt = `You are a transaction parser for a finance app. Parse the following natural language input into a structured transaction.
+
+The input can be in ANY language (Bengali, Hindi, English, Spanish, or mixed). Extract:
+1. type: "debit" (expense/spent/খরচ) or "credit" (income/earned/আয়)
+2. amount: number (extract from text, handle words like "টাকা", "rupees", "rs", "₹")
+3. description: Short English description of what the transaction is about
+4. date: YYYY-MM-DD format. Today is ${today}. Handle "yesterday", "কাল", "আজ", "today", "last monday", etc.
+5. category: Best match from these categories: ${categories}
+6. account: "Cash", "Bank", or "UPI" (infer from context, default "Cash")
+
+User input: "${text}"
+
+RESPOND WITH ONLY valid JSON, no markdown, no explanation:
+{"type":"debit","amount":0,"description":"","date":"${today}","category":"Others","account":"Cash"}`
+
+    try {
+      const res = await axios.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        {
+          model: OR_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+          max_tokens: 256,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${OR_API_KEY}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://moneyflow-xyz.vercel.app',
+            'X-Title': 'MoneyFlow AI',
+          },
+        }
+      )
+      const raw = res.data?.choices?.[0]?.message?.content || ''
+      // Extract JSON from response (handle possible markdown wrapping)
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0])
+        // Validate required fields
+        if (parsed.amount && parsed.description) {
+          return {
+            type: parsed.type === 'credit' ? 'credit' : 'debit',
+            amount: Math.abs(Number(parsed.amount)) || 0,
+            description: String(parsed.description).trim(),
+            date: parsed.date || today,
+            category: customCategories.includes(parsed.category) ? parsed.category : 'Others',
+            account: ['Cash', 'Bank', 'UPI'].includes(parsed.account) ? parsed.account : 'Cash',
+          }
+        }
+      }
+      return null
+    } catch (e) {
+      console.error('NLP parse error:', e)
+      return null
     }
   }
 
@@ -313,11 +511,14 @@ export function AppProvider({ children }) {
     budgets, saveBudget, removeBudget,
     accounts, updateAccountBalance,
     debts, addDebt, markDebtRepaid, deleteDebt,
+    goals, addGoal, deleteGoal,
+    bills, addBill, deleteBill, markBillPaid,
+    recurringTx, addRecurring, deleteRecurring,
     getBudgetAlerts, getAnomalies,
     sendBudgetNotification, requestNotificationPermission,
     addTransaction, updateTransaction, deleteTransaction, toggleNeedWant,
     getSummary, getFilteredTransactions,
-    askGemini,
+    askGemini, askGeminiRaw, parseNLPTransaction,
     isDemo: false,
     fetchTransactions: () => { },
   }

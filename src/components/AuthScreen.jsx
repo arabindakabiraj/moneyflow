@@ -39,27 +39,27 @@ export default function AuthScreen({ onAuth }) {
     const handleSubmit = async () => {
         reset()
         const p = phone.replace(/\s/g, '')
-        if (p.length < 10) { setError('সঠিক phone number দাও (10 digit)'); return }
+        if (p.length < 10) { setError('Enter a valid phone number (10 digits)'); return }
 
         setLoading(true)
         try {
             if (tab === 'login') {
-                if (!password) { setError('Password দাও'); setLoading(false); return }
+                if (!password) { setError('Enter your password'); setLoading(false); return }
                 const uid = await loginUser(p, password)
                 saveSession(uid); onAuth(uid)
 
             } else if (tab === 'register') {
-                if (!username.trim()) { setError('তোমার নাম দাও'); setLoading(false); return }
-                if (password.length < 6) { setError('Password কমপক্ষে 6 character'); setLoading(false); return }
-                if (password !== confirm) { setError('Password দুটো মিলছে না'); setLoading(false); return }
+                if (!username.trim()) { setError('Enter your name'); setLoading(false); return }
+                if (password.length < 6) { setError('Password must be at least 6 characters'); setLoading(false); return }
+                if (password !== confirm) { setError('Passwords do not match'); setLoading(false); return }
                 const uid = await registerUser(p, password, username.trim())
-                setSuccess('✅ Account তৈরি হয়েছে! স্বাগতম ' + username + '!')
+                setSuccess('✅ Account created! Welcome ' + username + '!')
                 setTimeout(() => { saveSession(uid); onAuth(uid) }, 900)
 
             } else if (tab === 'forgot') {
-                if (newPass.length < 6) { setError('নতুন password কমপক্ষে 6 character'); setLoading(false); return }
+                if (newPass.length < 6) { setError('New password must be at least 6 characters'); setLoading(false); return }
                 await resetPassword(p, newPass)
-                setSuccess('✅ Password reset হয়েছে! এখন Login করো।')
+                setSuccess('✅ Password has been reset! Please login now.')
                 setTimeout(() => switchTab('login'), 2000)
             }
         } catch (err) {
@@ -75,7 +75,7 @@ export default function AuthScreen({ onAuth }) {
             <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col items-center justify-center px-6">
                 <div className="w-full max-w-sm">
                     <button onClick={() => switchTab('login')} className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm mb-6 transition-colors">
-                        <ArrowLeft size={16} /> Login এ ফিরে যাও
+                        <ArrowLeft size={16} /> Back to Login
                     </button>
 
                     <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl">
@@ -85,7 +85,7 @@ export default function AuthScreen({ onAuth }) {
                             </div>
                             <div>
                                 <h2 className="font-display font-bold text-white">Password Reset</h2>
-                                <p className="text-xs text-gray-400">Phone number ও নতুন password দাও</p>
+                                <p className="text-xs text-gray-400">Enter your phone number and new password</p>
                             </div>
                         </div>
 
@@ -103,7 +103,7 @@ export default function AuthScreen({ onAuth }) {
 
                             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:border-amber-500/60 transition-all">
                                 <div className="pl-4"><Lock size={15} className="text-amber-400" /></div>
-                                <input type={showPw ? 'text' : 'password'} placeholder="নতুন password (min 6)"
+                                <input type={showPw ? 'text' : 'password'} placeholder="New password (min 6)"
                                     value={newPass} onChange={e => setNewPass(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                                     className="flex-1 bg-transparent py-3.5 text-white placeholder-gray-500 text-sm outline-none" />
@@ -118,7 +118,7 @@ export default function AuthScreen({ onAuth }) {
 
                         <button onClick={handleSubmit} disabled={loading}
                             className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-display font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30 disabled:opacity-60 active:scale-95 transition-all">
-                            {loading ? <RefreshCw size={18} className="animate-spin" /> : <><KeyRound size={18} /> Password Reset করো</>}
+                            {loading ? <RefreshCw size={18} className="animate-spin" /> : <><KeyRound size={18} /> Reset Password</>}
                         </button>
                     </div>
                 </div>
@@ -194,7 +194,7 @@ export default function AuthScreen({ onAuth }) {
                         {tab === 'register' && (
                             <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:border-brand-500/60 transition-all">
                                 <div className="pl-4"><User size={15} className="text-gray-400" /></div>
-                                <input placeholder="তোমার নাম (যেমন: Arabinda)"
+                                <input placeholder="Your name (e.g. Arabinda)"
                                     value={username} onChange={e => setUsername(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                                     className="flex-1 bg-transparent py-3.5 pr-4 text-white placeholder-gray-500 text-sm outline-none" />
@@ -234,23 +234,23 @@ export default function AuthScreen({ onAuth }) {
                         {loading
                             ? <RefreshCw size={18} className="animate-spin" />
                             : tab === 'login'
-                                ? <><LogIn size={18} /> Login করো</>
-                                : <><UserPlus size={18} /> Account বানাও</>}
+                                ? <><LogIn size={18} /> Login</>
+                                : <><UserPlus size={18} /> Create Account</>}
                     </button>
 
                     {/* Forgot password */}
                     {tab === 'login' && (
                         <div className="mt-4 pt-4 border-t border-white/5 text-center">
-                            <p className="text-gray-500 text-xs mb-1">Password ভুলে গেছো?</p>
+                            <p className="text-gray-500 text-xs mb-1">Forgot your password?</p>
                             <button onClick={() => switchTab('forgot')}
                                 className="text-amber-400 hover:text-amber-300 text-sm font-semibold flex items-center gap-1.5 mx-auto transition-colors">
-                                <KeyRound size={14} /> Password Reset করো →
+                                <KeyRound size={14} /> Reset Password →
                             </button>
                         </div>
                     )}
                 </div>
 
-                <p className="text-center text-gray-600 text-xs mt-4">তোমার data securely Firebase এ সংরক্ষিত হবে 🔒</p>
+                <p className="text-center text-gray-600 text-xs mt-4">Your data is securely stored on Firebase 🔒</p>
             </div>
         </div>
     )

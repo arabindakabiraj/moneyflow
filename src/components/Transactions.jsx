@@ -94,7 +94,7 @@ export default function Transactions({ onEdit }) {
           </button>
           <div>
             <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Transactions</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{filtered.length} লেনদেন</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{filtered.length} transactions</p>
           </div>
         </div>
         <button onClick={() => exportToPDF(filtered, summary, filterMonth || filterDate || 'All')}
@@ -108,7 +108,7 @@ export default function Transactions({ onEdit }) {
         <Search size={15} className="text-gray-400 shrink-0" />
         <input
           value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="নাম, category বা amount দিয়ে খোঁজো..."
+          placeholder="Search by name, category or amount..."
           className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none"
         />
         {search && (
@@ -147,7 +147,7 @@ export default function Transactions({ onEdit }) {
         )}
         {(filterDate || filterMonth || search) && (
           <button onClick={clearFilters} className="flex items-center gap-1 mt-2 text-xs text-rose-500 font-medium">
-            <X size={12} /> সব ফিল্টার সরান
+            <X size={12} /> Clear all filters
           </button>
         )}
       </div>
@@ -172,7 +172,7 @@ export default function Transactions({ onEdit }) {
           <div className="text-center py-12">
             <p className="text-4xl mb-3">{search ? '🔍' : '📭'}</p>
             <p className="text-gray-500 dark:text-gray-400 text-sm">
-              {search ? `"${search}" এ কিছু পাওয়া যায়নি` : 'কোনো লেনদেন পাওয়া যায়নি'}
+              {search ? `No results for "${search}"` : 'No transactions found'}
             </p>
           </div>
         ) : (

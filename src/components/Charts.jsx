@@ -4,14 +4,14 @@
 import { useMemo } from 'react'
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, Legend,
+    PieChart, Pie, Cell, Legend, LineChart, Line, Area, AreaChart,
 } from 'recharts'
 import { ArrowLeft } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 const COLORS = ['#10b981', '#f43f5e', '#8b5cf6', '#f59e0b', '#06b6d4', '#ec4899', '#84cc16', '#6366f1']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const DAYS = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহ', 'শুক্র', 'শনি']
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function weekStart(daysAgo = 0) {
     const d = new Date(); d.setDate(d.getDate() - daysAgo)
@@ -75,12 +75,49 @@ export default function Charts() {
     const lastWeekTotal = weeklyData.reduce((s, d) => s + d.lastWeek, 0)
     const weekDiff = lastWeekTotal ? ((thisWeekTotal - lastWeekTotal) / lastWeekTotal * 100).toFixed(0) : 0
 
+    // Cash flow timeline (last 30 days running balance)
+    const cashFlowData = useMemo(() => {
+        const days = 30
+        const today = new Date()
+        const result = []
+        let running = 0
+        // Get all tx sorted by date
+        const sorted = [...transactions]
+            .filter(t => t.date)
+            .sort((a, b) => a.date.localeCompare(b.date))
+        const txByDate = {}
+        sorted.forEach(t => {
+            if (!txByDate[t.date]) txByDate[t.date] = 0
+            txByDate[t.date] += t.type === 'credit' ? Number(t.amount) : -Number(t.amount)
+        })
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(today)
+            d.setDate(d.getDate() - i)
+            const key = d.toISOString().split('T')[0]
+            running += txByDate[key] || 0
+            if (i % 3 === 0 || i === 0) { // show every 3 days to avoid clutter
+                result.push({ date: key.slice(5), balance: Math.round(running) })
+            }
+        }
+        return result
+    }, [transactions])
+
+    // Day of week spending
+    const dowData = useMemo(() => {
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        const totals = Array(7).fill(0)
+        transactions.filter(t => t.type === 'debit' && t.date).forEach(t => {
+            totals[new Date(t.date).getDay()] += Number(t.amount)
+        })
+        return dayNames.map((day, i) => ({ day, amount: Math.round(totals[i]) }))
+    }, [transactions])
+
     if (transactions.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
                 <p className="text-5xl mb-4">📊</p>
-                <p className="text-gray-500 dark:text-gray-400 font-semibold">কোনো data নেই</p>
-                <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Transaction add করো, তারপর charts দেখাবে!</p>
+                <p className="text-gray-500 dark:text-gray-400 font-semibold">No data yet</p>
+                <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Add transactions to see charts!</p>
             </div>
         )
     }
@@ -94,7 +131,7 @@ export default function Charts() {
                 </button>
                 <div>
                     <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Analytics 📊</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">তোমার income ও expense এর বিশ্লেষণ</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Analysis of your income and expenses</p>
                 </div>
             </div>
 
@@ -103,8 +140,8 @@ export default function Charts() {
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold text-gray-800 dark:text-white text-sm">📆 This Week vs Last Week</h3>
                     <span className={`text-xs font-bold px-2 py-1 rounded-lg ${Number(weekDiff) > 0
-                            ? 'bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400'
-                            : 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+                        ? 'bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400'
+                        : 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400'
                         }`}>
                         {Number(weekDiff) > 0 ? '↑' : '↓'} {Math.abs(Number(weekDiff))}%
                     </span>
@@ -149,6 +186,46 @@ export default function Charts() {
                     </div>
                 </div>
             )}
+
+            {/* Cash Flow Timeline */}
+            {cashFlowData.length > 2 && (
+                <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                    <h3 className="font-semibold text-gray-800 dark:text-white text-sm mb-4">📈 Cash Flow (30 Days)</h3>
+                    <ResponsiveContainer width="100%" height={180}>
+                        <AreaChart data={cashFlowData}>
+                            <defs>
+                                <linearGradient id="cfGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 9, fill: '#9ca3af' }} axisLine={false} tickLine={false}
+                                tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Area type="monotone" dataKey="balance" name="Balance" stroke="#10b981" fill="url(#cfGrad)" strokeWidth={2} dot={false} />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
+
+            {/* Spending by Day of Week */}
+            <div className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                <h3 className="font-semibold text-gray-800 dark:text-white text-sm mb-4">🗓️ Spending by Day</h3>
+                <ResponsiveContainer width="100%" height={150}>
+                    <BarChart data={dowData} barSize={20}>
+                        <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                        <YAxis hide />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Bar dataKey="amount" name="Spent" radius={[6, 6, 0, 0]}>
+                            {dowData.map((entry, i) => (
+                                <Cell key={i} fill={entry.day === ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()] ? '#8b5cf6' : '#10b981'} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+                <p className="text-[10px] text-center text-gray-400 mt-1">Purple bar = today's day of week</p>
+            </div>
 
             {/* Category pie */}
             {catData.length > 0 && (
