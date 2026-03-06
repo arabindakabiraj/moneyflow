@@ -228,7 +228,14 @@ export default function Dashboard({ onAddWithType }) {
   const { getSummary, transactions, savingsGoal, setActiveTab, loading, accounts, debts, goals } = useApp()
   const summary = getSummary()
   const savingsProgress = Math.min((summary.balance / savingsGoal) * 100, 100)
-  const recent = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5)
+  const recent = [...transactions].sort((a, b) => {
+    const dateDiff = new Date(b.date) - new Date(a.date)
+    if (dateDiff !== 0) return dateDiff
+    // Same date — sort by createdAt (Firestore timestamp) descending
+    const aT = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0
+    const bT = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0
+    return bT - aT
+  }).slice(0, 5)
   const streak = useStreak()
 
   // Category breakdown for debits
@@ -240,10 +247,10 @@ export default function Dashboard({ onAddWithType }) {
   // Top active goal progress
   const topGoal = goals?.length > 0
     ? goals.reduce((best, g) => {
-        const pct = Math.min((Number(g.saved || 0) / Number(g.target || 1)) * 100, 100)
-        const bestPct = Math.min((Number(best.saved || 0) / Number(best.target || 1)) * 100, 100)
-        return pct < 100 && pct > bestPct ? g : best
-      }, goals[0])
+      const pct = Math.min((Number(g.saved || 0) / Number(g.target || 1)) * 100, 100)
+      const bestPct = Math.min((Number(best.saved || 0) / Number(best.target || 1)) * 100, 100)
+      return pct < 100 && pct > bestPct ? g : best
+    }, goals[0])
     : null
   const topGoalPct = topGoal ? Math.min((Number(topGoal.saved || 0) / Number(topGoal.target || 1)) * 100, 100) : 0
 
@@ -537,6 +544,14 @@ export function TransactionRow({ tx, compact = false, onEdit, onDelete, onToggle
               </>
             )}
           </div>
+          {/* Tags */}
+          {tx.tags && tx.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {tx.tags.map(tag => (
+                <span key={tag} className="text-[9px] px-1.5 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 rounded font-semibold">#{tag}</span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className={`font-mono font-bold text-sm ${isCredit ? 'text-green-600 dark:text-green-400' : 'text-rose-500 dark:text-rose-400'}`}>

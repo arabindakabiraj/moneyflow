@@ -3,7 +3,7 @@
  * Form to add or edit a transaction
  */
 import { useState, useEffect, useRef } from 'react'
-import { PlusCircle, CheckCircle, X, Sparkles, Wand2, Mic, MicOff, Loader2 } from 'lucide-react'
+import { PlusCircle, CheckCircle, X, Sparkles, Wand2, Mic, MicOff, Loader2, Hash, StickyNote } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { suggestCategory } from '../utils/autoCategory'
 
@@ -16,6 +16,8 @@ const defaultForm = {
   date: new Date().toISOString().split('T')[0],
   category: 'Others',
   account: 'Cash',
+  tags: [],
+  notes: '',
 }
 
 /* ─── Success Bottom Sheet Popup ──────────────────────────────────────────── */
@@ -101,6 +103,79 @@ function SuccessToast({ data, onClose, onGoHome }) {
           100% { transform: scale(1); opacity: 1; }
         }
       `}</style>
+    </div>
+  )
+}
+
+/* ─── Tags Input Component ──────────────────────────────────────────────── */
+function TagsInput({ tags, onChange, allTransactions }) {
+  const [input, setInput] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  // Gather all unique tags from past transactions
+  const allTags = [...new Set(
+    (allTransactions || []).flatMap(t => t.tags || []).filter(Boolean)
+  )].sort()
+
+  const suggestions = input.trim()
+    ? allTags.filter(t => t.toLowerCase().includes(input.toLowerCase()) && !tags.includes(t)).slice(0, 5)
+    : allTags.filter(t => !tags.includes(t)).slice(0, 8)
+
+  const addTag = (tag) => {
+    const clean = tag.replace(/^#/, '').trim().toLowerCase()
+    if (clean && !tags.includes(clean)) {
+      onChange([...tags, clean])
+    }
+    setInput('')
+    setShowSuggestions(false)
+  }
+
+  const removeTag = (tag) => onChange(tags.filter(t => t !== tag))
+
+  const handleKey = (e) => {
+    if ((e.key === 'Enter' || e.key === ',') && input.trim()) {
+      e.preventDefault()
+      addTag(input)
+    }
+    if (e.key === 'Backspace' && !input && tags.length > 0) {
+      removeTag(tags[tags.length - 1])
+    }
+  }
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+        <Hash size={12} className="inline mr-1" />Tags (optional)
+      </label>
+      <div className="flex flex-wrap gap-1.5 p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl min-h-[44px] items-center">
+        {tags.map(tag => (
+          <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-lg text-xs font-semibold">
+            #{tag}
+            <button onClick={() => removeTag(tag)} className="text-violet-400 hover:text-violet-600 ml-0.5">
+              <X size={10} />
+            </button>
+          </span>
+        ))}
+        <input
+          value={input}
+          onChange={e => { setInput(e.target.value); setShowSuggestions(true) }}
+          onKeyDown={handleKey}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          placeholder={tags.length === 0 ? 'e.g. #trip, #office...' : 'Add tag...'}
+          className="flex-1 min-w-[80px] bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none py-0.5"
+        />
+      </div>
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-1.5 animate-fade-in">
+          {suggestions.map(s => (
+            <button key={s} onClick={() => addTag(s)}
+              className="text-[10px] px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg font-medium hover:bg-violet-100 dark:hover:bg-violet-900/30 hover:text-violet-600 transition-colors">
+              #{s}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -393,6 +468,23 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Tags */}
+        <TagsInput tags={form.tags || []} onChange={(tags) => handleChange('tags', tags)} allTransactions={transactions} />
+
+        {/* Notes */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+            <StickyNote size={12} className="inline mr-1" />Notes (optional)
+          </label>
+          <textarea
+            placeholder="Add any extra notes..."
+            value={form.notes || ''}
+            onChange={e => handleChange('notes', e.target.value)}
+            rows={2}
+            className="input-field bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm resize-none"
+          />
         </div>
 
         {/* Account type */}

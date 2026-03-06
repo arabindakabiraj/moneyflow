@@ -1,10 +1,11 @@
 /**
  * AppContext.jsx — Global state with budget alerts + anomaly detection + custom categories
+ * + Group Expenses, Family Mode, Local Notifications
  */
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import {
-  collection, query, orderBy, onSnapshot,
+  collection, query, orderBy, onSnapshot, where, getDocs,
   addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../firebase'
@@ -34,13 +35,22 @@ export function AppProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('mf_cats') || 'null') || DEFAULT_CATEGORIES }
     catch { return DEFAULT_CATEGORIES }
   })
-  const [username, setUsername] = useState('')
-  const [profilePhoto, setProfilePhoto] = useState(null) // base64 string
+  const [username, setUsername] = useState(() => localStorage.getItem('mf_username') || '')
+  const [profilePhoto, setProfilePhoto] = useState(() => localStorage.getItem('mf_profile_photo') || null)
   const [accounts, setAccounts] = useState({ cash: 0, bank: 0, upi: 0 })
   const [debts, setDebts] = useState([])
   const [goals, setGoals] = useState([])
   const [bills, setBills] = useState([])
   const [recurringTx, setRecurringTx] = useState([])
+
+  // ── Group Expenses state ──
+  const [groups, setGroups] = useState([])
+
+  // ── Family Mode state ──
+  const [familySettings, setFamilySettings] = useState(null)
+  const [familyTransactions, setFamilyTransactions] = useState([])
+
+
 
   // Dark mode
   useEffect(() => {
@@ -51,14 +61,25 @@ export function AppProvider({ children }) {
   // Session load
   useEffect(() => { setUid(getSession()) }, [])
 
-  // Load username + photo from Firestore when uid changes
+  // Load username + photo from Firestore when uid changes (localStorage is primary cache)
   useEffect(() => {
-    if (!uid) { setUsername(''); setProfilePhoto(null); return }
+    if (!uid) {
+      setUsername(''); setProfilePhoto(null)
+      localStorage.removeItem('mf_username')
+      localStorage.removeItem('mf_profile_photo')
+      return
+    }
     getDoc(doc(db, 'users', uid, 'profile', 'info'))
       .then(snap => {
         if (snap.exists()) {
-          setUsername(snap.data().username || '')
-          setProfilePhoto(snap.data().photoURL || null)
+          const name = snap.data().username || ''
+          const photo = snap.data().photoURL || null
+          setUsername(name)
+          setProfilePhoto(photo)
+          // Cache locally for instant load next time
+          if (name) localStorage.setItem('mf_username', name)
+          if (photo) localStorage.setItem('mf_profile_photo', photo)
+          else localStorage.removeItem('mf_profile_photo')
         }
       })
       .catch(console.error)
@@ -66,15 +87,24 @@ export function AppProvider({ children }) {
 
   const updateUsername = async (newName) => {
     if (!uid || !newName.trim()) return
-    setUsername(newName.trim())
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), { username: newName.trim() }, { merge: true })
+    const trimmed = newName.trim()
+    setUsername(trimmed)
+    localStorage.setItem('mf_username', trimmed)
+    await setDoc(doc(db, 'users', uid, 'profile', 'info'), { username: trimmed }, { merge: true })
   }
 
-  // Load username + profile photo from Firestore
+  // Update profile photo — stores compressed base64 in Firestore + localStorage cache
   const updateProfilePhoto = async (base64) => {
-    if (!uid) return
+    if (!uid || !base64) return
+    // Immediately show in UI + cache locally
     setProfilePhoto(base64)
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), { photoURL: base64 }, { merge: true })
+    localStorage.setItem('mf_profile_photo', base64)
+    try {
+      await setDoc(doc(db, 'users', uid, 'profile', 'info'), { photoURL: base64 }, { merge: true })
+    } catch (err) {
+      console.error('Photo save error:', err)
+      // localStorage still has it, so it persists locally even if Firestore fails
+    }
   }
 
   // Push notification helper
@@ -200,6 +230,219 @@ export function AppProvider({ children }) {
   const addRecurring = async (r) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'recurring'), { ...r, createdAt: serverTimestamp() }) }
   const deleteRecurring = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'recurring', id)) }
 
+  // Firestore — Groups real-time
+  useEffect(() => {
+    if (!uid) { setGroups([]); return }
+    const unsub = onSnapshot(
+      collection(db, 'users', uid, 'groups'),
+      snap => setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error('Groups err:', err)
+    )
+    return unsub
+  }, [uid])
+
+  const addGroup = async (g) => {
+    if (!uid) return
+    await addDoc(collection(db, 'users', uid, 'groups'), { ...g, expenses: [], createdAt: serverTimestamp() })
+  }
+
+  const deleteGroup = async (id) => {
+    if (!uid) return
+    await deleteDoc(doc(db, 'users', uid, 'groups', id))
+  }
+
+  const addGroupExpense = async (groupId, expense) => {
+    if (!uid) return
+    const groupDoc = doc(db, 'users', uid, 'groups', groupId)
+    const group = groups.find(g => g.id === groupId)
+    if (!group) return
+    const expenses = [...(group.expenses || []), expense]
+    await updateDoc(groupDoc, { expenses })
+  }
+
+  const deleteGroupExpense = async (groupId, expenseIndex) => {
+    if (!uid) return
+    const group = groups.find(g => g.id === groupId)
+    if (!group) return
+    const expenses = group.expenses.filter((_, i) => i !== expenseIndex)
+    await updateDoc(doc(db, 'users', uid, 'groups', groupId), { expenses })
+  }
+
+  // Calculate minimum transfers for settlement (greedy algorithm)
+  const getSettlements = (groupId) => {
+    const group = groups.find(g => g.id === groupId)
+    if (!group || !group.expenses?.length) return []
+
+    // Calculate net balance for each person
+    const balances = {}
+    group.members.forEach(m => { balances[m] = 0 })
+
+    group.expenses.forEach(exp => {
+      // Person who paid gets credited
+      balances[exp.paidBy] = (balances[exp.paidBy] || 0) + Number(exp.amount)
+      // Each person owes their split
+      Object.entries(exp.splits || {}).forEach(([person, amt]) => {
+        balances[person] = (balances[person] || 0) - Number(amt)
+      })
+    })
+
+    // Separate into creditors and debtors
+    const creditors = []
+    const debtors = []
+    Object.entries(balances).forEach(([person, balance]) => {
+      if (balance > 0.01) creditors.push({ person, amount: balance })
+      else if (balance < -0.01) debtors.push({ person, amount: -balance })
+    })
+
+    // Sort by amount
+    creditors.sort((a, b) => b.amount - a.amount)
+    debtors.sort((a, b) => b.amount - a.amount)
+
+    // Greedy matching
+    const settlements = []
+    let i = 0, j = 0
+    while (i < debtors.length && j < creditors.length) {
+      const debtor = debtors[i]
+      const creditor = creditors[j]
+      const amount = Math.min(debtor.amount, creditor.amount)
+
+      if (amount > 0.01) {
+        settlements.push({
+          from: debtor.person,
+          to: creditor.person,
+          amount: Math.round(amount)
+        })
+      }
+
+      debtor.amount -= amount
+      creditor.amount -= amount
+
+      if (debtor.amount < 0.01) i++
+      if (creditor.amount < 0.01) j++
+    }
+
+    return settlements
+  }
+
+  // Firestore — Family Settings real-time
+  useEffect(() => {
+    if (!uid) { setFamilySettings(null); setFamilyTransactions([]); return }
+    const unsub = onSnapshot(
+      doc(db, 'users', uid, 'settings', 'family'),
+      snap => {
+        if (snap.exists()) {
+          setFamilySettings(snap.data())
+        } else {
+          setFamilySettings(null)
+        }
+      },
+      err => console.error('Family settings err:', err)
+    )
+    return unsub
+  }, [uid])
+
+  // Listen to partner's transactions when linked
+  useEffect(() => {
+    if (!familySettings?.linkedUid) {
+      setFamilyTransactions([])
+      return
+    }
+    const unsub = onSnapshot(
+      query(collection(db, 'users', familySettings.linkedUid, 'transactions'), orderBy('date', 'desc')),
+      snap => setFamilyTransactions(snap.docs.map(d => ({ id: d.id, ...d.data(), isPartner: true }))),
+      err => console.error('Family transactions err:', err)
+    )
+    return unsub
+  }, [familySettings?.linkedUid])
+
+  const generateInviteCode = async () => {
+    if (!uid) return null
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+
+    // Store in global familyLinks collection
+    await setDoc(doc(db, 'familyLinks', code), {
+      uid,
+      name: username || 'Partner',
+      createdAt: serverTimestamp()
+    })
+
+    // Store in user's family settings
+    await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
+      inviteCode: code,
+      linkedUid: null,
+      linkedName: null
+    }, { merge: true })
+
+    return code
+  }
+
+  const linkPartner = async (code) => {
+    if (!uid || !code) return { success: false, error: 'Invalid code' }
+
+    try {
+      const linkDoc = await getDoc(doc(db, 'familyLinks', code.toUpperCase()))
+      if (!linkDoc.exists()) {
+        return { success: false, error: 'Invalid invite code' }
+      }
+
+      const partnerData = linkDoc.data()
+      if (partnerData.uid === uid) {
+        return { success: false, error: 'Cannot link to yourself' }
+      }
+
+      // Update both users' family settings
+      await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
+        linkedUid: partnerData.uid,
+        linkedName: partnerData.name
+      }, { merge: true })
+
+      await setDoc(doc(db, 'users', partnerData.uid, 'settings', 'family'), {
+        linkedUid: uid,
+        linkedName: username || 'Partner'
+      }, { merge: true })
+
+      return { success: true }
+    } catch (err) {
+      console.error('Link partner error:', err)
+      return { success: false, error: 'Failed to link' }
+    }
+  }
+
+  const unlinkPartner = async () => {
+    if (!uid || !familySettings?.linkedUid) return
+
+    const partnerUid = familySettings.linkedUid
+
+    // Remove link from both users
+    await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
+      linkedUid: null,
+      linkedName: null
+    }, { merge: true })
+
+    await setDoc(doc(db, 'users', partnerUid, 'settings', 'family'), {
+      linkedUid: null,
+      linkedName: null
+    }, { merge: true })
+  }
+
+  const getFamilySummary = () => {
+    const combined = [...transactions, ...familyTransactions]
+    const totalCredit = combined.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
+    const totalDebit = combined.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
+
+    const myCredit = transactions.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
+    const myDebit = transactions.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
+
+    const partnerCredit = familyTransactions.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
+    const partnerDebit = familyTransactions.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
+
+    return {
+      combined: { income: totalCredit, expense: totalDebit, balance: totalCredit - totalDebit },
+      me: { income: myCredit, expense: myDebit },
+      partner: { income: partnerCredit, expense: partnerDebit }
+    }
+  }
+
   const col = () => collection(db, 'users', uid, 'transactions')
 
   const addTransaction = async (tx) => {
@@ -287,7 +530,13 @@ export function AppProvider({ children }) {
     let f = [...transactions]
     if (filterDate) f = f.filter(t => t.date === filterDate)
     else if (filterMonth) f = f.filter(t => t.date?.startsWith(filterMonth))
-    return f.sort((a, b) => new Date(b.date) - new Date(a.date))
+    return f.sort((a, b) => {
+      const dateDiff = new Date(b.date) - new Date(a.date)
+      if (dateDiff !== 0) return dateDiff
+      const aT = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0
+      const bT = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0
+      return bT - aT
+    })
   }
 
   const askGemini = async (userMessage) => {
@@ -514,6 +763,8 @@ RESPOND WITH ONLY valid JSON, no markdown, no explanation:
     goals, addGoal, deleteGoal,
     bills, addBill, deleteBill, markBillPaid,
     recurringTx, addRecurring, deleteRecurring,
+    groups, addGroup, deleteGroup, addGroupExpense, deleteGroupExpense, getSettlements,
+    familySettings, familyTransactions, generateInviteCode, linkPartner, unlinkPartner, getFamilySummary,
     getBudgetAlerts, getAnomalies,
     sendBudgetNotification, requestNotificationPermission,
     addTransaction, updateTransaction, deleteTransaction, toggleNeedWant,

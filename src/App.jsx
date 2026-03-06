@@ -3,6 +3,7 @@
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
+import { ThemeProvider } from './context/ThemeContext'
 import Header from './components/Header'
 import BottomNav from './components/BottomNav'
 import Dashboard from './components/Dashboard'
@@ -23,6 +24,10 @@ import Notifications from './components/Notifications'
 import AuthScreen from './components/AuthScreen'
 import AppLock, { isPinSet, getAutoLockMinutes, isBiometricEnabled } from './components/AppLock'
 import SplashScreen from './components/SplashScreen'
+import InstallBanner from './components/InstallBanner'
+import GroupExpenses from './components/GroupExpenses'
+import SMSImport from './components/SMSImport'
+import FamilyMode from './components/FamilyMode'
 import { useNetwork } from './hooks/useNetwork'
 
 function AppContent() {
@@ -130,6 +135,9 @@ function AppContent() {
       case 'emi': return <EMICalculator />
       case 'bills': return <BillReminders />
       case 'recurring': return <RecurringTransactions />
+      case 'groups': return <GroupExpenses />
+      case 'smsimport': return <SMSImport />
+      case 'family': return <FamilyMode />
       case 'settings': return <Settings />
       default: return <Dashboard />
     }
@@ -137,6 +145,9 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+      {/* PWA Install Banner */}
+      <InstallBanner />
+
       {/* Offline banner */}
       {!isOnline && (
         <div className="bg-amber-500 text-white text-center py-2 text-xs font-semibold animate-slide-up flex items-center justify-center gap-1.5">
@@ -144,6 +155,7 @@ function AppContent() {
         </div>
       )}
       <Header />
+
       {error && (
         <div className="mx-4 mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-medium animate-slide-up">
           ⚠️ {error}
@@ -160,8 +172,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <ThemeProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </ThemeProvider>
   )
 }

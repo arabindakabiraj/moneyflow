@@ -2,10 +2,12 @@
  * Settings.jsx — Clean, modern profile & settings page
  */
 import { useState, useRef, useMemo } from 'react'
-import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert } from 'lucide-react'
+import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert, Palette, Users, Heart, MessageSquare, Smartphone } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { useTheme, THEMES } from '../context/ThemeContext'
 import { setupPin, clearPin, isPinSet, isBiometricCapable, isBiometricEnabled, checkPlatformAuthenticator, registerBiometric, clearBiometric, getAutoLockMinutes, setAutoLockMinutes } from './AppLock'
 import { exportToCSV } from '../utils/csvExport'
+import { useInstallPrompt } from '../hooks/useInstallPrompt'
 
 /* ── Section header ── */
 const SectionHeader = ({ children, icon: Icon, iconBg, iconColor }) => (
@@ -40,7 +42,12 @@ export default function Settings() {
   const { savingsGoal, setSavingsGoal, user, logout, customCategories, addCategory,
     budgets, saveBudget, removeBudget, getBudgetAlerts,
     username, updateUsername, profilePhoto, updateProfilePhoto,
-    darkMode, setDarkMode, transactions, setActiveTab } = useApp()
+    darkMode, setDarkMode, transactions, setActiveTab,
+    requestNotificationPermission, familySettings } = useApp()
+
+  const { theme, setTheme, themes } = useTheme()
+  const { canInstall, isInstalled, promptInstall } = useInstallPrompt()
+
 
   const fileRef = useRef(null)
   const [goalInput, setGoalInput] = useState(savingsGoal)
@@ -73,7 +80,7 @@ export default function Settings() {
 
   // Check biometric capability on mount
   useState(() => {
-    checkPlatformAuthenticator().then(ok => setBioCapable(ok)).catch(() => {})
+    checkPlatformAuthenticator().then(ok => setBioCapable(ok)).catch(() => { })
   })
 
   const alerts = getBudgetAlerts()
@@ -95,12 +102,42 @@ export default function Settings() {
     }
   }
 
-  const handlePhotoUpload = (e) => {
+  const [photoUploading, setPhotoUploading] = useState(false)
+
+  // Compress image to max 256×256 JPEG ≤150KB for reliable Firestore storage
+  const compressImage = (file, maxSize = 256, quality = 0.8) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        const canvas = document.createElement('canvas')
+        let w = img.width, h = img.height
+        if (w > h) { if (w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize } }
+        else { if (h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize } }
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = reject
+      img.src = url
+    })
+  }
+
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onloadend = () => updateProfilePhoto(reader.result)
-    reader.readAsDataURL(file)
+    setPhotoUploading(true)
+    try {
+      const compressed = await compressImage(file)
+      await updateProfilePhoto(compressed)
+    } catch (err) {
+      console.error('Photo upload error:', err)
+    }
+    setPhotoUploading(false)
+    // Reset input so re-selecting the same file triggers onChange
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   const initials = (username || 'M').charAt(0).toUpperCase()
@@ -139,8 +176,8 @@ export default function Settings() {
 
         <div className="relative px-6 pt-8 pb-6 flex flex-col items-center text-white">
           {/* Avatar */}
-          <button onClick={() => fileRef.current?.click()} className="group relative mb-4">
-            <div className="w-24 h-24 rounded-full ring-4 ring-white/30 overflow-hidden bg-white/20 flex items-center justify-center shadow-2xl transition-transform group-active:scale-95">
+          <button onClick={() => fileRef.current?.click()} disabled={photoUploading} className="group relative mb-4">
+            <div className={`w-24 h-24 rounded-full ring-4 ring-white/30 overflow-hidden bg-white/20 flex items-center justify-center shadow-2xl transition-transform group-active:scale-95 ${photoUploading ? 'animate-pulse' : ''}`}>
               {profilePhoto ? (
                 <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -148,7 +185,9 @@ export default function Settings() {
               )}
             </div>
             <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center group-active:scale-90 transition-transform">
-              <Camera size={14} className="text-brand-600" />
+              {photoUploading
+                ? <RefreshCw size={14} className="text-brand-600 animate-spin" />
+                : <Camera size={14} className="text-brand-600" />}
             </div>
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
@@ -281,6 +320,9 @@ export default function Settings() {
             { label: 'EMI Calc', icon: Calculator, color: 'from-purple-400 to-violet-600', tab: 'emi' },
             { label: 'Bill Split', icon: Scissors, color: 'from-green-400 to-emerald-600', tab: 'split' },
             { label: 'Debt Tracker', icon: TrendingDown, color: 'from-rose-400 to-rose-600', tab: 'debts' },
+            { label: 'Group Expense', icon: Users, color: 'from-indigo-400 to-indigo-600', tab: 'groups' },
+            { label: 'SMS Import', icon: MessageSquare, color: 'from-cyan-400 to-cyan-600', tab: 'smsimport' },
+            { label: 'Family Mode', icon: Heart, color: 'from-pink-400 to-pink-600', tab: 'family' },
           ].map(({ label, icon: Icon, color, tab }) => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm active:scale-95 transition-transform group">
@@ -313,6 +355,37 @@ export default function Settings() {
               className={`relative w-12 h-7 rounded-full transition-all duration-300 ${darkMode ? 'bg-brand-500' : 'bg-gray-200 dark:bg-gray-600'}`}>
               <div className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300 ${darkMode ? 'left-6' : 'left-1'}`} />
             </button>
+          </div>
+
+          {/* Theme Selector */}
+          <div className="px-4 py-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
+                <Palette size={18} className="text-violet-600 dark:text-violet-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 dark:text-white">Theme</p>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">{themes[theme]?.name || 'Default Green'}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              {Object.entries(themes).map(([key, t]) => (
+                <button
+                  key={key}
+                  onClick={() => setTheme(key)}
+                  className={`flex flex-col items-center gap-1.5 py-2.5 rounded-xl transition-all active:scale-95 ${theme === key
+                    ? 'bg-gray-100 dark:bg-gray-700 ring-2 ring-brand-500'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    }`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full shadow-md ${theme === key ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-100 dark:ring-offset-gray-800' : ''}`}
+                    style={{ backgroundColor: t.preview }}
+                  />
+                  <span className="text-[9px] text-gray-500 dark:text-gray-400 font-medium">{t.emoji}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Savings Goal */}
@@ -558,6 +631,11 @@ export default function Settings() {
             icon={Download} iconBg="bg-emerald-100 dark:bg-emerald-900/30" iconColor="text-emerald-600 dark:text-emerald-400"
             label="Export as CSV" desc="Download all transactions"
             onClick={() => exportToCSV(transactions)}
+          />
+          <SettingsRow
+            icon={MessageSquare} iconBg="bg-blue-100 dark:bg-blue-900/30" iconColor="text-blue-600 dark:text-blue-400"
+            label="Import from SMS" desc="Parse bank SMS to add transactions"
+            onClick={() => setActiveTab('smsimport')}
           />
           <SettingsRow
             icon="📤" iconBg="bg-green-100 dark:bg-green-900/30"

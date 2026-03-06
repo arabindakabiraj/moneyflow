@@ -68,11 +68,14 @@ export default function Transactions({ onEdit }) {
 
   // Search filter on top of date filters
   const filtered = search.trim()
-    ? allFiltered.filter(tx =>
-      tx.description?.toLowerCase().includes(search.toLowerCase()) ||
-      tx.category?.toLowerCase().includes(search.toLowerCase()) ||
-      String(tx.amount).includes(search)
-    )
+    ? allFiltered.filter(tx => {
+      const q = search.toLowerCase()
+      return tx.description?.toLowerCase().includes(q) ||
+        tx.category?.toLowerCase().includes(q) ||
+        String(tx.amount).includes(search) ||
+        (tx.tags || []).some(tag => tag.toLowerCase().includes(q)) ||
+        tx.notes?.toLowerCase().includes(q)
+    })
     : allFiltered
 
   const summary = getSummary(filtered)

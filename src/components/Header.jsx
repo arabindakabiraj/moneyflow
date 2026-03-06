@@ -1,8 +1,10 @@
 import { Bell, Moon, Sun } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { useNotificationCount } from './Notifications'
 
 export default function Header() {
   const { darkMode, setDarkMode, username, profilePhoto, activeTab, setActiveTab } = useApp()
+  const notifCount = useNotificationCount()
 
   return (
     <header className="sticky top-0 z-50 px-5 pt-4 pb-3
@@ -39,7 +41,9 @@ export default function Header() {
           <button onClick={() => setActiveTab('notifications')}
             className="relative p-2.5 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-90">
             <Bell size={16} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
+            {notifCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+            )}
           </button>
 
           {/* Dark mode */}

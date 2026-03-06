@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════ Default Theme CSS Variables ═══════ */
+:root {
+  --brand-50: 240 253 244;
+  --brand-100: 220 252 231;
+  --brand-200: 187 247 208;
+  --brand-300: 134 239 172;
+  --brand-400: 74 222 128;
+  --brand-500: 34 197 94;
+  --brand-600: 22 163 74;
+  --brand-700: 21 128 61;
+  --brand-800: 22 101 52;
+  --brand-900: 20 83 45;
+  --color-credit: #22c55e;
+  --color-debit: #f43f5e;
+  --splash-from: #064e3b;
+  --splash-to: #059669;
+  --diamond-shadow: rgba(34, 197, 94, 0.4);
+}
+
 @layer base {
   * { @apply box-border; }
   body {
@@ -42,7 +61,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4), 0 0 0 4px rgba(255,255,255,0.15);
+  box-shadow: 0 8px 24px var(--diamond-shadow), 0 0 0 4px rgba(255,255,255,0.15);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .diamond-btn:active {
@@ -61,7 +80,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #064e3b 0%, #065f46 30%, #047857 60%, #059669 100%);
+  background: linear-gradient(135deg, var(--splash-from) 0%, var(--splash-to) 100%);
 }
 .splash-ring {
   position: absolute;
@@ -86,3 +105,16 @@
 .circular-progress {
   transform: rotate(-90deg);
 }
+
+/* ═══════ AMOLED Mode Overrides ═══════ */
+.amoled.dark {
+  --bg-main: #000000;
+}
+.amoled.dark body,
+.amoled.dark .bg-gray-950 { background-color: #000000 !important; }
+.amoled.dark .bg-gray-900,
+.amoled.dark .dark\:bg-gray-900 { background-color: #0a0a0a !important; }
+.amoled.dark .dark\:bg-gray-900\/95 { background-color: rgba(10,10,10,0.95) !important; }
+.amoled.dark .dark\:bg-gray-800 { background-color: #111111 !important; }
+.amoled.dark .dark\:border-gray-700,
+.amoled.dark .dark\:border-gray-700\/40 { border-color: #1a1a1a !important; }
