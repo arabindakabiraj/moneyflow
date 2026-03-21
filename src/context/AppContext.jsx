@@ -19,7 +19,7 @@ const DEFAULT_CATEGORIES = ['Tiffin', 'Books', 'Travel', 'Tuition', 'Entertainme
 
 export function AppProvider({ children }) {
   const [uid, setUid] = useState(undefined)
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') !== 'light')
   const [transactions, setTx] = useState([])
   const [budgets, setBudgets] = useState({})   // { category: limitAmount }
   const [loading, setLoading] = useState(false)
@@ -42,6 +42,12 @@ export function AppProvider({ children }) {
   const [goals, setGoals] = useState([])
   const [bills, setBills] = useState([])
   const [recurringTx, setRecurringTx] = useState([])
+
+  // ── Opening Balance + GST state ──
+  const [openingBalance, setOpeningBalanceState] = useState(0)
+  const [openingDate, setOpeningDateState] = useState('')
+  const [gstSettings, setGstSettingsState] = useState({ gstRate: 18, registered: false })
+  const [onboardingDone, setOnboardingDoneState] = useState(null) // null = loading, false = needed, true = done
 
   // ── Group Expenses state ──
   const [groups, setGroups] = useState([])
@@ -229,6 +235,54 @@ export function AppProvider({ children }) {
 
   const addRecurring = async (r) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'recurring'), { ...r, createdAt: serverTimestamp() }) }
   const deleteRecurring = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'recurring', id)) }
+
+  // Firestore — Opening Balance + GST settings real-time
+  useEffect(() => {
+    if (!uid) {
+      setOpeningBalanceState(0)
+      setOpeningDateState('')
+      setGstSettingsState({ gstRate: 18, registered: false })
+      setOnboardingDoneState(null)
+      return
+    }
+    const unsub = onSnapshot(
+      doc(db, 'users', uid, 'settings', 'finance'),
+      snap => {
+        if (snap.exists()) {
+          const d = snap.data()
+          setOpeningBalanceState(Number(d.openingBalance) || 0)
+          setOpeningDateState(d.openingDate || '')
+          setGstSettingsState({ gstRate: Number(d.gstRate) || 18, registered: !!d.registered })
+          setOnboardingDoneState(!!d.onboardingDone)
+        } else {
+          setOnboardingDoneState(false)
+        }
+      },
+      err => console.error('Finance settings err:', err)
+    )
+    return unsub
+  }, [uid])
+
+  const setOpeningBalance = async (amount, date) => {
+    if (!uid) return
+    const val = { openingBalance: Number(amount) || 0, openingDate: date || new Date().toISOString().split('T')[0] }
+    setOpeningBalanceState(val.openingBalance)
+    setOpeningDateState(val.openingDate)
+    await setDoc(doc(db, 'users', uid, 'settings', 'finance'), val, { merge: true })
+  }
+
+  const completeOnboarding = async () => {
+    setOnboardingDoneState(true)
+    if (!uid) return
+    await setDoc(doc(db, 'users', uid, 'settings', 'finance'), { onboardingDone: true }, { merge: true })
+  }
+
+  const updateGstSettings = async (settings) => {
+    if (!uid) return
+    const updated = { ...gstSettings, ...settings }
+    setGstSettingsState(updated)
+    await setDoc(doc(db, 'users', uid, 'settings', 'finance'), { gstRate: updated.gstRate, registered: updated.registered }, { merge: true })
+  }
 
   // Firestore — Groups real-time
   useEffect(() => {
@@ -520,24 +574,173 @@ export function AppProvider({ children }) {
   const logout = () => { clearSession(); setUid(null); setTx([]); setBudgets({}) }
   const setSavingsGoal = (v) => { setSavingsGoalState(v); localStorage.setItem('savingsGoal', v) }
 
-  const getSummary = (txList = transactions) => {
+  const getSummary = useCallback((txList = transactions) => {
     const totalCredit = txList.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
     const totalDebit = txList.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
     return { totalCredit, totalDebit, balance: totalCredit - totalDebit }
+  }, [transactions])
+
+  // ── True Balance (Opening Balance + all transactions) ──
+  const getTrueBalance = () => {
+    const { totalCredit, totalDebit } = getSummary()
+    return openingBalance + totalCredit - totalDebit
   }
 
-  const getFilteredTransactions = () => {
+  // ── Net Worth History — month-by-month cumulative balance (for chart) ──
+  const getNetWorthHistory = () => {
+    // Sort all transactions by date ascending
+    const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date))
+    if (!sorted.length) return []
+
+    // Group by month, track running balance starting from openingBalance
+    const monthMap = {}
+    sorted.forEach(t => {
+      const month = t.date?.slice(0, 7)
+      if (!month) return
+      if (!monthMap[month]) monthMap[month] = { income: 0, expense: 0 }
+      if (t.type === 'credit') monthMap[month].income += Number(t.amount)
+      else monthMap[month].expense += Number(t.amount)
+    })
+
+    const months = Object.keys(monthMap).sort()
+    let running = openingBalance
+    return months.map(m => {
+      running += (monthMap[m].income - monthMap[m].expense)
+      return { month: m, netWorth: Math.round(running) }
+    })
+  }
+
+  // ── Cash Flow Statement — Operating / Investing / Financing ──
+  const OPERATING_CATS = ['Tiffin', 'Books', 'Travel', 'Entertainment', 'Health', 'Rent', 'Others', 'Mobile', 'Electricity', 'Groceries', 'Food', 'Clothing']
+  const INVESTING_CATS = ['Investment', 'Savings', 'Gold', 'Stocks', 'MF', 'FD', 'Insurance']
+  const FINANCING_CATS = ['Loan', 'Debt', 'Repayment', 'Credit Card', 'EMI', 'Tuition']
+
+  const getCashFlowData = (month = '') => {
+    const filtered = month ? transactions.filter(t => t.date?.startsWith(month)) : transactions
+    const result = {
+      operating: { inflow: 0, outflow: 0, items: [] },
+      investing: { inflow: 0, outflow: 0, items: [] },
+      financing: { inflow: 0, outflow: 0, items: [] },
+    }
+    filtered.forEach(t => {
+      const amt = Number(t.amount)
+      const cat = t.category || 'Others'
+      let section = 'operating'
+      if (INVESTING_CATS.some(c => cat.toLowerCase().includes(c.toLowerCase()))) section = 'investing'
+      else if (FINANCING_CATS.some(c => cat.toLowerCase().includes(c.toLowerCase()))) section = 'financing'
+      if (t.type === 'credit') {
+        result[section].inflow += amt
+        result[section].items.push({ ...t, flowType: 'inflow' })
+      } else {
+        result[section].outflow += amt
+        result[section].items.push({ ...t, flowType: 'outflow' })
+      }
+    })
+    Object.keys(result).forEach(k => {
+      result[k].net = result[k].inflow - result[k].outflow
+    })
+    result.totalNet = result.operating.net + result.investing.net + result.financing.net
+    return result
+  }
+
+  // ── P&L Statement — monthly income vs expense breakdown ──
+  const getPLStatement = (month = '') => {
+    const target = month || new Date().toISOString().slice(0, 7)
+    const filtered = transactions.filter(t => t.date?.startsWith(target))
+    const income = filtered.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
+    const expense = filtered.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
+    // Category breakdown of expenses
+    const catBreakdown = {}
+    filtered.filter(t => t.type === 'debit').forEach(t => {
+      catBreakdown[t.category] = (catBreakdown[t.category] || 0) + Number(t.amount)
+    })
+    // Income breakdown
+    const incomeBreakdown = {}
+    filtered.filter(t => t.type === 'credit').forEach(t => {
+      incomeBreakdown[t.category || 'Income'] = (incomeBreakdown[t.category || 'Income'] || 0) + Number(t.amount)
+    })
+    const grossSavings = income - expense
+    const savingsRate = income > 0 ? Math.round((grossSavings / income) * 100) : 0
+    return { month: target, income, expense, grossSavings, savingsRate, catBreakdown, incomeBreakdown }
+  }
+
+  // ── Double-Entry Ledger — every transaction as Debit/Credit row with running balance ──
+  const getLedgerEntries = useCallback(() => {
+    const sorted = [...transactions].sort((a, b) => {
+      const dateDiff = new Date(a.date) - new Date(b.date)
+      if (dateDiff !== 0) return dateDiff
+      const aT = a.createdAt?.toMillis?.() || (a.createdAt?.seconds || 0) * 1000
+      const bT = b.createdAt?.toMillis?.() || (b.createdAt?.seconds || 0) * 1000
+      return aT - bT
+    })
+    let balance = openingBalance
+    const entries = []
+    // First row = Opening Balance entry
+    if (openingBalance > 0 && openingDate) {
+      entries.push({
+        id: 'opening',
+        date: openingDate,
+        description: 'Opening Balance',
+        category: '—',
+        debit: 0,
+        credit: openingBalance,
+        balance: openingBalance,
+        isOpening: true,
+      })
+    }
+    sorted.forEach(t => {
+      const amt = Number(t.amount)
+      if (t.type === 'credit') {
+        balance += amt
+        entries.push({ ...t, debit: 0, credit: amt, balance })
+      } else {
+        balance -= amt
+        entries.push({ ...t, debit: amt, credit: 0, balance })
+      }
+    })
+    return entries
+  }, [transactions, openingBalance, openingDate])
+
+  // ── ML Spending Prediction — weighted avg of last 3 months per category ──
+  const getMLPredictions = () => {
+    const monthsData = {}
+    transactions.filter(t => t.type === 'debit').forEach(t => {
+      const m = t.date?.slice(0, 7)
+      if (!m) return
+      if (!monthsData[m]) monthsData[m] = {}
+      monthsData[m][t.category] = (monthsData[m][t.category] || 0) + Number(t.amount)
+    })
+    const sortedMonths = Object.keys(monthsData).sort().slice(-3) // last 3 months
+    if (!sortedMonths.length) return []
+
+    const allCats = [...new Set(sortedMonths.flatMap(m => Object.keys(monthsData[m])))]
+    return allCats.map(cat => {
+      // Weighted average: most recent month weight=3, middle=2, oldest=1
+      const weights = [1, 2, 3]
+      let weightedSum = 0, totalWeight = 0
+      sortedMonths.forEach((m, i) => {
+        const w = weights[i] || 1
+        weightedSum += (monthsData[m][cat] || 0) * w
+        totalWeight += w
+      })
+      const predicted = Math.round(weightedSum / totalWeight)
+      const lastMonth = monthsData[sortedMonths[sortedMonths.length - 1]][cat] || 0
+      return { category: cat, predicted, lastMonth, change: predicted - lastMonth }
+    }).sort((a, b) => b.predicted - a.predicted)
+  }
+
+  const getFilteredTransactions = useCallback(() => {
     let f = [...transactions]
     if (filterDate) f = f.filter(t => t.date === filterDate)
     else if (filterMonth) f = f.filter(t => t.date?.startsWith(filterMonth))
     return f.sort((a, b) => {
       const dateDiff = new Date(b.date) - new Date(a.date)
       if (dateDiff !== 0) return dateDiff
-      const aT = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0
-      const bT = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0
+      const aT = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ?? 0) * 1000
+      const bT = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ?? 0) * 1000
       return bT - aT
     })
-  }
+  }, [transactions, filterDate, filterMonth])
 
   const askGemini = async (userMessage) => {
     const summary = getSummary()
@@ -770,6 +973,13 @@ RESPOND WITH ONLY valid JSON, no markdown, no explanation:
     addTransaction, updateTransaction, deleteTransaction, toggleNeedWant,
     getSummary, getFilteredTransactions,
     askGemini, askGeminiRaw, parseNLPTransaction,
+    // ── Commerce & AI Features ──
+    openingBalance, openingDate, setOpeningBalance,
+    gstSettings, updateGstSettings,
+    onboardingDone, completeOnboarding,
+    getTrueBalance, getNetWorthHistory,
+    getCashFlowData, getPLStatement,
+    getLedgerEntries, getMLPredictions,
     isDemo: false,
     fetchTransactions: () => { },
   }

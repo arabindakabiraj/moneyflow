@@ -1,7 +1,7 @@
 /**
  * App.jsx — Root with Splash + PIN lock + all tabs including Accounts, Debts
  */
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import { ThemeProvider } from './context/ThemeContext'
 import Header from './components/Header'
@@ -9,29 +9,60 @@ import BottomNav from './components/BottomNav'
 import Dashboard from './components/Dashboard'
 import Transactions from './components/Transactions'
 import AddTransaction from './components/AddTransaction'
-import AIChat from './components/AIChat'
-import Settings from './components/Settings'
-import Charts from './components/Charts'
-import SplitCalculator from './components/SplitCalculator'
-import Accounts from './components/Accounts'
-import DebtTracker from './components/DebtTracker'
-import SmartAdd from './components/SmartAdd'
-import SavingsGoals from './components/SavingsGoals'
-import EMICalculator from './components/EMICalculator'
-import BillReminders from './components/BillReminders'
-import RecurringTransactions from './components/RecurringTransactions'
-import Notifications from './components/Notifications'
 import AuthScreen from './components/AuthScreen'
 import AppLock, { isPinSet, getAutoLockMinutes, isBiometricEnabled } from './components/AppLock'
 import SplashScreen from './components/SplashScreen'
 import InstallBanner from './components/InstallBanner'
-import GroupExpenses from './components/GroupExpenses'
-import SMSImport from './components/SMSImport'
-import FamilyMode from './components/FamilyMode'
+import OnboardingModal from './components/OnboardingModal'
+import ErrorBoundary from './components/ErrorBoundary'
 import { useNetwork } from './hooks/useNetwork'
 
+// ── Lazy-loaded tabs (code-split → faster initial load) ──
+const AIChat            = lazy(() => import('./components/AIChat'))
+const Settings          = lazy(() => import('./components/Settings'))
+const Charts            = lazy(() => import('./components/Charts'))
+const SplitCalculator   = lazy(() => import('./components/SplitCalculator'))
+const Accounts          = lazy(() => import('./components/Accounts'))
+const DebtTracker       = lazy(() => import('./components/DebtTracker'))
+const SmartAdd          = lazy(() => import('./components/SmartAdd'))
+const SavingsGoals      = lazy(() => import('./components/SavingsGoals'))
+const EMICalculator     = lazy(() => import('./components/EMICalculator'))
+const BillReminders     = lazy(() => import('./components/BillReminders'))
+const RecurringTransactions = lazy(() => import('./components/RecurringTransactions'))
+const Notifications     = lazy(() => import('./components/Notifications'))
+const GroupExpenses     = lazy(() => import('./components/GroupExpenses'))
+const SMSImport         = lazy(() => import('./components/SMSImport'))
+const FamilyMode        = lazy(() => import('./components/FamilyMode'))
+const Ledger            = lazy(() => import('./components/Ledger'))
+const CashFlow          = lazy(() => import('./components/CashFlow'))
+
+// ── Skeleton shown while a lazy tab is loading ──
+function TabFallback() {
+  return (
+    <div className="space-y-4 pt-2 animate-fade-in">
+      <div className="skeleton h-10 w-40 rounded-xl" />
+      <div className="skeleton h-36 rounded-3xl" />
+      <div className="skeleton h-24 rounded-2xl" />
+      <div className="skeleton h-14 rounded-2xl" />
+      <div className="skeleton h-40 rounded-2xl" />
+    </div>
+  )
+}
+
+/* ── Animated ambient background ── */
+function LiquidBackground() {
+  return (
+    <>
+      <div className="lg-bg-orb lg-bg-orb-1" />
+      <div className="lg-bg-orb lg-bg-orb-2" />
+      <div className="lg-bg-orb lg-bg-orb-3" />
+    </>
+  )
+}
+
+
 function AppContent() {
-  const { activeTab, setActiveTab, error, uid, setUid } = useApp()
+  const { activeTab, setActiveTab, error, uid, setUid, onboardingDone, completeOnboarding } = useApp()
   const [editData, setEditData] = useState(null)
   const [addType, setAddType] = useState(null) // 'credit' or 'debit' — pre-select when coming from quick actions
   const [unlocked, setUnlocked] = useState(!isPinSet())
@@ -101,12 +132,13 @@ function AppContent() {
 
   if (uid === undefined) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(165deg, #062b1a 0%, #0a3d2e 30%, #0d4540 60%, #071e2e 100%)' }}>
+        <LiquidBackground />
+        <div className="text-center relative z-10">
           <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-brand-400 to-emerald-600 flex items-center justify-center mx-auto mb-4 animate-pulse shadow-2xl shadow-brand-500/30">
             <span className="text-3xl font-bold text-white">₹</span>
           </div>
-          <p className="text-gray-400 text-sm">Loading...</p>
+          <p className="lg-text-secondary text-sm">Loading...</p>
         </div>
       </div>
     )
@@ -138,34 +170,55 @@ function AppContent() {
       case 'groups': return <GroupExpenses />
       case 'smsimport': return <SMSImport />
       case 'family': return <FamilyMode />
+      case 'ledger': return <Ledger />
+      case 'cashflow': return <CashFlow />
       case 'settings': return <Settings />
       default: return <Dashboard />
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
-      {/* PWA Install Banner */}
-      <InstallBanner />
+    <div className="min-h-screen relative">
+      {/* ── Liquid Glass Background ── */}
+      <LiquidBackground />
 
-      {/* Offline banner */}
-      {!isOnline && (
-        <div className="bg-amber-500 text-white text-center py-2 text-xs font-semibold animate-slide-up flex items-center justify-center gap-1.5">
-          ⚠️ You are offline — data will sync automatically when connected
-        </div>
-      )}
-      <Header />
+      {/* ── Content Layer (above orbs) ── */}
+      <div className="relative z-10">
+        {/* PWA Install Banner */}
+        <InstallBanner />
 
-      {error && (
-        <div className="mx-4 mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-medium animate-slide-up">
-          ⚠️ {error}
-        </div>
-      )}
-      <main className={`px-4 pt-4 max-w-md mx-auto ${activeTab === 'ai' ? 'pb-0 overflow-hidden' : 'pb-32'}`}
-        style={{ minHeight: activeTab === 'ai' ? undefined : 'calc(100vh - 64px)' }}>
-        {renderTab()}
-      </main>
-      <BottomNav />
+        {/* Offline banner */}
+        {!isOnline && (
+          <div className="bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-white text-center py-2 text-xs font-semibold animate-slide-up flex items-center justify-center gap-1.5 backdrop-blur-sm">
+            ⚠️ You are offline — data will sync automatically when connected
+          </div>
+        )}
+        <Header />
+
+        {error && (
+          <div className="mx-4 mt-3 p-3 rounded-xl text-xs font-medium animate-slide-up"
+            style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.30)', color: '#fbbf24' }}>
+            ⚠️ {error}
+          </div>
+        )}
+        <main
+          key={activeTab}
+          className={`px-4 pt-4 max-w-md mx-auto animate-tab-enter ${activeTab === 'ai' ? 'pb-0 overflow-hidden' : 'pb-32'}`}
+          style={{ minHeight: activeTab === 'ai' ? undefined : 'calc(100vh - 64px)' }}
+        >
+          <ErrorBoundary key={activeTab}>
+            <Suspense fallback={<TabFallback />}>
+              {renderTab()}
+            </Suspense>
+          </ErrorBoundary>
+        </main>
+        <BottomNav />
+
+        {/* Onboarding modal — shown once after first login */}
+        {onboardingDone === false && (
+          <OnboardingModal onComplete={completeOnboarding} />
+        )}
+      </div>
     </div>
   )
 }

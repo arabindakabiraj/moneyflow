@@ -1,4 +1,4 @@
-/**
+  /**
  * useNetwork.js — Hook to track online/offline status
  */
 import { useState, useEffect } from 'react'

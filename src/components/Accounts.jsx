@@ -1,147 +1,202 @@
 /**
- * Accounts.jsx — Cash / Bank / UPI balance tracker with calculated balances
+ * Accounts.jsx — Wallet with multi-layered Liquid Glass account cards
+ * Depth stacking, colour-coded left-border glows, animated fade-in
  */
 import { useState } from 'react'
 import { Wallet, Building2, Smartphone, Pencil, Check, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 const ACCOUNT_META = {
-    cash: { label: 'Cash', emoji: '💵', Icon: Wallet, color: 'from-emerald-500 to-green-600', badge: 'bg-emerald-500/20 text-emerald-300' },
-    bank: { label: 'Bank', emoji: '🏦', Icon: Building2, color: 'from-blue-500 to-indigo-600', badge: 'bg-blue-500/20 text-blue-300' },
-    upi: { label: 'UPI', emoji: '📱', Icon: Smartphone, color: 'from-violet-500 to-purple-600', badge: 'bg-violet-500/20 text-violet-300' },
+  cash: {
+    label: 'Cash', emoji: '💵', Icon: Wallet,
+    gradient: 'from-emerald-500 to-green-600',
+    glow: 'rgba(34,197,94,0.45)',
+    border: 'rgba(34,197,94,0.35)',
+    accent: '#4ade80',
+    bg: 'rgba(34,197,94,0.10)',
+  },
+  bank: {
+    label: 'Bank', emoji: '🏦', Icon: Building2,
+    gradient: 'from-blue-500 to-indigo-600',
+    glow: 'rgba(59,130,246,0.45)',
+    border: 'rgba(59,130,246,0.35)',
+    accent: '#60a5fa',
+    bg: 'rgba(59,130,246,0.10)',
+  },
+  upi: {
+    label: 'UPI', emoji: '📱', Icon: Smartphone,
+    gradient: 'from-violet-500 to-purple-600',
+    glow: 'rgba(139,92,246,0.45)',
+    border: 'rgba(139,92,246,0.35)',
+    accent: '#a78bfa',
+    bg: 'rgba(139,92,246,0.10)',
+  },
 }
 
 export default function Accounts() {
-    const { accounts, updateAccountBalance, transactions } = useApp()
-    const [editing, setEditing] = useState(null)
-    const [input, setInput] = useState('')
+  const { accounts, updateAccountBalance, transactions } = useApp()
+  const [editing, setEditing] = useState(null)
+  const [input, setInput]     = useState('')
 
-    const save = (key) => {
-        if (!isNaN(Number(input))) updateAccountBalance(key, Number(input))
-        setEditing(null)
-        setInput('')
-    }
+  const save = (key) => {
+    if (!isNaN(Number(input))) updateAccountBalance(key, Number(input))
+    setEditing(null); setInput('')
+  }
 
-    // Per-account transaction totals
-    const acctTotals = {}
-    transactions.forEach(tx => {
-        const a = tx.account?.toLowerCase() || 'cash'
-        if (!acctTotals[a]) acctTotals[a] = { credit: 0, debit: 0 }
-        if (tx.type === 'credit') acctTotals[a].credit += Number(tx.amount)
-        else acctTotals[a].debit += Number(tx.amount)
-    })
+  const acctTotals = {}
+  transactions.forEach(tx => {
+    const a = tx.account?.toLowerCase() || 'cash'
+    if (!acctTotals[a]) acctTotals[a] = { credit: 0, debit: 0 }
+    if (tx.type === 'credit') acctTotals[a].credit += Number(tx.amount)
+    else acctTotals[a].debit += Number(tx.amount)
+  })
 
-    // Calculated balance per account = base + income - expense
-    const calcBalance = (key) => {
-        const base = accounts[key] ?? 0
-        const totals = acctTotals[key] || { credit: 0, debit: 0 }
-        return base + totals.credit - totals.debit
-    }
+  const calcBalance = (key) => {
+    const base   = accounts[key] ?? 0
+    const totals = acctTotals[key] || { credit: 0, debit: 0 }
+    return base + totals.credit - totals.debit
+  }
 
-    const cashBal = calcBalance('cash')
-    const bankBal = calcBalance('bank')
-    const upiBal = calcBalance('upi')
-    const totalBalance = cashBal + bankBal + upiBal
+  const cashBal = calcBalance('cash')
+  const bankBal = calcBalance('bank')
+  const  upiBal = calcBalance('upi')
+  const totalBalance = cashBal + bankBal + upiBal
 
-    // Last transaction per account
-    const lastTx = (key) => transactions.filter(
-        tx => (tx.account?.toLowerCase() || 'cash') === key
-    )[0]
+  const lastTx = (key) => transactions.filter(tx => (tx.account?.toLowerCase() || 'cash') === key)[0]
+  const getBal  = (key) => key === 'cash' ? cashBal : key === 'bank' ? bankBal : upiBal
 
-    const getBal = (key) => key === 'cash' ? cashBal : key === 'bank' ? bankBal : upiBal
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div>
+        <h2 className="font-display font-bold text-xl" style={{ color: 'rgba(255,255,255,0.95)' }}>Wallet 💳</h2>
+        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>All accounts in one place</p>
+      </div>
 
-    return (
-        <div className="space-y-4 animate-fade-in">
-            <div>
-                <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">Wallet 💳</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">All accounts in one place</p>
-            </div>
-
-            {/* Total Balance */}
-            <div className="card bg-gradient-to-br from-gray-900 to-gray-800 dark:from-gray-800 dark:to-gray-900 text-white text-center">
-                <p className="text-white/60 text-xs mb-1">Total Balance</p>
-                <p className="font-display font-bold text-3xl">₹{totalBalance.toLocaleString('en-IN')}</p>
-                <div className="flex items-center justify-center gap-3 mt-3">
-                    {Object.entries(ACCOUNT_META).map(([key, { emoji, badge }]) => (
-                        <span key={key} className={`text-xs px-2.5 py-1 rounded-lg ${badge} font-mono font-semibold`}>
-                            {emoji} ₹{getBal(key).toLocaleString('en-IN')}
-                        </span>
-                    ))}
-                </div>
-            </div>
-
-            {/* Account cards */}
-            {Object.entries(ACCOUNT_META).map(([key, { label, emoji, Icon, color }]) => {
-                const bal = getBal(key)
-                const baseBal = accounts[key] ?? 0
-                const totals = acctTotals[key] || { credit: 0, debit: 0 }
-                const lastTransaction = lastTx(key)
-                const txCount = transactions.filter(tx => (tx.account?.toLowerCase() || 'cash') === key).length
-                return (
-                    <div key={key} className="card bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                        {/* Header */}
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${color} flex items-center justify-center shadow-md`}>
-                                <Icon size={18} className="text-white" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="font-semibold text-gray-900 dark:text-white">{emoji} {label}</p>
-                                <p className="text-xs text-gray-400">{txCount} transactions</p>
-                            </div>
-                            {editing === key ? (
-                                <div className="flex items-center gap-1.5">
-                                    <input autoFocus type="number" value={input} onChange={e => setInput(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter') save(key); if (e.key === 'Escape') setEditing(null) }}
-                                        className="w-28 px-2 py-1.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono outline-none focus:border-brand-500" placeholder="₹ Base" />
-                                    <button onClick={() => save(key)} className="w-7 h-7 rounded-lg bg-brand-500 text-white flex items-center justify-center hover:bg-brand-600"><Check size={13} /></button>
-                                    <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 flex items-center justify-center"><X size={13} /></button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2">
-                                    <span className="font-display font-bold text-xl text-gray-900 dark:text-white font-mono">₹{bal.toLocaleString('en-IN')}</span>
-                                    <button onClick={() => { setEditing(key); setInput(String(baseBal)) }}
-                                        className="w-7 h-7 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-brand-500 transition-colors">
-                                        <Pencil size={13} />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Income & Expense stats */}
-                        <div className="flex gap-2 mb-3">
-                            <div className="flex-1 flex items-center gap-1.5 bg-green-50 dark:bg-green-900/10 rounded-xl px-2.5 py-1.5">
-                                <ArrowDownLeft size={12} className="text-green-500 shrink-0" />
-                                <div>
-                                    <p className="text-[10px] text-gray-400">Income</p>
-                                    <p className="text-xs font-mono font-bold text-green-600 dark:text-green-400">₹{totals.credit.toLocaleString('en-IN')}</p>
-                                </div>
-                            </div>
-                            <div className="flex-1 flex items-center gap-1.5 bg-rose-50 dark:bg-rose-900/10 rounded-xl px-2.5 py-1.5">
-                                <ArrowUpRight size={12} className="text-rose-500 shrink-0" />
-                                <div>
-                                    <p className="text-[10px] text-gray-400">Expense</p>
-                                    <p className="text-xs font-mono font-bold text-rose-600 dark:text-rose-400">₹{totals.debit.toLocaleString('en-IN')}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Last transaction */}
-                        {lastTransaction && (
-                            <div className="border-t border-gray-100 dark:border-gray-700 pt-2">
-                                <p className="text-[10px] text-gray-400 mb-1">Last transaction</p>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 dark:text-gray-300 truncate max-w-[60%]">{lastTransaction.description || lastTransaction.category}</span>
-                                    <span className={`text-xs font-mono font-bold ${lastTransaction.type === 'credit' ? 'text-green-600 dark:text-green-400' : 'text-rose-500'}`}>
-                                        {lastTransaction.type === 'credit' ? '+' : '-'}₹{Number(lastTransaction.amount).toLocaleString('en-IN')}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )
-            })}
-
-            <p className="text-xs text-gray-400 dark:text-gray-500 text-center">Set base balance. Income - Expense will auto-calculate.</p>
+      {/* ── Total Balance Hero ── */}
+      <div className="lg-deep rounded-3xl p-5 text-center">
+        {/* Ambient glow inside */}
+        <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+          <div style={{
+            position:'absolute', top:'-20%', right:'-10%',
+            width:'200px', height:'200px', borderRadius:'50%',
+            background:'radial-gradient(circle, rgba(34,197,94,0.18) 0%, transparent 70%)',
+            filter:'blur(24px)',
+          }} />
         </div>
-    )
+        <p className="text-xs mb-1 relative z-10" style={{ color:'rgba(255,255,255,0.50)' }}>Total Balance</p>
+        <p className="font-display font-bold text-4xl relative z-10" style={{
+          color:'rgba(255,255,255,0.97)',
+          textShadow:'0 2px 20px rgba(74,222,128,0.35)',
+        }}>
+          ₹{totalBalance.toLocaleString('en-IN')}
+        </p>
+        <div className="flex items-center justify-center gap-2 mt-3 relative z-10 flex-wrap">
+          {Object.entries(ACCOUNT_META).map(([key, { emoji, accent, bg }]) => (
+            <span key={key} className="text-xs px-2.5 py-1 rounded-xl font-mono font-semibold"
+              style={{ background: bg, color: accent, border: `1px solid ${accent}55` }}>
+              {emoji} ₹{getBal(key).toLocaleString('en-IN')}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Account cards — depth-stacked with slight offset ── */}
+      {Object.entries(ACCOUNT_META).map(([key, { label, emoji, Icon, gradient, glow, border, accent, bg }], idx) => {
+        const bal            = getBal(key)
+        const baseBal        = accounts[key] ?? 0
+        const totals         = acctTotals[key] || { credit: 0, debit: 0 }
+        const lastTransaction = lastTx(key)
+        const txCount        = transactions.filter(tx => (tx.account?.toLowerCase() || 'cash') === key).length
+
+        return (
+          <div key={key} className="lg-surface rounded-3xl p-4 stagger-item transition-all"
+            style={{
+              borderLeft: `3px solid ${border}`,
+              boxShadow: `0 8px 32px rgba(0,0,0,0.20), 0 0 0 1px rgba(255,255,255,0.12), 0 0 24px ${glow.replace('0.45','0.12')}`,
+              animationDelay: `${idx * 60}ms`,
+            }}>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-3 relative z-10">
+              <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}
+                style={{ boxShadow: `0 4px 16px ${glow}` }}>
+                <Icon size={18} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold" style={{ color:'rgba(255,255,255,0.90)' }}>{emoji} {label}</p>
+                <p className="text-xs" style={{ color:'rgba(255,255,255,0.40)' }}>{txCount} transactions</p>
+              </div>
+              {editing === key ? (
+                <div className="flex items-center gap-1.5">
+                  <input autoFocus type="number" value={input} onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') save(key); if (e.key === 'Escape') setEditing(null) }}
+                    className="w-28 px-2 py-1.5 rounded-xl text-sm font-mono outline-none"
+                    style={{ background:'rgba(255,255,255,0.10)', border:`1.5px solid ${accent}77`, color:'rgba(255,255,255,0.90)' }}
+                    placeholder="₹ Base" />
+                  <button onClick={() => save(key)} className="w-7 h-7 rounded-lg flex items-center justify-center text-white"
+                    style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)` }}>
+                    <Check size={13} />
+                  </button>
+                  <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-lg flex items-center justify-center"
+                    style={{ background:'rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.60)' }}>
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="font-display font-bold text-xl font-mono" style={{ color: accent }}>
+                    ₹{bal.toLocaleString('en-IN')}
+                  </span>
+                  <button onClick={() => { setEditing(key); setInput(String(baseBal)) }}
+                    className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors"
+                    style={{ background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.45)' }}>
+                    <Pencil size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Income & Expense mini */}
+            <div className="flex gap-2 mb-3 relative z-10">
+              <div className="flex-1 flex items-center gap-1.5 rounded-xl px-2.5 py-1.5"
+                style={{ background:'rgba(34,197,94,0.10)', border:'1px solid rgba(34,197,94,0.20)' }}>
+                <ArrowDownLeft size={12} style={{ color:'#4ade80', flexShrink:0 }} />
+                <div>
+                  <p className="text-[10px]" style={{ color:'rgba(255,255,255,0.38)' }}>Income</p>
+                  <p className="text-xs font-mono font-bold" style={{ color:'#4ade80' }}>₹{totals.credit.toLocaleString('en-IN')}</p>
+                </div>
+              </div>
+              <div className="flex-1 flex items-center gap-1.5 rounded-xl px-2.5 py-1.5"
+                style={{ background:'rgba(244,63,94,0.10)', border:'1px solid rgba(244,63,94,0.20)' }}>
+                <ArrowUpRight size={12} style={{ color:'#f87171', flexShrink:0 }} />
+                <div>
+                  <p className="text-[10px]" style={{ color:'rgba(255,255,255,0.38)' }}>Expense</p>
+                  <p className="text-xs font-mono font-bold" style={{ color:'#f87171' }}>₹{totals.debit.toLocaleString('en-IN')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Last transaction */}
+            {lastTransaction && (
+              <div className="relative z-10 pt-2" style={{ borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+                <p className="text-[10px] mb-1" style={{ color:'rgba(255,255,255,0.35)' }}>Last transaction</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs truncate max-w-[60%]" style={{ color:'rgba(255,255,255,0.65)' }}>
+                    {lastTransaction.description || lastTransaction.category}
+                  </span>
+                  <span className="text-xs font-mono font-bold" style={{ color: lastTransaction.type === 'credit' ? '#4ade80' : '#f87171' }}>
+                    {lastTransaction.type === 'credit' ? '+' : '-'}₹{Number(lastTransaction.amount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      <p className="text-xs text-center" style={{ color:'rgba(255,255,255,0.28)' }}>
+        Set base balance. Income − Expense will auto-calculate.
+      </p>
+    </div>
+  )
 }

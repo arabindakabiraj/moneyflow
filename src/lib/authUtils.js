@@ -1,13 +1,11 @@
   /**
  * authUtils.js — Custom auth helpers
  * Phone + Password using pure-JS SHA-256 + Firestore
- * Works on HTTP, HTTPS, local network.
- * No Firebase Auth SDK needed!
  */
 import { db } from './firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 
-// Pure JS SHA-256 — works on HTTP, HTTPS, and local network IPs
+// Pure JS SHA-256
 function sha256(ascii) {
     const K = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -55,19 +53,16 @@ export async function hashPassword(password) {
     return sha256('MoneyFlow2025:' + password)
 }
 
-// Sync hash for PIN (used by AppLock — localStorage only, no async needed)
 export function sha256ForPin(pin) {
     return sha256('MF_PIN_2025:' + pin)
 }
 
-// Normalize phone → remove spaces/dashes, add +91 if needed
 export function normalizePhone(phone) {
     let p = phone.replace(/[\s\-()]/g, '')
     if (!p.startsWith('+')) p = '+91' + p
     return p
 }
 
-// Register new user (with username)
 export async function registerUser(phone, password, username) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
@@ -85,7 +80,6 @@ export async function registerUser(phone, password, username) {
     return uid
 }
 
-// Login existing user
 export async function loginUser(phone, password) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
@@ -100,7 +94,6 @@ export async function loginUser(phone, password) {
     return uid
 }
 
-// Forgot/Reset password — set new password with phone number
 export async function resetPassword(phone, newPassword) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
@@ -112,17 +105,16 @@ export async function resetPassword(phone, newPassword) {
     await setDoc(userRef, { passwordHash: hashed }, { merge: true })
 }
 
-// Get user profile (username etc.)
 export async function getUserProfile(uid) {
     const snap = await getDoc(doc(db, 'users', uid, 'profile', 'info'))
     return snap.exists() ? snap.data() : {}
 }
 
-// Persist session in localStorage
 export function saveSession(uid) {
     localStorage.setItem('mf_uid', uid)
 }
 export function getSession() {
+    if (typeof window === 'undefined') return null
     return localStorage.getItem('mf_uid') || null
 }
 export function clearSession() {

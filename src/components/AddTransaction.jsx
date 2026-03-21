@@ -1,6 +1,6 @@
 /**
- * AddTransaction.jsx - Form to add or edit a transaction
- * Form to add or edit a transaction
+ * AddTransaction.jsx — Full Liquid Glass redesign
+ * iOS 18 glass inputs, dark backdrop, premium form
  */
 import { useState, useEffect, useRef } from 'react'
 import { PlusCircle, CheckCircle, X, Sparkles, Wand2, Mic, MicOff, Loader2, Hash, StickyNote } from 'lucide-react'
@@ -20,157 +20,143 @@ const defaultForm = {
   notes: '',
 }
 
-/* ─── Success Bottom Sheet Popup ──────────────────────────────────────────── */
+/* ── Label helper ── */
+const GlassLabel = ({ children }) => (
+  <label className="block text-[11px] font-bold uppercase tracking-widest mb-2"
+    style={{ color: 'rgba(255,255,255,0.40)' }}>
+    {children}
+  </label>
+)
+
+/* ── Glass Input field ── */
+const GlassInput = ({ className = '', ...props }) => (
+  <input
+    {...props}
+    className={`w-full px-4 py-3 rounded-2xl text-sm outline-none transition-all duration-200 ${className}`}
+    style={{
+      background: 'rgba(255,255,255,0.08)',
+      border: '1.5px solid rgba(255,255,255,0.16)',
+      color: 'rgba(255,255,255,0.92)',
+      ...props.style,
+    }}
+    onFocus={e => {
+      e.target.style.borderColor = 'rgba(34,197,94,0.65)'
+      e.target.style.boxShadow   = '0 0 0 3px rgba(34,197,94,0.18)'
+    }}
+    onBlur={e => {
+      e.target.style.borderColor = 'rgba(255,255,255,0.16)'
+      e.target.style.boxShadow   = 'none'
+    }}
+  />
+)
+
+/* ── Success bottom sheet ── */
 function SuccessToast({ data, onClose, onGoHome }) {
-  const [visible, setVisible] = useState(false)
-  const [exiting, setExiting] = useState(false)
+  const [visible,  setVisible]  = useState(false)
+  const [exiting,  setExiting]  = useState(false)
+  const isCredit = data.type === 'credit'
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true))
-    const timer = setTimeout(() => dismiss(), 5000)
-    return () => clearTimeout(timer)
+    const t = setTimeout(() => dismiss(), 5000)
+    return () => clearTimeout(t)
   }, [])
 
-  const dismiss = () => {
-    setExiting(true)
-    setTimeout(() => onClose(), 400)
-  }
-
-  const isCredit = data.type === 'credit'
+  const dismiss = () => { setExiting(true); setTimeout(() => onClose(), 400) }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center">
-      {/* Backdrop */}
-      <div
-        className={`fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-400 ${visible && !exiting ? 'opacity-100' : 'opacity-0'}`}
-        onClick={dismiss}
-      />
-      {/* Bottom sheet */}
-      <div
-        className={`relative w-full max-w-md transition-all duration-500 ease-out ${visible && !exiting
-          ? 'translate-y-0 opacity-100'
-          : 'translate-y-full opacity-0'
-          }`}
-      >
-        <div className={`rounded-t-3xl p-6 pb-8 shadow-2xl border-t ${isCredit
-          ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400/30'
-          : 'bg-gradient-to-br from-rose-500 to-pink-600 border-rose-400/30'
-          }`}>
-          {/* Handle bar */}
+      <div className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${visible && !exiting ? 'opacity-100' : 'opacity-0'}`}
+        onClick={dismiss} />
+      <div className={`relative w-full max-w-md transition-all duration-500 ease-out ${visible && !exiting ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
+        {/* Glass bottom sheet */}
+        <div className="rounded-t-3xl p-6 pb-10"
+          style={{
+            background: isCredit
+              ? 'linear-gradient(145deg, rgba(34,197,94,0.75) 0%, rgba(16,185,129,0.70) 100%)'
+              : 'linear-gradient(145deg, rgba(244,63,94,0.75) 0%, rgba(239,68,68,0.70) 100%)',
+            backdropFilter: 'blur(40px)',
+            WebkitBackdropFilter: 'blur(40px)',
+            border: '1px solid rgba(255,255,255,0.20)',
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.40)',
+          }}>
           <div className="w-10 h-1 bg-white/30 rounded-full mx-auto mb-5" />
-
-          {/* Close button */}
           <button onClick={dismiss}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white/80 hover:bg-white/30 transition-colors">
-            <X size={16} />
+            className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.15)' }}>
+            <X size={16} className="text-white" />
           </button>
-
-          {/* Content */}
           <div className="flex flex-col items-center text-center">
-            <div className="w-18 h-18 rounded-full bg-white/20 flex items-center justify-center mb-4"
-              style={{ width: 72, height: 72, animation: 'bounceIn 0.6s ease-out' }}>
+            <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center mb-4"
+              style={{ background: 'rgba(255,255,255,0.20)' }}>
               <CheckCircle size={36} className="text-white" />
             </div>
             <h3 className="text-white font-display font-bold text-xl mb-1">
               {isCredit ? '💰 Income Added!' : '💸 Expense Added!'}
             </h3>
-            <p className="text-white/80 text-sm mb-4">
-              Saved successfully ✅
-            </p>
-            <div className="bg-white/15 rounded-2xl px-6 py-4 backdrop-blur-sm w-full mb-5">
+            <p className="text-white/75 text-sm mb-5">Saved successfully ✅</p>
+            <div className="w-full px-4 py-4 rounded-2xl mb-5 text-center"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.20)' }}>
               <p className="text-white font-display font-bold text-3xl">
                 {isCredit ? '+' : '-'}₹{Number(data.amount).toLocaleString('en-IN')}
               </p>
-              <p className="text-white/70 text-xs mt-1.5 truncate">
-                {data.description} · {data.category} · {data.account === 'Cash' ? '💵 Cash' : data.account === 'UPI' ? '📱 UPI' : '🏦 Bank'}
+              <p className="text-white/65 text-xs mt-1.5 truncate">
+                {data.description} · {data.category}
               </p>
             </div>
-
-            {/* Go to Home button */}
             <button onClick={() => { dismiss(); setTimeout(() => onGoHome?.(), 300) }}
-              className="w-full py-3.5 rounded-2xl bg-white/20 backdrop-blur-sm text-white font-bold text-sm hover:bg-white/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+              className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 text-white transition-all active:scale-95"
+              style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)' }}>
               🏠 Go to Home
             </button>
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes bounceIn {
-          0% { transform: scale(0.3); opacity: 0; }
-          50% { transform: scale(1.1); }
-          70% { transform: scale(0.9); }
-          100% { transform: scale(1); opacity: 1; }
-        }
-      `}</style>
     </div>
   )
 }
 
-/* ─── Tags Input Component ──────────────────────────────────────────────── */
+/* ── Tags input ── */
 function TagsInput({ tags, onChange, allTransactions }) {
-  const [input, setInput] = useState('')
-  const [showSuggestions, setShowSuggestions] = useState(false)
-
-  // Gather all unique tags from past transactions
-  const allTags = [...new Set(
-    (allTransactions || []).flatMap(t => t.tags || []).filter(Boolean)
-  )].sort()
-
+  const [input, setInput]               = useState('')
+  const [showSuggestions, setShowSugs]  = useState(false)
+  const allTags = [...new Set((allTransactions||[]).flatMap(t=>t.tags||[]).filter(Boolean))].sort()
   const suggestions = input.trim()
-    ? allTags.filter(t => t.toLowerCase().includes(input.toLowerCase()) && !tags.includes(t)).slice(0, 5)
-    : allTags.filter(t => !tags.includes(t)).slice(0, 8)
+    ? allTags.filter(t => t.toLowerCase().includes(input.toLowerCase()) && !tags.includes(t)).slice(0,5)
+    : allTags.filter(t => !tags.includes(t)).slice(0,8)
 
-  const addTag = (tag) => {
-    const clean = tag.replace(/^#/, '').trim().toLowerCase()
-    if (clean && !tags.includes(clean)) {
-      onChange([...tags, clean])
-    }
-    setInput('')
-    setShowSuggestions(false)
-  }
-
-  const removeTag = (tag) => onChange(tags.filter(t => t !== tag))
-
-  const handleKey = (e) => {
-    if ((e.key === 'Enter' || e.key === ',') && input.trim()) {
-      e.preventDefault()
-      addTag(input)
-    }
-    if (e.key === 'Backspace' && !input && tags.length > 0) {
-      removeTag(tags[tags.length - 1])
-    }
+  const addTag = tag => { const c=tag.replace(/^#/,'').trim().toLowerCase(); if(c&&!tags.includes(c))onChange([...tags,c]); setInput(''); setShowSugs(false) }
+  const removeTag = tag => onChange(tags.filter(t=>t!==tag))
+  const handleKey = e => {
+    if((e.key==='Enter'||e.key===',')&&input.trim()){e.preventDefault();addTag(input)}
+    if(e.key==='Backspace'&&!input&&tags.length>0)removeTag(tags[tags.length-1])
   }
 
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-        <Hash size={12} className="inline mr-1" />Tags (optional)
-      </label>
-      <div className="flex flex-wrap gap-1.5 p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl min-h-[44px] items-center">
+      <GlassLabel><Hash size={11} className="inline mr-1" />Tags (optional)</GlassLabel>
+      <div className="flex flex-wrap gap-1.5 p-2.5 min-h-[48px] items-center rounded-2xl"
+        style={{ background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.16)' }}>
         {tags.map(tag => (
-          <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded-lg text-xs font-semibold">
+          <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold"
+            style={{ background:'rgba(139,92,246,0.25)', color:'#c4b5fd', border:'1px solid rgba(139,92,246,0.35)' }}>
             #{tag}
-            <button onClick={() => removeTag(tag)} className="text-violet-400 hover:text-violet-600 ml-0.5">
-              <X size={10} />
-            </button>
+            <button onClick={() => removeTag(tag)} style={{ color:'#a78bfa' }}><X size={10}/></button>
           </span>
         ))}
-        <input
-          value={input}
-          onChange={e => { setInput(e.target.value); setShowSuggestions(true) }}
-          onKeyDown={handleKey}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-          placeholder={tags.length === 0 ? 'e.g. #trip, #office...' : 'Add tag...'}
-          className="flex-1 min-w-[80px] bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 outline-none py-0.5"
-        />
+        <input value={input} onChange={e=>{setInput(e.target.value);setShowSugs(true)}}
+          onKeyDown={handleKey} onFocus={()=>setShowSugs(true)}
+          onBlur={()=>setTimeout(()=>setShowSugs(false),200)}
+          placeholder={tags.length===0?'e.g. #trip, #office...':'Add tag...'}
+          className="flex-1 min-w-[80px] bg-transparent text-sm outline-none"
+          style={{ color:'rgba(255,255,255,0.90)', caretColor:'#4ade80' }} />
       </div>
-      {showSuggestions && suggestions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-1.5 animate-fade-in">
-          {suggestions.map(s => (
-            <button key={s} onClick={() => addTag(s)}
-              className="text-[10px] px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg font-medium hover:bg-violet-100 dark:hover:bg-violet-900/30 hover:text-violet-600 transition-colors">
+      {showSuggestions && suggestions.length>0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2 animate-fade-in">
+          {suggestions.map(s=>(
+            <button key={s} onClick={()=>addTag(s)}
+              className="text-[10px] px-2 py-1 rounded-lg font-medium transition-colors"
+              style={{ background:'rgba(139,92,246,0.15)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.25)' }}>
               #{s}
             </button>
           ))}
@@ -180,134 +166,133 @@ function TagsInput({ tags, onChange, allTransactions }) {
   )
 }
 
-/* ─── NLP Smart Add Bar ──────────────────────────────────────────────────── */
+/* ── Smart Add bar (inline in Add form) ── */
 function SmartAddBar({ nlpInput, setNlpInput, nlpParsing, nlpResult, nlpError, nlpListening, onParse, onVoice, onClearResult }) {
+  const [showExamples, setShowExamples] = useState(false)
   const NLP_EXAMPLES = [
     '🍱 "yesterday 50 rupees tiffin expense"',
     '🚌 "spent 30 on bus today"',
     '💰 "got 5000 salary yesterday"',
   ]
-  const [showExamples, setShowExamples] = useState(false)
 
   return (
-    <div className="card bg-gradient-to-br from-violet-50 via-indigo-50 to-blue-50 dark:from-violet-900/15 dark:via-indigo-900/15 dark:to-blue-900/15 border border-violet-200/60 dark:border-violet-800/40 shadow-sm">
-      <div className="flex items-center gap-2 mb-2.5">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-sm">
-          <Wand2 size={13} className="text-white" />
+    <div className="lg-surface rounded-3xl p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2 relative z-10">
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center"
+          style={{ boxShadow:'0 4px 12px rgba(139,92,246,0.45)' }}>
+          <Wand2 size={14} className="text-white" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-white">Smart Add ✨</h3>
-          <p className="text-[10px] text-gray-500 dark:text-gray-400">Type in any language — AI fills the form</p>
+          <h3 className="text-sm font-semibold" style={{ color:'rgba(255,255,255,0.90)' }}>Smart Add ✨</h3>
+          <p className="text-[10px]" style={{ color:'rgba(255,255,255,0.40)' }}>Type in any language — AI fills the form</p>
         </div>
       </div>
 
       {/* Input bar */}
-      <div className="flex gap-2 items-center bg-white dark:bg-gray-800 rounded-xl p-1.5 border border-gray-200 dark:border-gray-700">
+      <div className="flex gap-2 items-center rounded-2xl px-2 py-1.5 relative z-10"
+        style={{ background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.14)' }}>
         <button onClick={onVoice}
-          className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${nlpListening
-            ? 'bg-rose-500 text-white animate-pulse'
-            : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-violet-500'
-            }`}>
-          {nlpListening ? <MicOff size={14} /> : <Mic size={14} />}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${nlpListening ? 'animate-pulse' : ''}`}
+          style={nlpListening
+            ? { background:'rgba(244,63,94,0.80)', color:'white' }
+            : { background:'rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.50)' }}>
+          {nlpListening ? <MicOff size={14}/> : <Mic size={14}/>}
         </button>
-        <input
-          type="text"
-          value={nlpInput}
-          onChange={e => setNlpInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && onParse()}
-          placeholder={nlpListening ? '🎤 Listening...' : 'e.g. "spent 200 on bus yesterday"'}
-          className="flex-1 text-sm bg-transparent text-gray-900 dark:text-white placeholder-gray-400 outline-none px-1"
-        />
-        <button onClick={onParse} disabled={nlpParsing || !nlpInput.trim()}
-          className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${nlpParsing || !nlpInput.trim()
-            ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-            : 'bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-md active:scale-90'
-            }`}>
-          {nlpParsing ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+        <input type="text" value={nlpInput}
+          onChange={e=>setNlpInput(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&onParse()}
+          placeholder={nlpListening?'🎤 Listening...':'e.g. "spent 200 on bus yesterday"'}
+          className="flex-1 text-sm bg-transparent outline-none px-1"
+          style={{ color:'rgba(255,255,255,0.90)', caretColor:'#4ade80' }} />
+        <button onClick={onParse} disabled={nlpParsing||!nlpInput.trim()}
+          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all active:scale-90"
+          style={nlpParsing||!nlpInput.trim()
+            ? { background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.25)', cursor:'not-allowed' }
+            : { background:'linear-gradient(135deg, rgba(139,92,246,0.85), rgba(109,40,217,0.85))', color:'white', boxShadow:'0 4px 12px rgba(139,92,246,0.40)' }}>
+          {nlpParsing?<Loader2 size={14} className="animate-spin"/>:<Wand2 size={14}/>}
         </button>
       </div>
 
-      {/* Examples hint */}
-      <button onClick={() => setShowExamples(p => !p)} className="text-[10px] text-violet-500 font-semibold mt-2">
-        {showExamples ? 'Hide examples ▲' : 'Show examples ▼'}
-      </button>
-      {showExamples && (
-        <div className="mt-1.5 space-y-1 animate-fade-in">
-          {NLP_EXAMPLES.map((ex, i) => (
-            <p key={i} className="text-[11px] text-gray-500 dark:text-gray-400">{ex}</p>
-          ))}
-        </div>
-      )}
+      {/* Examples */}
+      <div className="relative z-10">
+        <button onClick={()=>setShowExamples(p=>!p)}
+          className="text-[10px] font-semibold" style={{ color:'#a78bfa' }}>
+          {showExamples?'Hide examples ▲':'Show examples ▼'}
+        </button>
+        {showExamples && (
+          <div className="mt-2 space-y-1 animate-fade-in">
+            {NLP_EXAMPLES.map((ex,i)=>(
+              <p key={i} className="text-[11px]" style={{ color:'rgba(139,92,246,0.80)' }}>{ex}</p>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Parsed result preview */}
+      {/* Result */}
       {nlpResult && (
-        <div className="mt-2.5 p-2.5 bg-emerald-50 dark:bg-emerald-900/15 rounded-xl border border-emerald-200 dark:border-emerald-800/40 animate-fade-in">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase">✅ Parsed — form filled!</span>
-            <button onClick={onClearResult} className="text-emerald-400 hover:text-emerald-600"><X size={12} /></button>
+        <div className="p-3 rounded-2xl relative z-10 animate-fade-in"
+          style={{ background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.25)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold uppercase" style={{ color:'#4ade80' }}>✅ Parsed — form filled!</span>
+            <button onClick={onClearResult} style={{ color:'rgba(255,255,255,0.40)' }}><X size={12}/></button>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {[
-              { label: nlpResult.type, color: nlpResult.type === 'credit' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700' },
-              { label: `₹${nlpResult.amount}`, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-              { label: nlpResult.description, color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
-              { label: nlpResult.category, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
-              { label: nlpResult.date, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-            ].map((tag, i) => (
-              <span key={i} className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${tag.color}`}>{tag.label}</span>
+              { label: nlpResult.type,        bg:'rgba(34,197,94,0.20)',   color:'#4ade80' },
+              { label: `₹${nlpResult.amount}`, bg:'rgba(59,130,246,0.20)', color:'#60a5fa' },
+              { label: nlpResult.description,  bg:'rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.75)' },
+              { label: nlpResult.category,     bg:'rgba(139,92,246,0.20)', color:'#a78bfa' },
+              { label: nlpResult.date,         bg:'rgba(251,191,36,0.15)', color:'#fbbf24' },
+            ].map((t,i)=>(
+              <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
+                style={{ background:t.bg, color:t.color }}>{t.label}</span>
             ))}
           </div>
         </div>
       )}
 
-      {/* Error */}
       {nlpError && (
-        <p className="mt-2 text-xs text-rose-500 font-medium animate-fade-in">❌ {nlpError}</p>
+        <p className="text-xs font-medium relative z-10 animate-fade-in" style={{ color:'#f87171' }}>❌ {nlpError}</p>
       )}
     </div>
   )
 }
 
+/* ═══════ MAIN FORM ═══════ */
 export default function AddTransaction({ editData, onEditDone, defaultType, onTypeConsumed }) {
   const { addTransaction, updateTransaction, customCategories, transactions, parseNLPTransaction, setActiveTab } = useApp()
-  const [form, setForm] = useState(defaultForm)
+  const [form, setForm]             = useState(defaultForm)
   const [successData, setSuccessData] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [suggestion, setSuggestion] = useState(null)
   const [suggestionApplied, setSuggestionApplied] = useState(false)
   const suggestTimer = useRef(null)
 
-  // ── NLP Smart Add State ──
-  const [nlpInput, setNlpInput] = useState('')
-  const [nlpParsing, setNlpParsing] = useState(false)
-  const [nlpResult, setNlpResult] = useState(null)
-  const [nlpError, setNlpError] = useState('')
+  const [nlpInput, setNlpInput]       = useState('')
+  const [nlpParsing, setNlpParsing]   = useState(false)
+  const [nlpResult, setNlpResult]     = useState(null)
+  const [nlpError, setNlpError]       = useState('')
   const [nlpListening, setNlpListening] = useState(false)
   const nlpRecogRef = useRef(null)
 
-  // Populate form when editing
   useEffect(() => {
     if (editData) setForm({ ...defaultForm, ...editData })
     else setForm(defaultForm)
   }, [editData])
 
-  // Pre-select type when coming from Dashboard quick actions
   useEffect(() => {
-    if (defaultType && !editData) {
-      setForm(prev => ({ ...prev, type: defaultType }))
-      onTypeConsumed?.()
-    }
+    if (defaultType && !editData) { setForm(p => ({ ...p, type: defaultType })); onTypeConsumed?.() }
   }, [defaultType, editData, onTypeConsumed])
 
   const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }))
-    // Auto-suggest category when description changes (debounced)
+    setForm(p => ({ ...p, [field]: value }))
     if (field === 'description') {
       setSuggestionApplied(false)
       if (suggestTimer.current) clearTimeout(suggestTimer.current)
       suggestTimer.current = setTimeout(() => {
-        const result = suggestCategory(value, transactions, customCategories)
-        setSuggestion(result)
+        const r = suggestCategory(value, transactions, customCategories)
+        setSuggestion(r)
       }, 300)
     }
   }
@@ -317,18 +302,9 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
     if (!amt || amt <= 0 || !form.description?.trim()) return
     setSubmitting(true)
     try {
-      if (editData) {
-        await updateTransaction(editData.id, { ...form, amount: amt, description: form.description.trim() })
-        onEditDone?.()
-      } else {
-        const submitted = { ...form, amount: amt, description: form.description.trim() }
-        await addTransaction(submitted)
-        setForm({ ...defaultForm, date: new Date().toISOString().split('T')[0] })
-        setSuccessData(submitted)
-      }
-    } catch (e) {
-      console.error('Submit error:', e)
-    }
+      if (editData) { await updateTransaction(editData.id, { ...form, amount: amt, description: form.description.trim() }); onEditDone?.() }
+      else { const sub = { ...form, amount: amt, description: form.description.trim() }; await addTransaction(sub); setForm({ ...defaultForm, date: new Date().toISOString().split('T')[0] }); setSuccessData(sub) }
+    } catch(e) { console.error(e) }
     setSubmitting(false)
   }
 
@@ -336,26 +312,22 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
 
   return (
     <>
-      {/* ─── Success Bottom Sheet Overlay ─── */}
       {successData && (
-        <SuccessToast
-          data={successData}
-          onClose={() => setSuccessData(null)}
-          onGoHome={() => setActiveTab('dashboard')}
-        />
+        <SuccessToast data={successData} onClose={()=>setSuccessData(null)} onGoHome={()=>setActiveTab('dashboard')} />
       )}
 
       <div className="space-y-4 animate-slide-up">
+        {/* Page title */}
         <div>
-          <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white">
+          <h2 className="font-display font-bold text-xl" style={{ color:'rgba(255,255,255,0.95)' }}>
             {isEdit ? '✏️ Edit Transaction' : '➕ New Transaction'}
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-sm mt-1" style={{ color:'rgba(255,255,255,0.45)' }}>
             {isEdit ? 'Edit your transaction' : 'Add new income or expense'}
           </p>
         </div>
 
-        {/* ── NLP Smart Add ──────────────────────────────── */}
+        {/* Smart Add bar */}
         {!isEdit && <SmartAddBar
           nlpInput={nlpInput} setNlpInput={setNlpInput}
           nlpParsing={nlpParsing} nlpResult={nlpResult}
@@ -363,40 +335,35 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
           onParse={async () => {
             if (!nlpInput.trim() || nlpParsing) return
             setNlpParsing(true); setNlpError(''); setNlpResult(null)
-            const result = await parseNLPTransaction(nlpInput)
-            if (result) {
-              setNlpResult(result)
-              setForm(result)
-              setNlpInput('')
-            } else { setNlpError('Could not parse. Please try again!') }
+            const r = await parseNLPTransaction(nlpInput)
+            if (r) { setNlpResult(r); setForm(r); setNlpInput('') }
+            else setNlpError('Could not parse. Try again!')
             setNlpParsing(false)
           }}
           onVoice={() => {
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition
             if (!SR) { alert('Voice input not supported. Use Chrome.'); return }
             if (nlpListening) { nlpRecogRef.current?.stop(); setNlpListening(false); return }
-            const recog = new SR()
-            recog.lang = navigator.language || 'en-US'
-            recog.interimResults = false
-            recog.onresult = (e) => { setNlpInput(e.results[0][0].transcript); setNlpListening(false) }
-            recog.onerror = () => setNlpListening(false)
-            recog.onend = () => setNlpListening(false)
-            nlpRecogRef.current = recog; recog.start(); setNlpListening(true)
+            const r = new SR(); r.lang = navigator.language || 'en-US'; r.interimResults = false
+            r.onresult = e => { setNlpInput(e.results[0][0].transcript); setNlpListening(false) }
+            r.onerror = r.onend = () => setNlpListening(false)
+            nlpRecogRef.current = r; r.start(); setNlpListening(true)
           }}
           onClearResult={() => setNlpResult(null)}
         />}
 
-        {/* Credit / Debit toggle */}
-        <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-2xl">
+        {/* Debit / Credit toggle */}
+        <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl"
+          style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)' }}>
           {[
-            { value: 'debit', label: '💸 Debit (Expense)', color: 'from-rose-400 to-pink-500' },
-            { value: 'credit', label: '💰 Credit (Income)', color: 'from-emerald-400 to-brand-500' },
-          ].map(({ value, label, color }) => (
+            { value:'debit',  label:'💸 Debit (Expense)', activeGrad:'linear-gradient(135deg,rgba(244,63,94,0.85),rgba(239,68,68,0.80))', activeShadow:'rgba(244,63,94,0.40)' },
+            { value:'credit', label:'💰 Credit (Income)', activeGrad:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', activeShadow:'rgba(34,197,94,0.40)' },
+          ].map(({ value, label, activeGrad, activeShadow }) => (
             <button key={value} onClick={() => handleChange('type', value)}
-              className={`py-3 rounded-xl font-semibold text-sm transition-all duration-200 ${form.type === value
-                ? `bg-gradient-to-r ${color} text-white shadow-md`
-                : 'text-gray-500 dark:text-gray-400'
-                }`}>
+              className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95"
+              style={form.type === value
+                ? { background:activeGrad, color:'white', boxShadow:`0 4px 16px ${activeShadow}` }
+                : { color:'rgba(255,255,255,0.40)' }}>
               {label}
             </button>
           ))}
@@ -404,66 +371,54 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
 
         {/* Amount */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-            Amount (₹) *
-          </label>
-          <input
+          <GlassLabel>Amount (₹) *</GlassLabel>
+          <GlassInput
             type="number" inputMode="decimal" placeholder="0.00"
             value={form.amount}
             onChange={e => handleChange('amount', e.target.value)}
-            className="input-field bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-xl font-display font-bold"
+            className="font-display font-bold text-2xl"
           />
         </div>
 
         {/* Description */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-            Description *
-          </label>
-          <input
+          <GlassLabel>Description *</GlassLabel>
+          <GlassInput
             type="text" placeholder="e.g. College tiffin, Bus fare..."
             value={form.description}
             onChange={e => handleChange('description', e.target.value)}
-            className="input-field bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
           />
-          {/* Auto-category suggestion chip */}
           {suggestion && !suggestionApplied && form.category !== suggestion.category && (
-            <button
-              onClick={() => { handleChange('category', suggestion.category); setSuggestionApplied(true) }}
-              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800/40 animate-fade-in active:scale-95 transition-transform">
-              <Sparkles size={12} className="text-violet-500" />
+            <button onClick={() => { handleChange('category', suggestion.category); setSuggestionApplied(true) }}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold animate-fade-in active:scale-95 transition-transform"
+              style={{ background:'rgba(139,92,246,0.18)', color:'#c4b5fd', border:'1px solid rgba(139,92,246,0.30)' }}>
+              <Sparkles size={12} />
               Auto: <span className="font-bold">{suggestion.category}</span>
-              <span className="text-violet-400 dark:text-violet-500">•</span>
-              <span className="text-[10px] text-violet-400 dark:text-violet-500">{suggestion.source === 'history' ? 'from your history' : 'suggested'}</span>
+              <span style={{ color:'rgba(167,139,250,0.60)' }}>· {suggestion.source==='history'?'from history':'suggested'}</span>
             </button>
           )}
         </div>
 
         {/* Date */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-            Date *
-          </label>
-          <input
+          <GlassLabel>Date *</GlassLabel>
+          <GlassInput
             type="date"
             value={form.date}
             onChange={e => handleChange('date', e.target.value)}
-            className="input-field bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
           />
         </div>
 
-        {/* Category */}
+        {/* Category chips */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-            Category
-          </label>
+          <GlassLabel>Category</GlassLabel>
           <div className="flex flex-wrap gap-2">
             {customCategories.map(cat => (
               <button key={cat} onClick={() => handleChange('category', cat)}
-                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-150 ${form.category === cat
-                  ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                  }`}>
+                className="px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95"
+                style={form.category === cat
+                  ? { background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', color:'white', boxShadow:'0 4px 12px rgba(34,197,94,0.40)', border:'1px solid rgba(34,197,94,0.50)' }
+                  : { background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.55)', border:'1px solid rgba(255,255,255,0.12)' }}>
                 {cat}
               </button>
             ))}
@@ -471,68 +426,65 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
         </div>
 
         {/* Tags */}
-        <TagsInput tags={form.tags || []} onChange={(tags) => handleChange('tags', tags)} allTransactions={transactions} />
+        <TagsInput tags={form.tags||[]} onChange={t => handleChange('tags',t)} allTransactions={transactions} />
 
         {/* Notes */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-            <StickyNote size={12} className="inline mr-1" />Notes (optional)
-          </label>
+          <GlassLabel><StickyNote size={11} className="inline mr-1" />Notes (optional)</GlassLabel>
           <textarea
             placeholder="Add any extra notes..."
-            value={form.notes || ''}
+            value={form.notes||''}
             onChange={e => handleChange('notes', e.target.value)}
             rows={2}
-            className="input-field bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 text-sm resize-none"
+            className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none transition-all duration-200"
+            style={{ background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.16)', color:'rgba(255,255,255,0.90)' }}
+            onFocus={e => { e.target.style.borderColor='rgba(34,197,94,0.65)'; e.target.style.boxShadow='0 0 0 3px rgba(34,197,94,0.18)' }}
+            onBlur={e => { e.target.style.borderColor='rgba(255,255,255,0.16)'; e.target.style.boxShadow='none' }}
           />
         </div>
 
         {/* Account type */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
-            Account Type
-          </label>
+          <GlassLabel>Account Type</GlassLabel>
           <div className="space-y-2">
-            {/* Cash - full width */}
-            <button onClick={() => handleChange('account', 'Cash')}
-              className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${form.account === 'Cash'
-                ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md shadow-emerald-500/30'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                }`}>
+            <button onClick={() => handleChange('account','Cash')}
+              className="w-full py-3 rounded-2xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 active:scale-95"
+              style={form.account==='Cash'
+                ? { background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', color:'white', boxShadow:'0 4px 16px rgba(34,197,94,0.40)' }
+                : { background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.50)', border:'1px solid rgba(255,255,255,0.12)' }}>
               💵 Cash
             </button>
-            {/* Bank & UPI - half half */}
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => handleChange('account', 'Bank')}
-                className={`py-3 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${form.account === 'Bank'
-                  ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/30'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                  }`}>
-                🏦 Bank
-              </button>
-              <button onClick={() => handleChange('account', 'UPI')}
-                className={`py-3 rounded-xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 ${form.account === 'UPI'
-                  ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-md shadow-violet-500/30'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                  }`}>
-                📱 UPI
-              </button>
+              {[
+                { key:'Bank', emoji:'🏦', grad:'linear-gradient(135deg,rgba(59,130,246,0.85),rgba(99,102,241,0.80))', glow:'rgba(59,130,246,0.40)' },
+                { key:'UPI',  emoji:'📱', grad:'linear-gradient(135deg,rgba(139,92,246,0.85),rgba(109,40,217,0.80))', glow:'rgba(139,92,246,0.40)' },
+              ].map(({ key, emoji, grad, glow }) => (
+                <button key={key} onClick={() => handleChange('account', key)}
+                  className="py-3 rounded-2xl text-sm font-semibold transition-all flex items-center justify-center gap-2 active:scale-95"
+                  style={form.account===key
+                    ? { background:grad, color:'white', boxShadow:`0 4px 16px ${glow}` }
+                    : { background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.50)', border:'1px solid rgba(255,255,255,0.12)' }}>
+                  {emoji} {key}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Submit */}
-        <button onClick={handleSubmit} disabled={submitting || !form.amount || !form.description?.trim()}
-          className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all duration-200 flex items-center justify-center gap-2
-            ${submitting ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed' :
-              'bg-gradient-to-r from-brand-500 to-emerald-500 text-white shadow-lg shadow-brand-500/30 active:scale-98'}`}>
-          {submitting ? 'Saving...' :
-            <><PlusCircle size={18} /> {isEdit ? 'Update' : 'Add Transaction'}</>}
+        <button onClick={handleSubmit}
+          disabled={submitting || !form.amount || !form.description?.trim()}
+          className="w-full py-4 rounded-2xl font-display font-bold text-base flex items-center justify-center gap-2 transition-all active:scale-95"
+          style={submitting || !form.amount || !form.description?.trim()
+            ? { background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.28)', cursor:'not-allowed', border:'1px solid rgba(255,255,255,0.10)' }
+            : { background:'linear-gradient(135deg,rgba(34,197,94,0.90),rgba(16,185,129,0.85))', color:'white', boxShadow:'0 6px 24px rgba(34,197,94,0.45)', border:'1px solid rgba(34,197,94,0.50)' }}>
+          {submitting ? 'Saving...' : <><PlusCircle size={18}/> {isEdit ? 'Update Transaction' : 'Add Transaction'}</>}
         </button>
 
         {isEdit && (
           <button onClick={onEditDone}
-            className="w-full py-3 rounded-2xl font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 text-sm">
+            className="w-full py-3 rounded-2xl font-semibold text-sm transition-colors active:scale-95"
+            style={{ background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.45)', border:'1px solid rgba(255,255,255,0.12)' }}>
             Cancel
           </button>
         )}

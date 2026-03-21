@@ -1,4 +1,4 @@
-/**
+  /**
  * useInstallPrompt.js — PWA install prompt hook
  * Captures beforeinstallprompt event and provides install API
  */

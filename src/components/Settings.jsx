@@ -1,7 +1,7 @@
 /**
  * Settings.jsx — Clean, modern profile & settings page
  */
-import { useState, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert, Palette, Users, Heart, MessageSquare, Smartphone } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useTheme, THEMES } from '../context/ThemeContext'
@@ -43,7 +43,9 @@ export default function Settings() {
     budgets, saveBudget, removeBudget, getBudgetAlerts,
     username, updateUsername, profilePhoto, updateProfilePhoto,
     darkMode, setDarkMode, transactions, setActiveTab,
-    requestNotificationPermission, familySettings } = useApp()
+    requestNotificationPermission, familySettings,
+    openingBalance, openingDate, setOpeningBalance,
+    gstSettings, updateGstSettings } = useApp()
 
   const { theme, setTheme, themes } = useTheme()
   const { canInstall, isInstalled, promptInstall } = useInstallPrompt()
@@ -74,14 +76,25 @@ export default function Settings() {
   const [budgetAmt, setBudgetAmt] = useState('')
   const [newCat, setNewCat] = useState('')
 
+  // Opening Balance state
+  const [obInput, setObInput] = useState(openingBalance || '')
+  const [obDate, setObDate] = useState(openingDate || new Date().toISOString().split('T')[0])
+  const [obSaved, setObSaved] = useState(false)
+
+  const saveOpeningBalance = async () => {
+    await setOpeningBalance(Number(obInput) || 0, obDate)
+    setObSaved(true)
+    setTimeout(() => setObSaved(false), 2000)
+  }
+
   // Expandable sections
   const [expandBudget, setExpandBudget] = useState(false)
   const [expandCategories, setExpandCategories] = useState(false)
 
   // Check biometric capability on mount
-  useState(() => {
+  useEffect(() => {
     checkPlatformAuthenticator().then(ok => setBioCapable(ok)).catch(() => { })
-  })
+  }, [])
 
   const alerts = getBudgetAlerts()
 
@@ -505,7 +518,110 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* ═══════════ 7. SECURITY ═══════════ */}
+      {/* ═══════════ 6b. FINANCIAL SETUP ═══════════ */}
+      <div>
+        <SectionHeader icon={'📒'} iconBg="bg-indigo-100 dark:bg-indigo-900/30" iconColor="text-indigo-500">
+          Financial Setup
+        </SectionHeader>
+        <div className="rounded-2xl bg-white dark:bg-gray-800 border border-blue-100 dark:border-indigo-800/40 overflow-hidden divide-y divide-gray-100 dark:divide-gray-700/60">
+
+          {/* Opening Balance */}
+          <div className="px-4 py-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
+                <span className="text-lg">🏦</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 dark:text-white">Opening Balance</p>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">Money you had before tracking started</p>
+              </div>
+              {openingBalance > 0 && (
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                  ₹{openingBalance.toLocaleString('en-IN')}
+                </span>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={obInput}
+                  onChange={e => setObInput(e.target.value)}
+                  placeholder="Enter opening balance ₹"
+                  className="flex-1 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm font-mono text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/50"
+                />
+              </div>
+              <div className="flex gap-2 items-center">
+                <label className="text-xs text-gray-500 shrink-0">As of:</label>
+                <input
+                  type="date"
+                  value={obDate}
+                  onChange={e => setObDate(e.target.value)}
+                  className="flex-1 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/50"
+                />
+                <button
+                  onClick={saveOpeningBalance}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] shrink-0 ${
+                    obSaved ? 'bg-emerald-500 text-white' : 'bg-indigo-500 text-white hover:bg-indigo-600'
+                  }`}>
+                  {obSaved ? '✓ Saved' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* GST Rate */}
+          <div className="px-4 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+              <span className="text-lg">🧾</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 dark:text-white">GST Rate</p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">Used for GST tracking in transactions</p>
+            </div>
+            <select
+              value={gstSettings.gstRate}
+              onChange={e => updateGstSettings({ gstRate: Number(e.target.value) })}
+              className="px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs font-bold text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-amber-500/50"
+            >
+              {[0, 5, 12, 18, 28].map(r => (
+                <option key={r} value={r}>{r}%</option>
+              ))}
+            </select>
+          </div>
+
+          {/* GST Registered */}
+          <div className="px-4 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center shrink-0">
+              <span className="text-lg">📄</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 dark:text-white">GST Registered</p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">I am registered for GST</p>
+            </div>
+            <button
+              onClick={() => updateGstSettings({ registered: !gstSettings.registered })}
+              className={`relative w-12 h-7 rounded-full transition-all duration-300 ${gstSettings.registered ? 'bg-brand-500' : 'bg-gray-200 dark:bg-gray-600'}`}>
+              <div className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300 ${gstSettings.registered ? 'left-6' : 'left-1'}`} />
+            </button>
+          </div>
+
+          {/* Accounting shortcuts */}
+          <div className="px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">Quick Access</p>
+            <div className="flex gap-2">
+              <button onClick={() => setActiveTab('ledger')}
+                className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 py-2.5 rounded-xl hover:bg-indigo-100 transition-colors">
+                📒 Ledger
+              </button>
+              <button onClick={() => setActiveTab('cashflow')}
+                className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 py-2.5 rounded-xl hover:bg-emerald-100 transition-colors">
+                💵 Cash Flow
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div>
         <SectionHeader icon={Shield} iconBg="bg-violet-100 dark:bg-violet-900/30" iconColor="text-violet-500">
           Security
