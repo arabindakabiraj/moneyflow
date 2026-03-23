@@ -1,5 +1,6 @@
 /**
- * Transactions.jsx — Full history with glass search, filters, undo
+ * Transactions.jsx — Full history with search, filters, undo
+ * REDESIGNED: Dark premium styling, clean cards
  */
 import { useState, useRef, useCallback } from 'react'
 import { Calendar, CalendarRange, Filter, X, FileDown, Search, ArrowLeft, Undo2 } from 'lucide-react'
@@ -14,17 +15,17 @@ function UndoToast({ tx, onUndo, onDismiss }) {
   return (
     <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-sm animate-fade-in">
       <div className={`rounded-2xl px-4 py-3 flex items-center gap-3 transition-all duration-300 ${exiting ? 'opacity-0 translate-y-4' : 'opacity-100'}`}
-        style={{ background:'rgba(10,30,25,0.90)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.16)', boxShadow:'0 8px 32px rgba(0,0,0,0.40)' }}>
+        style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)', boxShadow: '0 8px 32px rgba(0,0,0,0.60)' }}>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate" style={{ color:'rgba(255,255,255,0.90)' }}>Deleted: {tx.description}</p>
-          <p className="text-[11px]" style={{ color:'rgba(255,255,255,0.45)' }}>₹{Number(tx.amount).toLocaleString('en-IN')} · {tx.category}</p>
+          <p className="text-sm font-medium truncate text-gray-800 dark:text-white/90">Deleted: {tx.description}</p>
+          <p className="text-[11px] text-gray-400 dark:text-white/35">₹{Number(tx.amount).toLocaleString('en-IN')} · {tx.category}</p>
         </div>
         <button onClick={onUndo}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white active:scale-95 transition-transform"
-          style={{ background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', boxShadow:'0 4px 12px rgba(34,197,94,0.40)' }}>
+          style={{ background: '#34D399', boxShadow: '0 4px 12px rgba(52,211,153,0.30)' }}>
           <Undo2 size={13}/> Undo
         </button>
-        <button onClick={dismiss} style={{ color:'rgba(255,255,255,0.45)' }}><X size={14}/></button>
+        <button onClick={dismiss} className="text-gray-400 dark:text-white/35"><X size={14}/></button>
       </div>
     </div>
   )
@@ -76,41 +77,42 @@ export default function Transactions({ onEdit }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={() => setActiveTab('dashboard')}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors active:scale-95 lg-chip">
-            <ArrowLeft size={18} style={{ color:'rgba(255,255,255,0.70)' }} />
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.05)' }}>
+            <ArrowLeft size={18} className="text-gray-600 dark:text-white/60" />
           </button>
           <div>
-            <h2 className="font-display font-bold text-xl" style={{ color:'rgba(255,255,255,0.95)' }}>Transactions</h2>
-            <p className="text-xs" style={{ color:'rgba(255,255,255,0.40)' }}>{filtered.length} transactions</p>
+            <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white/95">Transactions</h2>
+            <p className="text-xs text-gray-400 dark:text-white/35">{filtered.length} transactions</p>
           </div>
         </div>
         <button onClick={() => exportToPDF(filtered, summary, filterMonth||filterDate||'All')}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all active:scale-95 lg-chip"
-          style={{ color:'rgba(255,255,255,0.60)' }}>
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all active:scale-95"
+          style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.50)' }}>
           <FileDown size={14}/> PDF
         </button>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-2 rounded-2xl px-3 py-3"
-        style={{ background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.16)' }}>
-        <Search size={15} style={{ color:'rgba(255,255,255,0.40)', flexShrink:0 }} />
+      {/* Search bar */}
+      <div className="flex items-center gap-2 rounded-xl px-3 py-3"
+        style={{ background: 'var(--mf-surface)', border: '1.5px solid var(--mf-border)' }}>
+        <Search size={15} className="text-gray-400 dark:text-white/30 flex-shrink-0" />
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search by name, category or amount..."
-          className="flex-1 bg-transparent text-sm outline-none"
-          style={{ color:'rgba(255,255,255,0.90)', caretColor:'#4ade80' }} />
+          className="flex-1 bg-transparent text-sm outline-none text-gray-800 dark:text-white/90"
+          style={{ caretColor: '#4F8EF7' }} />
         {search && (
-          <button onClick={() => setSearch('')} style={{ color:'rgba(255,255,255,0.40)' }}><X size={14}/></button>
+          <button onClick={() => setSearch('')} className="text-gray-400 dark:text-white/30"><X size={14}/></button>
         )}
       </div>
 
       {/* Filter bar */}
-      <div className="lg-surface rounded-2xl p-3">
-        <div className="flex items-center gap-2 mb-3 relative z-10">
-          <Filter size={14} style={{ color:'rgba(255,255,255,0.45)' }} />
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color:'rgba(255,255,255,0.38)' }}>Filter</span>
+      <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={14} className="text-gray-400 dark:text-white/35" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">Filter</span>
         </div>
-        <div className="flex gap-2 mb-3 relative z-10">
+        <div className="flex gap-2 mb-3">
           {[
             { mode:'all',   label:'All' },
             { mode:'day',   label:'By Day',   Icon:Calendar },
@@ -119,60 +121,59 @@ export default function Transactions({ onEdit }) {
             <button key={mode} onClick={() => { setFilterMode(mode); if (mode==='all') clearFilters() }}
               className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95"
               style={filterMode===mode
-                ? { background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', color:'white', boxShadow:'0 4px 12px rgba(34,197,94,0.35)' }
-                : { background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.50)', border:'1px solid rgba(255,255,255,0.12)' }}>
+                ? { background: '#4F8EF7', color: 'white', boxShadow: '0 4px 12px rgba(79,142,247,0.30)' }
+                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)' }}>
               {Icon && <Icon size={12}/>} {label}
             </button>
           ))}
         </div>
         {filterMode==='day' && (
           <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none relative z-10"
-            style={{ background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.16)', color:'rgba(255,255,255,0.90)' }} />
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+            style={{ background: 'var(--mf-surface-2)', border: '1.5px solid var(--mf-border)', color: 'rgba(255,255,255,0.90)' }} />
         )}
         {filterMode==='month' && (
           <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none relative z-10"
-            style={{ background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.16)', color:'rgba(255,255,255,0.90)' }} />
+            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+            style={{ background: 'var(--mf-surface-2)', border: '1.5px solid var(--mf-border)', color: 'rgba(255,255,255,0.90)' }} />
         )}
         {(filterDate||filterMonth||search) && (
           <button onClick={clearFilters}
-            className="flex items-center gap-1 mt-2 text-xs font-medium relative z-10"
-            style={{ color:'#f87171' }}>
+            className="flex items-center gap-1 mt-2 text-xs font-medium text-[#FF6B6B]">
             <X size={12}/> Clear all filters
           </button>
         )}
       </div>
 
       {/* Mini summary */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2.5">
         {[
-          { label:'Balance', amount:summary.balance,     color:'rgba(255,255,255,0.90)', bg:'rgba(255,255,255,0.08)' },
-          { label:'Credit',  amount:summary.totalCredit, color:'#4ade80',                bg:'rgba(34,197,94,0.10)'  },
-          { label:'Debit',   amount:summary.totalDebit,  color:'#f87171',                bg:'rgba(244,63,94,0.10)'  },
+          { label:'Balance', amount:summary.balance,     color:'rgba(255,255,255,0.90)', bg:'rgba(255,255,255,0.05)' },
+          { label:'Credit',  amount:summary.totalCredit, color:'#34D399',                bg:'rgba(52,211,153,0.08)' },
+          { label:'Debit',   amount:summary.totalDebit,  color:'#FF6B6B',                bg:'rgba(255,107,107,0.08)' },
         ].map(({ label, amount, color, bg }) => (
-          <div key={label} className="text-center p-3 rounded-2xl"
-            style={{ background:bg, border:'1px solid rgba(255,255,255,0.10)' }}>
-            <p className="text-[10px] mb-1" style={{ color:'rgba(255,255,255,0.40)' }}>{label}</p>
+          <div key={label} className="text-center p-3 rounded-xl"
+            style={{ background: bg }}>
+            <p className="text-[10px] mb-1 text-gray-400 dark:text-white/35">{label}</p>
             <p className="font-mono font-bold text-sm" style={{ color }}>₹{Number(amount).toLocaleString('en-IN')}</p>
           </div>
         ))}
       </div>
 
       {/* Transaction list */}
-      <div className="lg-surface rounded-2xl p-3">
+      <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-3">
         {filtered.length === 0 ? (
-          <div className="text-center py-12 relative z-10">
+          <div className="text-center py-12">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-              style={{ background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.14)' }}>
-              <Search size={22} style={{ color:'rgba(255,255,255,0.35)' }} />
+              style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <Search size={22} className="text-gray-300 dark:text-white/25" />
             </div>
-            <p className="text-sm font-medium" style={{ color:'rgba(255,255,255,0.50)' }}>
+            <p className="text-sm font-medium text-gray-400 dark:text-white/40">
               {search ? `No results for "${search}"` : 'No transactions found'}
             </p>
           </div>
         ) : (
-          <div className="space-y-1.5 relative z-10">
+          <div className="space-y-1.5">
             {filtered.map(tx => (
               <TransactionRow key={tx.id} tx={tx} onEdit={onEdit} onDelete={handleDelete} onToggleNeedWant={toggleNeedWant} />
             ))}

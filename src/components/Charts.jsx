@@ -78,7 +78,7 @@ export default function Charts() {
   const cashFlowData = useMemo(() => {
     const days = 30, today = new Date(), result = []
     let running = 0
-    const txByDate = {}
+    const txByDate = {};
     [...transactions].filter(t => t.date).sort((a,b) => a.date.localeCompare(b.date))
       .forEach(t => { if (!txByDate[t.date]) txByDate[t.date] = 0; txByDate[t.date] += t.type === 'credit' ? Number(t.amount) : -Number(t.amount) })
     for (let i = days-1; i >= 0; i--) {

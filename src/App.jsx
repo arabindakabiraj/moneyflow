@@ -1,5 +1,6 @@
 /**
  * App.jsx — Root with Splash + PIN lock + all tabs including Accounts, Debts
+ * REDESIGNED: Clean dark premium layout, no liquid glass orbs
  */
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
@@ -18,45 +19,34 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { useNetwork } from './hooks/useNetwork'
 
 // ── Lazy-loaded tabs (code-split → faster initial load) ──
-const AIChat            = lazy(() => import('./components/AIChat'))
-const Settings          = lazy(() => import('./components/Settings'))
-const Charts            = lazy(() => import('./components/Charts'))
-const SplitCalculator   = lazy(() => import('./components/SplitCalculator'))
-const Accounts          = lazy(() => import('./components/Accounts'))
-const DebtTracker       = lazy(() => import('./components/DebtTracker'))
-const SmartAdd          = lazy(() => import('./components/SmartAdd'))
-const SavingsGoals      = lazy(() => import('./components/SavingsGoals'))
-const EMICalculator     = lazy(() => import('./components/EMICalculator'))
-const BillReminders     = lazy(() => import('./components/BillReminders'))
+const AIChat = lazy(() => import('./components/AIChat'))
+const Settings = lazy(() => import('./components/Settings'))
+const Charts = lazy(() => import('./components/Charts'))
+const SplitCalculator = lazy(() => import('./components/SplitCalculator'))
+const Accounts = lazy(() => import('./components/Accounts'))
+const DebtTracker = lazy(() => import('./components/DebtTracker'))
+const SmartAdd = lazy(() => import('./components/SmartAdd'))
+const SavingsGoals = lazy(() => import('./components/SavingsGoals'))
+const EMICalculator = lazy(() => import('./components/EMICalculator'))
+const BillReminders = lazy(() => import('./components/BillReminders'))
 const RecurringTransactions = lazy(() => import('./components/RecurringTransactions'))
-const Notifications     = lazy(() => import('./components/Notifications'))
-const GroupExpenses     = lazy(() => import('./components/GroupExpenses'))
-const SMSImport         = lazy(() => import('./components/SMSImport'))
-const FamilyMode        = lazy(() => import('./components/FamilyMode'))
-const Ledger            = lazy(() => import('./components/Ledger'))
-const CashFlow          = lazy(() => import('./components/CashFlow'))
+const Notifications = lazy(() => import('./components/Notifications'))
+const GroupExpenses = lazy(() => import('./components/GroupExpenses'))
+const SMSImport = lazy(() => import('./components/SMSImport'))
+const FamilyMode = lazy(() => import('./components/FamilyMode'))
+const Ledger = lazy(() => import('./components/Ledger'))
+const CashFlow = lazy(() => import('./components/CashFlow'))
 
 // ── Skeleton shown while a lazy tab is loading ──
 function TabFallback() {
   return (
     <div className="space-y-4 pt-2 animate-fade-in">
       <div className="skeleton h-10 w-40 rounded-xl" />
-      <div className="skeleton h-36 rounded-3xl" />
+      <div className="skeleton h-36 rounded-2xl" />
       <div className="skeleton h-24 rounded-2xl" />
       <div className="skeleton h-14 rounded-2xl" />
       <div className="skeleton h-40 rounded-2xl" />
     </div>
-  )
-}
-
-/* ── Animated ambient background ── */
-function LiquidBackground() {
-  return (
-    <>
-      <div className="lg-bg-orb lg-bg-orb-1" />
-      <div className="lg-bg-orb lg-bg-orb-2" />
-      <div className="lg-bg-orb lg-bg-orb-3" />
-    </>
   )
 }
 
@@ -132,13 +122,12 @@ function AppContent() {
 
   if (uid === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(165deg, #062b1a 0%, #0a3d2e 30%, #0d4540 60%, #071e2e 100%)' }}>
-        <LiquidBackground />
-        <div className="text-center relative z-10">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-brand-400 to-emerald-600 flex items-center justify-center mx-auto mb-4 animate-pulse shadow-2xl shadow-brand-500/30">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--mf-bg)' }}>
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl bg-[#4F8EF7] flex items-center justify-center mx-auto mb-4 animate-pulse shadow-lg shadow-[#4F8EF7]/20">
             <span className="text-3xl font-bold text-white">₹</span>
           </div>
-          <p className="lg-text-secondary text-sm">Loading...</p>
+          <p className="text-white/40 text-sm">Loading...</p>
         </div>
       </div>
     )
@@ -178,47 +167,44 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen relative">
-      {/* ── Liquid Glass Background ── */}
-      <LiquidBackground />
+    <div className="min-h-screen" style={{ background: 'var(--mf-bg)' }}>
+      {/* PWA Install Banner */}
+      <InstallBanner />
 
-      {/* ── Content Layer (above orbs) ── */}
-      <div className="relative z-10">
-        {/* PWA Install Banner */}
-        <InstallBanner />
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="bg-[#FBBF24]/10 border-b border-[#FBBF24]/20 text-[#FBBF24] text-center py-2.5 text-xs font-semibold animate-slide-up flex items-center justify-center gap-1.5">
+          ⚠️ You are offline — data will sync when connected
+        </div>
+      )}
 
-        {/* Offline banner */}
-        {!isOnline && (
-          <div className="bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-white text-center py-2 text-xs font-semibold animate-slide-up flex items-center justify-center gap-1.5 backdrop-blur-sm">
-            ⚠️ You are offline — data will sync automatically when connected
-          </div>
-        )}
-        <Header />
+      <Header />
 
-        {error && (
-          <div className="mx-4 mt-3 p-3 rounded-xl text-xs font-medium animate-slide-up"
-            style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.30)', color: '#fbbf24' }}>
-            ⚠️ {error}
-          </div>
-        )}
-        <main
-          key={activeTab}
-          className={`px-4 pt-4 max-w-md mx-auto animate-tab-enter ${activeTab === 'ai' ? 'pb-0 overflow-hidden' : 'pb-32'}`}
-          style={{ minHeight: activeTab === 'ai' ? undefined : 'calc(100vh - 64px)' }}
-        >
-          <ErrorBoundary key={activeTab}>
-            <Suspense fallback={<TabFallback />}>
-              {renderTab()}
-            </Suspense>
-          </ErrorBoundary>
-        </main>
-        <BottomNav />
+      {error && (
+        <div className="mx-4 mt-3 p-3 rounded-xl text-xs font-medium animate-slide-up"
+          style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.20)', color: '#FBBF24' }}>
+          ⚠️ {error}
+        </div>
+      )}
 
-        {/* Onboarding modal — shown once after first login */}
-        {onboardingDone === false && (
-          <OnboardingModal onComplete={completeOnboarding} />
-        )}
-      </div>
+      <main
+        key={activeTab}
+        className={`px-4 pt-4 max-w-md mx-auto animate-tab-enter ${activeTab === 'ai' ? 'pb-0 overflow-hidden' : 'pb-28'}`}
+        style={{ minHeight: activeTab === 'ai' ? undefined : 'calc(100vh - 64px)' }}
+      >
+        <ErrorBoundary key={activeTab}>
+          <Suspense fallback={<TabFallback />}>
+            {renderTab()}
+          </Suspense>
+        </ErrorBoundary>
+      </main>
+
+      <BottomNav />
+
+      {/* Onboarding modal — shown once after first login */}
+      {onboardingDone === false && (
+        <OnboardingModal onComplete={completeOnboarding} />
+      )}
     </div>
   )
 }

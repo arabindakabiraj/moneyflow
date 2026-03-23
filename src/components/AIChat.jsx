@@ -1,5 +1,6 @@
 /**
- * AIChat.jsx — Enhanced Gemini AI with voice input, smart prompts, rich rendering
+ * AIChat.jsx — Modern dark-themed AI chat
+ * Clean bubbles, typing indicator, voice input
  */
 import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, Sparkles, Mic, MicOff, BarChart3, TrendingUp, Wallet, Calendar, AlertTriangle, Lightbulb, Globe } from 'lucide-react'
@@ -107,7 +108,7 @@ export default function AIChat() {
       // Bullet list
       if (line.match(/^[-*•]\s/)) {
         const text = line.replace(/^[-*•]\s/, '')
-        return <div key={j} className="flex gap-1.5 ml-1"><span className="text-gray-400 flex-shrink-0">•</span><span>{renderInline(text)}</span></div>
+        return <div key={j} className="flex gap-1.5 ml-1"><span className="text-gray-400 dark:text-white/30 flex-shrink-0">•</span><span>{renderInline(text)}</span></div>
       }
       // Numbered list
       if (line.match(/^\d+[.)]\s/)) {
@@ -124,7 +125,7 @@ export default function AIChat() {
       if (part.startsWith('**') && part.endsWith('**'))
         return <strong key={k} className="font-bold">{part.slice(2, -2)}</strong>
       if (part.startsWith('`') && part.endsWith('`'))
-        return <code key={k} className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[11px] font-mono text-violet-600 dark:text-violet-400">{part.slice(1, -1)}</code>
+        return <code key={k} className="px-1 py-0.5 bg-white/[0.06] rounded text-[11px] font-mono text-[#4F8EF7]">{part.slice(1, -1)}</code>
       if (part.startsWith('_') && part.endsWith('_'))
         return <em key={k}>{part.slice(1, -1)}</em>
       return part
@@ -137,16 +138,17 @@ export default function AIChat() {
       {/* Header */}
       <div className="flex-shrink-0">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-            <Sparkles size={18} className="text-white" />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(79,142,247,0.15)' }}>
+            <Sparkles size={18} className="text-[#4F8EF7]" />
           </div>
           <div>
-            <h2 className="font-display font-bold text-gray-900 dark:text-white">AI Advisor</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Gemini-powered · Smart Financial Insights</p>
+            <h2 className="font-display font-bold text-gray-900 dark:text-white/95">AI Advisor</h2>
+            <p className="text-xs text-gray-400 dark:text-white/35">Gemini-powered · Smart Financial Insights</p>
           </div>
           {/* Transaction count badge */}
-          <div className="ml-auto px-2 py-1 bg-violet-50 dark:bg-violet-900/20 rounded-lg">
-            <span className="text-[10px] font-mono font-semibold text-violet-600 dark:text-violet-400">{transactions.length} txns</span>
+          <div className="ml-auto px-2 py-1 rounded-lg" style={{ background: 'rgba(79,142,247,0.10)' }}>
+            <span className="text-[10px] font-mono font-semibold text-[#4F8EF7]">{transactions.length} txns</span>
           </div>
         </div>
 
@@ -154,7 +156,12 @@ export default function AIChat() {
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none mb-2 -mx-1 px-1">
           {ALL_QUICK_PROMPTS.map((p, i) => (
             <button key={i} onClick={() => sendMessage(`${p.icon} ${p.text}`)}
-              className="flex-shrink-0 text-xs px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-xl border border-purple-100 dark:border-purple-800/40 font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors whitespace-nowrap">
+              className="flex-shrink-0 text-xs px-3 py-2 rounded-xl font-medium transition-colors whitespace-nowrap"
+              style={{
+                background: 'rgba(79,142,247,0.08)',
+                color: '#4F8EF7',
+                border: '1px solid rgba(79,142,247,0.15)',
+              }}>
               {p.icon} {p.text}
             </button>
           ))}
@@ -168,16 +175,16 @@ export default function AIChat() {
           return (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}>
               {msg.role === 'assistant' && (
-                <div className={`w-7 h-7 rounded-xl flex items-center justify-center mr-2 flex-shrink-0 mt-1 ${isError ? 'bg-gradient-to-br from-rose-500 to-red-600' : 'bg-gradient-to-br from-violet-500 to-purple-600'
-                  }`}>
-                  <Bot size={13} className="text-white" />
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center mr-2 flex-shrink-0 mt-1`}
+                  style={{ background: isError ? 'rgba(255,107,107,0.15)' : 'rgba(79,142,247,0.15)' }}>
+                  <Bot size={13} style={{ color: isError ? '#FF6B6B' : '#4F8EF7' }} />
                 </div>
               )}
               <div className={`max-w-[82%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                ? 'bg-violet-600 text-white rounded-br-none shadow-md'
+                ? 'bg-[#4F8EF7] text-white rounded-br-sm'
                 : isError
-                  ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40 rounded-bl-none shadow-sm'
-                  : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-bl-none shadow-sm'
+                  ? 'bg-[#FF6B6B]/10 text-[#FF6B6B] border border-[#FF6B6B]/20 rounded-bl-sm'
+                  : 'bg-white dark:bg-[#1A1A1D] text-gray-800 dark:text-white/85 border border-black/[0.06] dark:border-white/[0.06] rounded-bl-sm'
                 }`}>
                 {msg.role === 'assistant' ? renderMessage(msg.content) : msg.content}
               </div>
@@ -185,15 +192,17 @@ export default function AIChat() {
           )
         })}
 
+        {/* Typing indicator */}
         {loading && (
           <div className="flex justify-start items-center gap-2 animate-fade-in">
-            <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-              <Bot size={13} className="text-white" />
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: 'rgba(79,142,247,0.15)' }}>
+              <Bot size={13} className="text-[#4F8EF7]" />
             </div>
-            <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-bl-none px-4 py-3">
-              <div className="flex gap-1">
+            <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl rounded-bl-sm px-4 py-3">
+              <div className="flex gap-1.5">
                 {[0, 1, 2].map(i => (
-                  <div key={i} className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#4F8EF7] animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
                 ))}
               </div>
             </div>
@@ -207,10 +216,11 @@ export default function AIChat() {
         <div className="flex-shrink-0 flex gap-1.5 pb-2 animate-fade-in">
           {VOICE_LANGS.map(lang => (
             <button key={lang.code} onClick={() => { setVoiceLang(lang.code); setShowLangPicker(false) }}
-              className={`text-[11px] px-2.5 py-1.5 rounded-lg font-medium transition-all ${voiceLang === lang.code
-                ? 'bg-violet-500 text-white shadow-sm'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                }`}>
+              className="text-[11px] px-2.5 py-1.5 rounded-lg font-medium transition-all"
+              style={voiceLang === lang.code
+                ? { background: '#4F8EF7', color: 'white' }
+                : { background: 'var(--mf-surface-2)', color: 'rgba(255,255,255,0.50)' }
+              }>
               {lang.label}
             </button>
           ))}
@@ -219,13 +229,15 @@ export default function AIChat() {
 
       {/* Input bar */}
       <div className="flex-shrink-0 pt-2 pb-1">
-        <div className="flex gap-2 items-end bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-2 shadow-lg">
-          {/* Voice button — long press for lang picker */}
+        <div className="flex gap-2 items-end rounded-2xl p-2"
+          style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}>
+          {/* Voice button */}
           <button onClick={toggleVoice} onContextMenu={(e) => { e.preventDefault(); setShowLangPicker(p => !p) }}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${listening
-              ? 'bg-rose-500 text-white animate-pulse'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/30'
-              }`}
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
+            style={listening
+              ? { background: '#FF6B6B', color: 'white' }
+              : { background: 'var(--mf-surface-2)', color: 'rgba(255,255,255,0.35)' }
+            }
             title="Tap: voice input · Right-click: change language">
             {listening ? <MicOff size={16} /> : <Mic size={16} />}
           </button>
@@ -234,24 +246,25 @@ export default function AIChat() {
             value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKey}
             placeholder={listening ? '🎤 Speak now...' : 'Ask anything in any language...'}
             rows={1}
-            className="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 resize-none outline-none py-1.5 px-2 max-h-24 leading-relaxed"
+            className="flex-1 bg-transparent text-sm text-gray-800 dark:text-white/90 placeholder-white/25 resize-none outline-none py-1.5 px-2 max-h-24 leading-relaxed"
           />
 
           {/* Language indicator */}
           <button onClick={() => setShowLangPicker(p => !p)}
-            className="flex-shrink-0 text-[10px] text-gray-400 hover:text-violet-500 transition-colors px-1">
+            className="flex-shrink-0 text-gray-300 dark:text-white/25 hover:text-[#4F8EF7] transition-colors px-1">
             <Globe size={12} />
           </button>
 
           <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${loading || !input.trim()
-              ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-              : 'bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md active:scale-95'
-              }`}>
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
+            style={loading || !input.trim()
+              ? { background: 'var(--mf-surface-2)', color: 'rgba(255,255,255,0.25)' }
+              : { background: '#4F8EF7', color: 'white', boxShadow: '0 4px 12px rgba(79,142,247,0.30)' }
+            }>
             <Send size={16} />
           </button>
         </div>
-        <p className="text-[9px] text-gray-400 dark:text-gray-500 text-center mt-1">
+        <p className="text-[9px] text-gray-300 dark:text-white/20 text-center mt-1">
           Voice: {VOICE_LANGS.find(l => l.code === voiceLang)?.label} · Right-click mic to change
         </p>
       </div>

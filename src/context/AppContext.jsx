@@ -305,6 +305,11 @@ export function AppProvider({ children }) {
     await deleteDoc(doc(db, 'users', uid, 'groups', id))
   }
 
+  const updateGroup = async (id, data) => {
+    if (!uid) return
+    await updateDoc(doc(db, 'users', uid, 'groups', id), data)
+  }
+
   const addGroupExpense = async (groupId, expense) => {
     if (!uid) return
     const groupDoc = doc(db, 'users', uid, 'groups', groupId)
@@ -966,7 +971,7 @@ RESPOND WITH ONLY valid JSON, no markdown, no explanation:
     goals, addGoal, deleteGoal,
     bills, addBill, deleteBill, markBillPaid,
     recurringTx, addRecurring, deleteRecurring,
-    groups, addGroup, deleteGroup, addGroupExpense, deleteGroupExpense, getSettlements,
+    groups, addGroup, updateGroup, deleteGroup, addGroupExpense, deleteGroupExpense, getSettlements,
     familySettings, familyTransactions, generateInviteCode, linkPartner, unlinkPartner, getFamilySummary,
     getBudgetAlerts, getAnomalies,
     sendBudgetNotification, requestNotificationPermission,

@@ -8,8 +8,20 @@ export default defineConfig({
     include: /src\/.*\.jsx?$/,
     exclude: [],
   },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          charts: ['recharts'],
+          icons: ['lucide-react']
+        }
+      }
+    }
+  },
   server: {
-    host: true,   // exposes on local network
+    host: true,
     port: 5173,
   },
 })
