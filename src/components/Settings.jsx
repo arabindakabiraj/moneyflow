@@ -2,9 +2,9 @@
  * Settings.jsx — Clean, modern profile & settings page
  */
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert, Palette, Users, Heart, MessageSquare, Smartphone } from 'lucide-react'
+import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert, Users, Heart, MessageSquare, Smartphone } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { useTheme, THEMES } from '../context/ThemeContext'
+// ThemeContext import removed — Accent Theme section removed
 import { setupPin, clearPin, isPinSet, isBiometricCapable, isBiometricEnabled, checkPlatformAuthenticator, registerBiometric, clearBiometric, getAutoLockMinutes, setAutoLockMinutes } from './AppLock'
 import { exportToCSV } from '../utils/csvExport'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -47,7 +47,7 @@ export default function Settings() {
     openingBalance, openingDate, setOpeningBalance,
     gstSettings, updateGstSettings } = useApp()
 
-  const { theme, setTheme, themes } = useTheme()
+
   const { canInstall, isInstalled, promptInstall } = useInstallPrompt()
 
 
@@ -329,35 +329,23 @@ export default function Settings() {
         </SectionHeader>
         <div className="rounded-2xl bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] overflow-hidden divide-y divide-black/[0.06] dark:divide-white/[0.06]">
 
-          {/* Theme Selector */}
-          <div className="px-4 py-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-2xl bg-violet-500/15 flex items-center justify-center shrink-0">
-                <Palette size={18} className="text-violet-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 dark:text-white/95">Accent Theme</p>
-                <p className="text-[11px] text-gray-400 dark:text-white/35">{themes[theme]?.name || 'Default Green'}</p>
-              </div>
+          {/* Day / Night Mode Toggle */}
+          <div className="px-4 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-violet-500/15 flex items-center justify-center shrink-0">
+              {darkMode ? <Moon size={18} className="text-violet-400" /> : <Sun size={18} className="text-amber-500" />}
             </div>
-            <div className="grid grid-cols-6 gap-2">
-              {Object.entries(themes).map(([key, t]) => (
-                <button
-                  key={key}
-                  onClick={() => setTheme(key)}
-                  className={`flex flex-col items-center gap-1.5 py-2.5 rounded-xl transition-all active:scale-95 ${theme === key
-                    ? 'bg-gray-100 dark:bg-[#222226] ring-2 ring-[#4F8EF7]'
-                    : 'hover:bg-white/[0.04]'
-                    }`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full shadow-md ${theme === key ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1A1A1D]' : ''}`}
-                    style={{ backgroundColor: t.preview }}
-                  />
-                  <span className="text-[9px] text-gray-400 dark:text-white/40 font-medium">{t.emoji}</span>
-                </button>
-              ))}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white/95">Appearance</p>
+              <p className="text-[11px] text-gray-400 dark:text-white/35">{darkMode ? 'Dark mode' : 'Light mode'}</p>
             </div>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`relative w-14 h-7 rounded-full transition-all duration-300 ${darkMode ? 'bg-violet-500' : 'bg-amber-400'}`}
+            >
+              <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-sm flex items-center justify-center transition-all duration-300 ${darkMode ? 'left-7' : 'left-0.5'}`}>
+                {darkMode ? <Moon size={12} className="text-violet-500" /> : <Sun size={12} className="text-amber-500" />}
+              </div>
+            </button>
           </div>
 
           {/* Savings Goal */}

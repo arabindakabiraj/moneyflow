@@ -521,7 +521,7 @@ html.dark {
   color: var(--mf-text-muted);
 }
 .liquid-nav-item.is-active .liquid-nav-icon {
-  color: var(--mf-accent);
+  color: #14B8A6;
 }
 
 /* Label */
@@ -535,7 +535,7 @@ html.dark {
   opacity: 0.7;
 }
 .liquid-nav-item.is-active .liquid-nav-label {
-  color: var(--mf-accent);
+  color: #14B8A6;
   transform: translateY(0);
   opacity: 1;
 }
@@ -547,7 +547,7 @@ html.dark {
   width: 36px; height: 36px;
   transform: translate(-50%, -55%);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(79, 142, 247, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.15) 0%, transparent 70%);
   pointer-events: none;
   z-index: 1;
 }
@@ -557,7 +557,7 @@ html.dark {
   position: absolute;
   width: 50px; height: 50px;
   border-radius: 50%;
-  background: rgba(79, 142, 247, 0.10);
+  background: rgba(20, 184, 166, 0.10);
   transform: translate(-50%,-50%) scale(0);
   animation: liquidRipple 0.45s ease-out forwards;
   pointer-events: none;

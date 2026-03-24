@@ -1,36 +1,25 @@
 /**
  * OnboardingModal.jsx — Full-screen onboarding (slides + setup wizard)
- * Liquid Glass dark style matching Dashboard throughout all phases
+ * Uses the app's theme system (--mf-* CSS variables) for light/dark mode support
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useApp } from '../context/AppContext'
 
-/* ─── Ambient orb background (matches Dashboard) ─── */
+/* ─── Ambient orb background (theme-aware) ─── */
 function LiquidBg() {
   return (
     <>
-      <div style={{
-        position: 'absolute', top: '-10%', right: '-10%',
-        width: 320, height: 320, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(34,197,94,0.22) 0%, transparent 70%)',
-        filter: 'blur(40px)', pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', bottom: '10%', left: '-15%',
-        width: 260, height: 260, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 70%)',
-        filter: 'blur(36px)', pointerEvents: 'none',
-      }} />
-      <div style={{
-        position: 'absolute', top: '40%', right: '5%',
-        width: 180, height: 180, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 70%)',
-        filter: 'blur(28px)', pointerEvents: 'none',
-      }} />
+      <div className="pointer-events-none absolute -right-[10%] -top-[10%] w-80 h-80 rounded-full blur-[40px] opacity-30 dark:opacity-100"
+        style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.22) 0%, transparent 70%)' }} />
+      <div className="pointer-events-none absolute bottom-[10%] -left-[15%] w-64 h-64 rounded-full blur-[36px] opacity-30 dark:opacity-100"
+        style={{ background: 'radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 70%)' }} />
+      <div className="pointer-events-none absolute top-[40%] right-[5%] w-44 h-44 rounded-full blur-[28px] opacity-25 dark:opacity-100"
+        style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 70%)' }} />
     </>
   )
 }
 
-/* ─── Slide icon backgrounds ─── */
+/* ─── Slide data ─── */
 const SLIDES = [
   {
     id: 'track',
@@ -73,8 +62,6 @@ const SLIDES = [
 /* ─── Setup steps ─── */
 const SETUP_STEPS = ['balance', 'gst']
 
-const BG = 'linear-gradient(165deg, #062b1a 0%, #0a3d2e 30%, #0d4540 60%, #071e2e 100%)'
-
 export default function OnboardingModal({
   onComplete,
   openingBalance = 0,
@@ -82,6 +69,7 @@ export default function OnboardingModal({
   gstSettings,
   updateGstSettings,
 }) {
+  const { darkMode } = useApp()
   const [phase, setPhase] = useState('slides') // 'slides' | 'setup'
   const [slideIdx, setSlideIdx] = useState(0)
   const [setupStep, setSetupStep] = useState(0)
@@ -175,7 +163,7 @@ export default function OnboardingModal({
     return (
       <div
         className={`fixed inset-0 z-[9999] flex flex-col select-none transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}
-        style={{ background: BG }}
+        style={{ background: 'var(--mf-bg)' }}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
@@ -187,7 +175,7 @@ export default function OnboardingModal({
           <button
             onClick={skip}
             className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all active:scale-95"
-            style={{ background: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.15)' }}
+            style={{ background: 'var(--mf-surface-2)', color: 'var(--mf-text-secondary)', border: '1px solid var(--mf-border)' }}
           >
             Skip
           </button>
@@ -199,8 +187,8 @@ export default function OnboardingModal({
             style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', boxShadow: '0 12px 36px rgba(34,197,94,0.40)' }}>
             <span className="text-white font-black text-2xl">₹</span>
           </div>
-          <span className="text-white font-black text-xl tracking-tight" style={{ fontFamily: 'system-ui' }}>MoneyFlow</span>
-          <span className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.40)' }}>Your Smart Money Tracker</span>
+          <span className="font-black text-xl tracking-tight" style={{ fontFamily: 'system-ui', color: 'var(--mf-text-primary)' }}>MoneyFlow</span>
+          <span className="text-xs mt-0.5" style={{ color: 'var(--mf-text-muted)' }}>Your Smart Money Tracker</span>
         </div>
 
         {/* ── Carousel ── */}
@@ -316,7 +304,7 @@ export default function OnboardingModal({
                   width: slideIdx === i ? 28 : 8,
                   height: 8,
                   borderRadius: 4,
-                  background: slideIdx === i ? '#22c55e' : 'rgba(255,255,255,0.22)',
+                  background: slideIdx === i ? '#22c55e' : 'var(--mf-surface-3)',
                   transition: 'all 0.3s cubic-bezier(0.25,1,0.5,1)',
                   boxShadow: slideIdx === i ? '0 0 10px rgba(34,197,94,0.50)' : 'none',
                   border: 'none',
@@ -348,38 +336,38 @@ export default function OnboardingModal({
           </button>
 
           {/* Home indicator */}
-          <div className="w-28 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.20)' }} />
+          <div className="w-28 h-1 rounded-full" style={{ background: 'var(--mf-surface-3)' }} />
         </div>
       </div>
     )
   }
 
-  /* ════════════════ SETUP PHASE (same full-screen Liquid Glass style) ════════════════ */
+  /* ════════════════ SETUP PHASE ════════════════ */
   return (
     <div
       className={`fixed inset-0 z-[9999] flex flex-col select-none transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}
-      style={{ background: BG }}
+      style={{ background: 'var(--mf-bg)' }}
     >
       <LiquidBg />
 
       {/* ── Header ── */}
       <div className="relative z-10 flex items-center justify-between px-5 pt-14 pb-6">
-        {/* Back to slides */}
+        {/* Back */}
         {setupStep === 0 ? (
           <button
             onClick={() => setPhase('slides')}
             className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-90"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
+            style={{ background: 'var(--mf-surface-2)', border: '1px solid var(--mf-border)' }}
           >
-            <span className="text-white text-base">‹</span>
+            <span style={{ color: 'var(--mf-text-primary)' }} className="text-base">‹</span>
           </button>
         ) : (
           <button
             onClick={() => setSetupStep(s => s - 1)}
             className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-90"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
+            style={{ background: 'var(--mf-surface-2)', border: '1px solid var(--mf-border)' }}
           >
-            <span className="text-white text-base">‹</span>
+            <span style={{ color: 'var(--mf-text-primary)' }} className="text-base">‹</span>
           </button>
         )}
 
@@ -392,7 +380,7 @@ export default function OnboardingModal({
               style={{
                 width: setupStep === i ? 28 : 8,
                 height: 8,
-                background: setupStep === i ? '#22c55e' : 'rgba(255,255,255,0.18)',
+                background: setupStep === i ? '#22c55e' : 'var(--mf-surface-3)',
                 boxShadow: setupStep === i ? '0 0 10px rgba(34,197,94,0.50)' : 'none',
               }}
             />
@@ -402,7 +390,7 @@ export default function OnboardingModal({
         <button
           onClick={skip}
           className="text-xs font-semibold px-3 py-1.5 rounded-full"
-          style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.12)' }}
+          style={{ background: 'var(--mf-surface-2)', color: 'var(--mf-text-secondary)', border: '1px solid var(--mf-border)' }}
         >
           Skip
         </button>
@@ -425,8 +413,8 @@ export default function OnboardingModal({
               >
                 <span style={{ fontSize: 32 }}>🏦</span>
               </div>
-              <h1 className="text-white font-black text-2xl mb-1" style={{ letterSpacing: '-0.02em' }}>Opening Balance</h1>
-              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.50)', maxWidth: 260 }}>
+              <h1 className="font-black text-2xl mb-1" style={{ letterSpacing: '-0.02em', color: 'var(--mf-text-primary)' }}>Opening Balance</h1>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--mf-text-secondary)', maxWidth: 260 }}>
                 How much money did you have before starting MoneyFlow?
               </p>
             </div>
@@ -434,15 +422,15 @@ export default function OnboardingModal({
             {/* Amount input */}
             <div
               className="rounded-3xl p-4 flex flex-col gap-4"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+              style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}
             >
               {/* Amount */}
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: 'var(--mf-text-muted)' }}>
                   Amount
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold" style={{ color: 'rgba(255,255,255,0.40)' }}>₹</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold" style={{ color: 'var(--mf-text-muted)' }}>₹</span>
                   <input
                     ref={amountRef}
                     type="number"
@@ -451,23 +439,33 @@ export default function OnboardingModal({
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && setSetupStep(1)}
-                    className="w-full pl-10 pr-4 py-4 rounded-2xl text-white text-2xl font-black font-mono placeholder-gray-700 outline-none"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.14)' }}
+                    className="w-full pl-10 pr-4 py-4 rounded-2xl text-2xl font-black font-mono outline-none"
+                    style={{
+                      background: 'var(--mf-surface-2)',
+                      border: '1.5px solid var(--mf-border)',
+                      color: 'var(--mf-text-primary)',
+                      colorScheme: darkMode ? 'dark' : 'light',
+                    }}
                   />
                 </div>
               </div>
 
               {/* Date */}
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: 'var(--mf-text-muted)' }}>
                   As of Date
                 </label>
                 <input
                   type="date"
                   value={date}
                   onChange={e => setDate(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-2xl text-white text-sm outline-none"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(255,255,255,0.14)', colorScheme: 'dark' }}
+                  className="w-full px-4 py-3.5 rounded-2xl text-sm outline-none"
+                  style={{
+                    background: 'var(--mf-surface-2)',
+                    border: '1.5px solid var(--mf-border)',
+                    color: 'var(--mf-text-primary)',
+                    colorScheme: darkMode ? 'dark' : 'light',
+                  }}
                 />
               </div>
             </div>
@@ -499,8 +497,8 @@ export default function OnboardingModal({
               >
                 <span style={{ fontSize: 32 }}>🧾</span>
               </div>
-              <h1 className="text-white font-black text-2xl mb-1" style={{ letterSpacing: '-0.02em' }}>GST Setup</h1>
-              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.50)', maxWidth: 260 }}>
+              <h1 className="font-black text-2xl mb-1" style={{ letterSpacing: '-0.02em', color: 'var(--mf-text-primary)' }}>GST Setup</h1>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--mf-text-secondary)', maxWidth: 260 }}>
                 Optional — for tax-deductible expense tracking
               </p>
             </div>
@@ -508,10 +506,10 @@ export default function OnboardingModal({
             {/* GST Rate */}
             <div
               className="rounded-3xl p-4 flex flex-col gap-4"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+              style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}
             >
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: 'var(--mf-text-muted)' }}>
                   Your GST Rate
                 </label>
                 <div className="grid grid-cols-5 gap-2">
@@ -521,9 +519,9 @@ export default function OnboardingModal({
                       onClick={() => setGstRate(r)}
                       className="py-3 rounded-2xl text-sm font-bold transition-all active:scale-95"
                       style={{
-                        background: gstRate === r ? 'rgba(251,191,36,0.90)' : 'rgba(255,255,255,0.07)',
-                        color: gstRate === r ? '#000' : 'rgba(255,255,255,0.55)',
-                        border: gstRate === r ? '1px solid #fbbf24' : '1px solid rgba(255,255,255,0.10)',
+                        background: gstRate === r ? 'rgba(251,191,36,0.90)' : 'var(--mf-surface-2)',
+                        color: gstRate === r ? '#000' : 'var(--mf-text-secondary)',
+                        border: gstRate === r ? '1px solid #fbbf24' : '1px solid var(--mf-border)',
                         boxShadow: gstRate === r ? '0 4px 14px rgba(251,191,36,0.35)' : 'none',
                       }}
                     >
@@ -536,16 +534,16 @@ export default function OnboardingModal({
               {/* GST Registered toggle */}
               <div
                 className="flex items-center justify-between px-4 py-4 rounded-2xl"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}
+                style={{ background: 'var(--mf-surface-2)', border: '1px solid var(--mf-border)' }}
               >
                 <div>
-                  <p className="text-sm font-semibold text-white">I am GST Registered</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>Track GST input credit on expenses</p>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--mf-text-primary)' }}>I am GST Registered</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--mf-text-muted)' }}>Track GST input credit on expenses</p>
                 </div>
                 <button
                   onClick={() => setRegistered(r => !r)}
                   className="relative w-14 h-7 rounded-full transition-all duration-300 shrink-0"
-                  style={{ background: registered ? '#22c55e' : 'rgba(255,255,255,0.12)' }}
+                  style={{ background: registered ? '#22c55e' : 'var(--mf-surface-3)' }}
                 >
                   <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300 ${registered ? 'left-7' : 'left-0.5'}`} />
                 </button>
@@ -597,7 +595,7 @@ export default function OnboardingModal({
 
         {/* Home indicator */}
         <div className="flex justify-center mt-4">
-          <div className="w-28 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.20)' }} />
+          <div className="w-28 h-1 rounded-full" style={{ background: 'var(--mf-surface-3)' }} />
         </div>
       </div>
     </div>

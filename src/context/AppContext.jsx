@@ -2,7 +2,7 @@
  * AppContext.jsx — Global state with budget alerts + anomaly detection + custom categories
  * + Group Expenses, Family Mode, Local Notifications
  */
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import axios from 'axios'
 import {
   collection, query, orderBy, onSnapshot, where, getDocs,
@@ -543,8 +543,8 @@ export function AppProvider({ children }) {
     await setDoc(doc(db, 'users', uid, 'settings', 'budgets'), nb)
   }
 
-  // Budget alerts — categories over limit this month
-  const getBudgetAlerts = () => {
+  // Budget alerts — categories over limit this month (memoized)
+  const budgetAlertsCache = useMemo(() => {
     const now = new Date().toISOString().slice(0, 7)
     const monthlySpend = {}
     transactions
@@ -559,10 +559,11 @@ export function AppProvider({ children }) {
         exceeded: (monthlySpend[cat] || 0) >= limit,
         pct: Math.round(((monthlySpend[cat] || 0) / limit) * 100),
       }))
-  }
+  }, [transactions, budgets])
+  const getBudgetAlerts = useCallback(() => budgetAlertsCache, [budgetAlertsCache])
 
-  // Anomaly detection — transactions > 2x category average
-  const getAnomalies = () => {
+  // Anomaly detection — transactions > 2x category average (memoized)
+  const anomaliesCache = useMemo(() => {
     const catAvg = {}
     const catCount = {}
     transactions.filter(t => t.type === 'debit').forEach(t => {
@@ -574,7 +575,8 @@ export function AppProvider({ children }) {
       .filter(t => t.type === 'debit' && Number(t.amount) > catAvg[t.category] * 2)
       .sort((a, b) => Number(b.amount) - Number(a.amount))
       .slice(0, 5)
-  }
+  }, [transactions])
+  const getAnomalies = useCallback(() => anomaliesCache, [anomaliesCache])
 
   const logout = () => { clearSession(); setUid(null); setTx([]); setBudgets({}) }
   const setSavingsGoal = (v) => { setSavingsGoalState(v); localStorage.setItem('savingsGoal', v) }
@@ -591,8 +593,8 @@ export function AppProvider({ children }) {
     return openingBalance + totalCredit - totalDebit
   }
 
-  // ── Net Worth History — month-by-month cumulative balance (for chart) ──
-  const getNetWorthHistory = () => {
+  // ── Net Worth History — month-by-month cumulative balance (memoized) ──
+  const netWorthHistoryCache = useMemo(() => {
     // Sort all transactions by date ascending
     const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date))
     if (!sorted.length) return []
@@ -613,14 +615,15 @@ export function AppProvider({ children }) {
       running += (monthMap[m].income - monthMap[m].expense)
       return { month: m, netWorth: Math.round(running) }
     })
-  }
+  }, [transactions, openingBalance])
+  const getNetWorthHistory = useCallback(() => netWorthHistoryCache, [netWorthHistoryCache])
 
   // ── Cash Flow Statement — Operating / Investing / Financing ──
   const OPERATING_CATS = ['Tiffin', 'Books', 'Travel', 'Entertainment', 'Health', 'Rent', 'Others', 'Mobile', 'Electricity', 'Groceries', 'Food', 'Clothing']
   const INVESTING_CATS = ['Investment', 'Savings', 'Gold', 'Stocks', 'MF', 'FD', 'Insurance']
   const FINANCING_CATS = ['Loan', 'Debt', 'Repayment', 'Credit Card', 'EMI', 'Tuition']
 
-  const getCashFlowData = (month = '') => {
+  const getCashFlowData = useCallback((month = '') => {
     const filtered = month ? transactions.filter(t => t.date?.startsWith(month)) : transactions
     const result = {
       operating: { inflow: 0, outflow: 0, items: [] },
@@ -646,10 +649,10 @@ export function AppProvider({ children }) {
     })
     result.totalNet = result.operating.net + result.investing.net + result.financing.net
     return result
-  }
+  }, [transactions])
 
   // ── P&L Statement — monthly income vs expense breakdown ──
-  const getPLStatement = (month = '') => {
+  const getPLStatement = useCallback((month = '') => {
     const target = month || new Date().toISOString().slice(0, 7)
     const filtered = transactions.filter(t => t.date?.startsWith(target))
     const income = filtered.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
@@ -667,7 +670,7 @@ export function AppProvider({ children }) {
     const grossSavings = income - expense
     const savingsRate = income > 0 ? Math.round((grossSavings / income) * 100) : 0
     return { month: target, income, expense, grossSavings, savingsRate, catBreakdown, incomeBreakdown }
-  }
+  }, [transactions])
 
   // ── Double-Entry Ledger — every transaction as Debit/Credit row with running balance ──
   const getLedgerEntries = useCallback(() => {
@@ -706,8 +709,8 @@ export function AppProvider({ children }) {
     return entries
   }, [transactions, openingBalance, openingDate])
 
-  // ── ML Spending Prediction — weighted avg of last 3 months per category ──
-  const getMLPredictions = () => {
+  // ── ML Spending Prediction — weighted avg of last 3 months per category (memoized) ──
+  const mlPredictionsCache = useMemo(() => {
     const monthsData = {}
     transactions.filter(t => t.type === 'debit').forEach(t => {
       const m = t.date?.slice(0, 7)
@@ -732,7 +735,8 @@ export function AppProvider({ children }) {
       const lastMonth = monthsData[sortedMonths[sortedMonths.length - 1]][cat] || 0
       return { category: cat, predicted, lastMonth, change: predicted - lastMonth }
     }).sort((a, b) => b.predicted - a.predicted)
-  }
+  }, [transactions])
+  const getMLPredictions = useCallback(() => mlPredictionsCache, [mlPredictionsCache])
 
   const getFilteredTransactions = useCallback(() => {
     let f = [...transactions]
@@ -787,7 +791,7 @@ export function AppProvider({ children }) {
     // ── Enhanced: debt info ──
     const activeDebts = debts.filter(d => !d.repaid)
     const debtInfo = activeDebts.length > 0
-      ? activeDebts.map(d => `${d.person}: ₹${d.amount} (${d.type})`).join(', ')
+      ? activeDebts.map(d => `${d.name || d.person || 'Someone'}: ₹${d.amount} (${d.type})`).join(', ')
       : 'No active debts'
 
     const systemInstruction = `You are MoneyFlow's AI Financial Advisor. You are talking to a student user.

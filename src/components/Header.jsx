@@ -4,7 +4,7 @@
  * Includes App Menu popover for Finance Tools
  */
 import { useState, useRef, useEffect } from 'react'
-import { Bell, Moon, Sun, LayoutGrid, Target, RefreshCw, Calculator, Scissors, TrendingDown, Users, MessageSquare, Heart, X } from 'lucide-react'
+import { Bell, LayoutGrid, Target, RefreshCw, Calculator, Scissors, TrendingDown, Users, MessageSquare, Heart, X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useNotificationCount } from '../hooks/useNotifications'
 
@@ -22,7 +22,7 @@ const FINANCE_TOOLS = [
 ]
 
 export default function Header() {
-  const { darkMode, setDarkMode, username, profilePhoto, activeTab, setActiveTab } = useApp()
+  const { darkMode, username, profilePhoto, activeTab, setActiveTab } = useApp()
   const notifCount = useNotificationCount()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
@@ -113,37 +113,6 @@ export default function Header() {
                 style={{ background: '#FF6B6B', boxShadow: '0 0 6px rgba(255,107,107,0.60)' }}
               />
             )}
-          </button>
-
-          {/* Day / Night toggle */}
-          <button
-            onClick={() => setDarkMode(prev => !prev)}
-            className="relative p-2.5 rounded-xl transition-all active:scale-90"
-            style={{ background: 'rgba(128,128,128,0.08)' }}
-            title={darkMode ? 'Switch to Day mode' : 'Switch to Night mode'}
-          >
-            <div className="relative w-4 h-4">
-              <Sun
-                size={16}
-                style={{
-                  color: 'var(--mf-text-secondary)',
-                  position: 'absolute', top: 0, left: 0,
-                  opacity: darkMode ? 1 : 0,
-                  transform: darkMode ? 'rotate(0deg) scale(1)' : 'rotate(-90deg) scale(0.5)',
-                  transition: 'all 0.35s cubic-bezier(0.34,1.56,0.64,1)'
-                }}
-              />
-              <Moon
-                size={16}
-                style={{
-                  color: 'var(--mf-text-secondary)',
-                  position: 'absolute', top: 0, left: 0,
-                  opacity: darkMode ? 0 : 1,
-                  transform: darkMode ? 'rotate(90deg) scale(0.5)' : 'rotate(0deg) scale(1)',
-                  transition: 'all 0.35s cubic-bezier(0.34,1.56,0.64,1)'
-                }}
-              />
-            </div>
           </button>
 
           {/* App Menu — four-squares button */}

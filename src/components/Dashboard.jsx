@@ -482,13 +482,13 @@ export default function Dashboard({ onAddWithType }) {
     setBalanceHidden(h => { localStorage.setItem('mf_balance_hidden', String(!h)); return !h })
   }
 
-  const recent = [...transactions].sort((a, b) => {
+  const recent = useMemo(() => [...transactions].sort((a, b) => {
     const dateDiff = new Date(b.date) - new Date(a.date)
     if (dateDiff !== 0) return dateDiff
     const aT = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ?? 0) * 1000
     const bT = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ?? 0) * 1000
     return bT - aT
-  }).slice(0, 5)
+  }).slice(0, 5), [transactions])
 
   if (loading && transactions.length === 0) return <DashboardSkeleton />
 

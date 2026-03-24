@@ -50,7 +50,7 @@ export default function Notifications() {
   // ═══════ Build real-time notifications from all data sources ═══════
   const notifications = useMemo(() => {
     const items = []
-    const thisMonth = NOW.toISOString().slice(0, 7)
+    const thisMonth = new Date().toISOString().slice(0, 7)
 
     // ── 1. Budget Alerts (real from Firestore budgets + transactions) ──
     const alerts = getBudgetAlerts()
@@ -100,14 +100,15 @@ export default function Notifications() {
       if (isDismissed(dismissed, id, TTL_NORMAL)) return
       const amt = Number(debt.amount)
       if (amt <= 0) return
-      const isOwed = debt.type === 'owed' // you owe someone
+      const personName = debt.name || debt.person || 'Someone'
+      const isOwed = debt.type === 'i_owe' // you owe someone
       items.push({
         id,
         type: isOwed ? 'warning' : 'info',
         icon: CreditCard,
         title: isOwed
-          ? `You owe ${debt.person} ${fmtAmt(amt)}`
-          : `${debt.person} owes you ${fmtAmt(amt)}`,
+          ? `You owe ${personName} ${fmtAmt(amt)}`
+          : `${personName} owes you ${fmtAmt(amt)}`,
         desc: debt.note || (isOwed ? 'Consider paying back soon' : 'Pending repayment'),
         time: debt.date ? relTime(debt.date) : 'Active',
         priority: isOwed ? 3 : 5,
