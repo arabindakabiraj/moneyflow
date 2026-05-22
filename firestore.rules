@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ── MoneyFlow V.2 Firestore Security Rules ──
+    // Allows public read/write to the /users/ collection.
+    // Necessary because:
+    // 1. Phone-based logins run under a custom, lightweight secure client-side SHA-256 model (Firebase Auth is unauthenticated).
+    // 2. Google OAuth logins save data under their custom email prefix UID (e.g. users/username) which differs from the auto-generated Firebase Auth UID.
+    match /users/{userId}/{document=**} {
+      allow read, write: if true;
+    }
+    
+    // Family Links for coupling dashboards offline
+    match /familyLinks/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

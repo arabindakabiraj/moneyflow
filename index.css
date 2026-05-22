@@ -845,11 +845,9 @@ html:not(.dark) .sidebar-tooltip::before {
 }
 
 /* ── Google reCAPTCHA v2 Invisible — Badge Styling ── */
-/* Move badge slightly up from browser bottom edge */
+/* Hiding badge completely to prevent overlapping UI (authorized by Google as we display notice in the form) */
 .grecaptcha-badge {
-  bottom: 80px !important;
-  z-index: 9999 !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15) !important;
-  border-radius: 4px !important;
-  transition: right 0.3s ease !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }

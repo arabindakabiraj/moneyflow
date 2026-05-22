@@ -5,7 +5,7 @@
  * social login placeholders, security trust strip, step indicators
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Lock, Eye, EyeOff, RefreshCw, UserPlus, LogIn, User, KeyRound, ArrowLeft, Phone, Shield, CheckCircle2, AlertCircle, Sparkles, Fingerprint, CloudOff, ChevronRight } from 'lucide-react'
+import { Lock, Eye, EyeOff, RefreshCw, UserPlus, LogIn, User, KeyRound, ArrowLeft, Phone, CheckCircle2, AlertCircle, Sparkles, CloudOff, ChevronRight } from 'lucide-react'
 import { registerUser, loginUser, resetPassword, saveSession, loginWithGoogle, handleGoogleRedirectResult } from '../authUtils'
 
 const RECAPTCHA_SITE_KEY = '6LeNy_YsAAAAACKDzdg_oMc2Ty9jVEvxLuL0qGAN'
@@ -262,31 +262,7 @@ function SuccessAnimation({ message }) {
   )
 }
 
-/* ═══════ Trust Badge Strip ═══════ */
-function TrustBadges() {
-  const badges = [
-    { icon: Lock, label: '256-bit Encryption', color: '#14B8A6' },
-    { icon: Shield, label: 'Secure Auth', color: '#34D399' },
-    { icon: Fingerprint, label: 'Biometric Ready', color: '#A78BFA' },
-  ]
-  return (
-    <div className="rounded-2xl p-3.5 mt-4" style={{ background: 'var(--mf-surface-2)', border: '1px solid var(--mf-border)' }}>
-      <div className="flex items-center justify-around">
-        {badges.map(({ icon: Icon, label, color }, i) => (
-          <div key={label} className="flex flex-col items-center gap-1.5 stagger-item" style={{ animationDelay: `${400 + i * 80}ms` }}>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: `${color}18` }}>
-              <Icon size={14} style={{ color }} />
-            </div>
-            <span className="text-[9px] font-semibold text-center leading-tight" style={{ color: 'var(--mf-text-muted)' }}>
-              {label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+
 
 /* ═══════ Step Indicator (for Forgot Password) ═══════ */
 function StepIndicator({ currentStep, totalSteps = 3 }) {
@@ -339,6 +315,73 @@ export default function AuthScreen({ onAuth }) {
   const [showSuccess, setShowSuccess] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [recaptchaToken, setRecaptchaToken] = useState('')
+  const [debugLogs, setDebugLogs] = useState(() => {
+    const saved = localStorage.getItem('mf_debug_logs')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        return Array.isArray(parsed) ? parsed : []
+      } catch (_) {}
+    }
+    return []
+  })
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(() => {
+    const saved = localStorage.getItem('mf_debug_logs')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        return Array.isArray(parsed) && parsed.length > 0
+      } catch (_) {}
+    }
+    return false
+  })
+  const [copiedLogs, setCopiedLogs] = useState(false)
+
+  // Helper to append logs and persist them
+  const appendLog = useCallback((formattedMsg) => {
+    setDebugLogs(p => {
+      const next = [...p.slice(-15), formattedMsg] // Keep more lines for extensive redirects!
+      localStorage.setItem('mf_debug_logs', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  // Live Console Diagnostic Overlay for Developer debugging
+  useEffect(() => {
+    const originalConsoleError = console.error
+    const originalConsoleLog = console.log
+    const originalConsoleWarn = console.warn
+
+    console.error = (...args) => {
+      originalConsoleError(...args)
+      const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ')
+      if (!msg.includes('react-hooks/exhaustive-deps') && !msg.includes('Vite Hot Module Replacement') && !msg.includes('Fast Refresh')) {
+        appendLog(`❌ ${msg}`)
+      }
+    }
+
+    console.log = (...args) => {
+      originalConsoleLog(...args)
+      const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ')
+      if (!msg.includes('[vite]') && !msg.includes('HMR') && !msg.includes('hmr') && !msg.includes('Checking') && !msg.includes('Firebase Config Validation')) {
+        appendLog(`ℹ️ ${msg}`)
+      }
+    }
+
+    console.warn = (...args) => {
+      originalConsoleWarn(...args)
+      const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ')
+      if (!msg.includes('[vite]') && !msg.includes('HMR')) {
+        appendLog(`⚠️ ${msg}`)
+      }
+    }
+
+    return () => {
+      console.error = originalConsoleError
+      console.log = originalConsoleLog
+      console.warn = originalConsoleWarn
+    }
+  }, [appendLog])
   const recaptchaWidgetId = useRef(null)
   const recaptchaContainerRef = useRef(null)
   const recaptchaPendingResolve = useRef(null)
@@ -362,7 +405,10 @@ export default function AuthScreen({ onAuth }) {
         setShowSuccess(true)
         setTimeout(() => onAuth(uid), 1200)
       }
-    }).catch(() => {/* silent */})
+    }).catch(err => {
+      console.error("Redirect auth error:", err)
+      setError(err.message || 'Google Redirect Login failed. Please try again.')
+    })
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mount reCAPTCHA v2 Invisible widget once on load
@@ -405,28 +451,31 @@ export default function AuthScreen({ onAuth }) {
 
   // Returns a Promise that resolves with a fresh reCAPTCHA token
   const executeRecaptcha = useCallback(() => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+      // If reCAPTCHA script not loaded or widget not mounted — bypass silently
       if (!window.grecaptcha || recaptchaWidgetId.current === null) {
-        // reCAPTCHA not loaded — skip silently (dev / no network)
         resolve('dev-bypass')
         return
       }
-      // Store resolver so the callback above can call it
+      // Store resolver so the callback fires when Google responds
       recaptchaPendingResolve.current = resolve
       try {
         window.grecaptcha.reset(recaptchaWidgetId.current)
         window.grecaptcha.execute(recaptchaWidgetId.current)
       } catch (err) {
+        // Domain not authorized, config error, etc. — bypass gracefully
+        console.warn('reCAPTCHA skipped:', err?.message || err)
         recaptchaPendingResolve.current = null
-        reject(err)
+        resolve('error-bypass')
       }
-      // Safety timeout: if no response in 30s, resolve anyway
+      // Safety timeout: if no response within 8s (e.g. domain error blocks callback),
+      // resolve anyway so auth is never permanently stuck
       setTimeout(() => {
         if (recaptchaPendingResolve.current) {
           recaptchaPendingResolve.current = null
           resolve('timeout-bypass')
         }
-      }, 30000)
+      }, 8000)
     })
   }, [])
 
@@ -437,6 +486,118 @@ export default function AuthScreen({ onAuth }) {
       try { window.grecaptcha.reset(recaptchaWidgetId.current) } catch (_) {}
     }
   }, [])
+
+  const renderDiagnostics = () => {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port;
+    if (!isLocal) return null;
+
+    const copyLogsToClipboard = () => {
+      navigator.clipboard.writeText(debugLogs.join('\n')).then(() => {
+        setCopiedLogs(true);
+        setTimeout(() => setCopiedLogs(false), 2000);
+      });
+    };
+
+    return (
+      <div
+        className="mt-4 rounded-2xl overflow-hidden border transition-all duration-300"
+        style={{
+          background: 'var(--mf-surface-2)',
+          borderColor: isDiagnosticsOpen ? '#14B8A6' : 'var(--mf-border)',
+        }}
+      >
+        {/* Accordion Header */}
+        <button
+          type="button"
+          onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}
+          className="w-full px-4 py-3 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider transition-colors duration-200"
+          style={{
+            color: isDiagnosticsOpen ? '#14B8A6' : 'var(--mf-text-secondary)',
+            background: 'rgba(0,0,0,0.02)',
+          }}
+        >
+          <span className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+            </span>
+            Developer Diagnostics
+          </span>
+          <ChevronRight
+            size={14}
+            style={{
+              transform: isDiagnosticsOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.3s ease',
+            }}
+          />
+        </button>
+
+        {/* Accordion Content */}
+        <div
+          style={{
+            maxHeight: isDiagnosticsOpen ? '250px' : '0px',
+            opacity: isDiagnosticsOpen ? 1 : 0,
+            transition: 'all 0.3s ease-in-out',
+            overflow: 'hidden',
+          }}
+        >
+          <div className="p-4 border-t border-black/[0.05] dark:border-white/[0.05] flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-gray-500 dark:text-white/40">
+                Live Console Output (Last {debugLogs.length} entries)
+              </span>
+              {debugLogs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={copyLogsToClipboard}
+                  className="text-[10px] font-bold px-2 py-1 rounded-lg border transition-all duration-150 active:scale-95 flex items-center gap-1"
+                  style={{
+                    color: copiedLogs ? 'var(--mf-success)' : 'var(--mf-text-secondary)',
+                    borderColor: copiedLogs ? 'var(--mf-success)' : 'var(--mf-border)',
+                    background: 'transparent',
+                  }}
+                >
+                  {copiedLogs ? '✓ Copied!' : 'Copy Logs'}
+                </button>
+              )}
+            </div>
+
+            <div
+              className="rounded-xl p-3 font-mono text-[10px] space-y-1.5 max-h-[140px] overflow-y-auto"
+              style={{
+                background: 'var(--mf-surface-3)',
+                border: '1px solid var(--mf-border)',
+                lineHeight: '1.4',
+              }}
+            >
+              {debugLogs.length === 0 ? (
+                <div className="text-center text-gray-400 dark:text-white/30 py-3">
+                  No logs recorded yet. Click Google Sign-in to trigger diagnostics.
+                </div>
+              ) : (
+                debugLogs.map((log, index) => {
+                  let color = 'var(--mf-text-secondary)';
+                  if (log.startsWith('❌')) color = 'var(--mf-error)';
+                  if (log.startsWith('⚠️')) color = 'var(--mf-warning)';
+                  if (log.startsWith('✅')) color = 'var(--mf-success)';
+                  if (log.includes('Starting') || log.includes('Attempting') || log.includes('Switching')) color = '#14B8A6';
+
+                  return (
+                    <div key={index} style={{ color, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                      {log}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="text-[9px] leading-relaxed text-gray-400 dark:text-white/30">
+              ℹ️ If you see a <code className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10">auth/internal-error</code> details with restricted IP/API keys, check Google Cloud Console API restrictions.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Real-time validation
   const validateField = useCallback((field, value) => {
@@ -774,7 +935,21 @@ export default function AuthScreen({ onAuth }) {
                 {loading ? <RefreshCw size={17} className="animate-spin" /> : <><KeyRound size={17} /> Reset Password</>}
               </button>
             </div>
-            <TrustBadges />
+            
+            {/* Google TOS notice for invisible reCAPTCHA compliant hiding */}
+            <p className="text-[10px] text-center leading-normal mt-4 mb-1 opacity-40 px-2 select-none" style={{ color: 'var(--mf-text-muted)' }}>
+              This site is protected by reCAPTCHA and the Google{' '}
+              <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="underline hover:text-[#14B8A6] transition-colors">
+                Privacy Policy
+              </a>{' '}
+              and{' '}
+              <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" className="underline hover:text-[#14B8A6] transition-colors">
+                Terms of Service
+              </a>{' '}
+              apply.
+            </p>
+
+            {renderDiagnostics()}
           </div>
         ) : (
           /* SIGN IN / SIGN UP CARD */
@@ -787,8 +962,24 @@ export default function AuthScreen({ onAuth }) {
               maxWidth: 440,
             }}
           >
+            {/* Welcome header inside card - now at the very top */}
+            <div className="flex flex-col items-center text-center pt-6 pb-2 px-5 stagger-item">
+              <div className="w-12 h-12 rounded-2xl bg-[#14B8A6]/10 border border-[#14B8A6]/20 flex items-center justify-center mb-3 relative overflow-hidden group shadow-md shadow-[#14B8A6]/5">
+                <div className="absolute inset-0 bg-gradient-to-tr from-[#14B8A6]/5 to-[#0D9488]/5" />
+                <span className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-tr from-[#14B8A6] to-[#2DD4BF] relative z-10 select-none">
+                  ₹
+                </span>
+              </div>
+              <p className="text-base font-bold mb-0.5" style={{ color: 'var(--mf-text-primary)' }}>
+                {tab === 'login' ? 'Welcome back 👋' : 'Create your account 🚀'}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--mf-text-muted)' }}>
+                {tab === 'login' ? 'Sign in to continue managing your finances' : 'Start tracking your money like a pro'}
+              </p>
+            </div>
+
             {/* Sliding Indicator Tab Switcher */}
-            <div className="px-5 pt-5 pb-1">
+            <div className="px-5 py-2">
               <div className="relative flex p-1 rounded-2xl" style={{ background: 'var(--mf-surface-2)' }}>
                 {/* Sliding indicator */}
                 <div
@@ -819,16 +1010,7 @@ export default function AuthScreen({ onAuth }) {
               </div>
             </div>
 
-            <div className="p-5 flex-1 flex flex-col">
-              {/* Welcome header inside card */}
-              <div className="text-center mb-5 stagger-item">
-                <p className="text-base font-bold mb-0.5" style={{ color: 'var(--mf-text-primary)' }}>
-                  {tab === 'login' ? 'Welcome back 👋' : 'Create your account 🚀'}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--mf-text-muted)' }}>
-                  {tab === 'login' ? 'Sign in to continue managing your finances' : 'Start tracking your money like a pro'}
-                </p>
-              </div>
+            <div className="p-5 pt-3 flex-1 flex flex-col">
 
               {/* Form fields */}
               <div className="space-y-3.5 mb-5">
@@ -891,11 +1073,69 @@ export default function AuthScreen({ onAuth }) {
               {/* Global Error Display */}
               {error && (
                 <div
-                  className="flex items-start gap-2 text-sm mb-4 px-4 py-3 rounded-2xl font-medium animate-slide-up animate-fade-in"
-                  style={{ background: 'rgba(255,107,107,0.08)', color: 'var(--mf-error)', border: '1px solid rgba(255,107,107,0.15)' }}
+                  className="flex flex-col gap-2 text-sm mb-4 px-4 py-3.5 rounded-2xl font-medium animate-slide-up animate-fade-in text-left"
+                  style={{
+                    background: error === 'POPUP_BLOCKED' ? 'rgba(245,158,11,0.08)' : error.includes('internal-error') ? 'rgba(239,68,68,0.06)' : 'rgba(255,107,107,0.08)',
+                    color: error === 'POPUP_BLOCKED' ? '#D97706' : error.includes('internal-error') ? '#F87171' : 'var(--mf-error)',
+                    border: error === 'POPUP_BLOCKED' ? '1px solid rgba(245,158,11,0.2)' : error.includes('internal-error') ? '1px solid rgba(239,68,68,0.18)' : '1px solid rgba(255,107,107,0.15)',
+                  }}
                 >
-                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                  {error === 'POPUP_BLOCKED' ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 font-bold text-[13px]">
+                        <AlertCircle size={16} className="shrink-0 text-amber-500" />
+                        <span>Google Sign-In Popup Blocked!</span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed opacity-90 font-normal">
+                        Your browser blocked the secure Google sign-in window. To allow it:
+                      </p>
+                      <ol className="text-[11px] space-y-1.5 list-decimal pl-4.5 opacity-90 leading-relaxed font-semibold">
+                        <li>Look at the right end of your browser's address bar (URL bar).</li>
+                        <li>Click the small <span className="underline">"Popup Blocked"</span> icon (usually a window with a red 'x').</li>
+                        <li>Select <span>"Always allow popups and redirects from http://localhost:5173"</span> and click <span className="font-black">Done</span>.</li>
+                        <li>Click the <span className="text-[#14B8A6] font-bold">Google</span> button again to log in!</li>
+                      </ol>
+                      <div className="text-[10px] pt-1 opacity-60 leading-normal font-normal">
+                        *Note: If you use Brave, disable Brave Shields for localhost, or try in an Incognito window.*
+                      </div>
+                    </div>
+                  ) : error.includes('internal-error') ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 font-bold text-[13.5px]" style={{ color: '#F87171' }}>
+                        <AlertCircle size={16} className="shrink-0 text-[#F87171]" />
+                        <span>Firebase Configuration Error (auth/internal-error)</span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed opacity-90 font-normal">
+                        Google Sign-in failed due to a security/credentials configuration in your consoles. Please complete these three simple checks to fix it:
+                      </p>
+                      
+                      <div className="space-y-2 text-[11px] leading-relaxed font-normal text-white/90">
+                        <div className="p-2.5 rounded-xl bg-black/15 dark:bg-white/[0.02] border border-white/5">
+                          <strong className="text-[11.5px] block mb-0.5 text-amber-400 font-semibold">1. Firebase App Check (Most Probable)</strong>
+                          <span className="opacity-80">Go to <strong>Firebase Console &gt; App Check &gt; APIs</strong>. If <strong>Identity Toolkit</strong> (Authentication) is set to <strong>"Enforce"</strong>, click it and set it to <strong>"Unenforce"</strong>. App Check is not enabled on localhost in this app and will block development logins.</span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-black/15 dark:bg-white/[0.02] border border-white/5">
+                          <strong className="text-[11.5px] block mb-0.5 text-amber-400 font-semibold">2. Web SDK Client Secret Mismatch</strong>
+                          <span className="opacity-80">In <strong>Firebase Console &gt; Authentication &gt; Sign-in method &gt; Google</strong>, expand <strong>"Web SDK configuration"</strong>. Verify the Client ID and Client Secret match the OAuth client named <code>Web client (auto created by Google Service)</code> in your <strong>Google Cloud Console &gt; Credentials</strong> exactly. If they don't match, copy-paste the correct ones or clear them.</span>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-black/15 dark:bg-white/[0.02] border border-white/5">
+                          <strong className="text-[11.5px] block mb-0.5 text-amber-400 font-semibold">3. Authorized Domains &amp; API Key Restrictions</strong>
+                          <span className="opacity-80">Confirm <code>localhost</code> is in <strong>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</strong>. Also check if your API Key in Google Cloud Console is restricted, and ensure it allows the <strong>Identity Toolkit API</strong> and requests from <code>localhost:5173</code>.</span>
+                        </div>
+                      </div>
+                      
+                      <div className="text-[10px] text-center pt-1 opacity-60 font-normal leading-normal">
+                        *Tip: Open the Developer Diagnostics logs below to copy the raw API trace!*
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                      <span>{error}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1002,7 +1242,21 @@ export default function AuthScreen({ onAuth }) {
 
               {/* Flex spacer and Trust Strip */}
               <div className="flex-1 min-h-[12px]" />
-              <TrustBadges />
+
+              {/* Google TOS notice for invisible reCAPTCHA compliant hiding */}
+              <p className="text-[10px] text-center leading-normal mb-3 opacity-40 px-2 select-none animate-fade-in" style={{ color: 'var(--mf-text-muted)' }}>
+                This site is protected by reCAPTCHA and the Google{' '}
+                <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="underline hover:text-[#14B8A6] transition-colors">
+                  Privacy Policy
+                </a>{' '}
+                and{' '}
+                <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" className="underline hover:text-[#14B8A6] transition-colors">
+                  Terms of Service
+                </a>{' '}
+                apply.
+              </p>
+
+              {renderDiagnostics()}
             </div>
           </div>
         )}

@@ -67,56 +67,84 @@ export function normalizePhone(phone) {
     if (!p.startsWith('+')) p = '+91' + p
     return p
 }
+// Error helper to catch Firestore permissions errors and output direct user guidance
+function handleFirestoreError(error) {
+    console.error("Firestore database error:", error)
+    if (
+        error.code === 'permission-denied' || 
+        error.message?.toLowerCase().includes('permission') || 
+        error.message?.toLowerCase().includes('insufficient')
+    ) {
+        throw new Error('🔒 Firestore Permission Error: You must copy the rules from "firestore.rules" and paste them in your Firebase Console -> Cloud Firestore -> Rules tab to allow user access.')
+    }
+    throw error
+}
 
 // Register new user (with username)
 export async function registerUser(phone, password, username) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
-    const existing = await getDoc(userRef)
-    if (existing.exists()) {
-        throw new Error('🚫 An account already exists with this number! Please login.')
+    try {
+        const existing = await getDoc(userRef)
+        if (existing.exists()) {
+            throw new Error('🚫 An account already exists with this number! Please login.')
+        }
+        const hashed = await hashPassword(password)
+        await setDoc(userRef, {
+            phone: uid,
+            username: username || 'MoneyFlow User',
+            passwordHash: hashed,
+            createdAt: serverTimestamp(),
+        })
+        return uid
+    } catch (error) {
+        return handleFirestoreError(error)
     }
-    const hashed = await hashPassword(password)
-    await setDoc(userRef, {
-        phone: uid,
-        username: username || 'MoneyFlow User',
-        passwordHash: hashed,
-        createdAt: serverTimestamp(),
-    })
-    return uid
 }
 
 // Login existing user
 export async function loginUser(phone, password) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
-    const snap = await getDoc(userRef)
-    if (!snap.exists()) {
-        throw new Error('Account not found. Please register first.')
+    try {
+        const snap = await getDoc(userRef)
+        if (!snap.exists()) {
+            throw new Error('Account not found. Please register first.')
+        }
+        const hashed = await hashPassword(password)
+        if (snap.data().passwordHash !== hashed) {
+            throw new Error('Wrong password! Please try again.')
+        }
+        return uid
+    } catch (error) {
+        return handleFirestoreError(error)
     }
-    const hashed = await hashPassword(password)
-    if (snap.data().passwordHash !== hashed) {
-        throw new Error('Wrong password! Please try again.')
-    }
-    return uid
 }
 
 // Forgot/Reset password — set new password with phone number
 export async function resetPassword(phone, newPassword) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
-    const snap = await getDoc(userRef)
-    if (!snap.exists()) {
-        throw new Error('No account found with this number.')
+    try {
+        const snap = await getDoc(userRef)
+        if (!snap.exists()) {
+            throw new Error('No account found with this number.')
+        }
+        const hashed = await hashPassword(newPassword)
+        await setDoc(userRef, { passwordHash: hashed }, { merge: true })
+    } catch (error) {
+        return handleFirestoreError(error)
     }
-    const hashed = await hashPassword(newPassword)
-    await setDoc(userRef, { passwordHash: hashed }, { merge: true })
 }
 
 // Get user profile (username etc.)
 export async function getUserProfile(uid) {
-    const snap = await getDoc(doc(db, 'users', uid, 'profile', 'info'))
-    return snap.exists() ? snap.data() : {}
+    try {
+        const snap = await getDoc(doc(db, 'users', uid, 'profile', 'info'))
+        return snap.exists() ? snap.data() : {}
+    } catch (error) {
+        return handleFirestoreError(error)
+    }
 }
 
 // Persist session in localStorage
@@ -162,31 +190,38 @@ export async function loginWithGoogle() {
         return await _saveGoogleProfile(user)
     } catch (error) {
         console.error('❌ Google login error:', error.code, error.message)
+        console.error('🔍 Google login error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
         
-        // Popup blocked — fall back to redirect flow
-        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-cancelled') {
-            console.log('↪️ Popup blocked — switching to redirect flow')
+        // If the user cancelled it manually, abort nicely
+        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            throw new Error('Google login cancelled. Please try again.')
+        }
+        
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port;
+        
+        if (error.code === 'auth/popup-blocked') {
+            if (isLocal) {
+                throw new Error('POPUP_BLOCKED')
+            }
+        }
+        
+        if (isLocal) {
+            // Localhost HTTP cannot use redirect due to modern browsers blocking cross-origin storage/cookies
+            throw new Error(error.message || 'Google login failed. Please allow popups or check Firebase console.')
+        }
+        
+        // In production, fallback to redirect flow if popup was blocked
+        console.log('↪️ Switching to secure redirect flow to bypass browser/cookie restrictions...')
+        try {
             const provider = new GoogleAuthProvider()
             provider.addScope('email')
             provider.addScope('profile')
             provider.setCustomParameters({ prompt: 'select_account' })
             await signInWithRedirect(auth, provider)
-            // Page will reload — caller must handle getRedirectResult on next load
             return null
-        }
-        
-        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-            throw new Error('Google login cancelled. Please try again.')
-        } else if (error.code === 'auth/network-request-failed') {
-            throw new Error('Network error. Please check your internet connection and try again.')
-        } else if (error.code === 'auth/unauthorized-domain') {
-            throw new Error('This domain is not authorized for Google Sign-In. Please add it in Firebase Console → Authentication → Authorized Domains.')
-        } else if (error.code === 'auth/operation-not-allowed') {
-            throw new Error('Google Sign-In is not enabled. Please enable it in Firebase Console → Authentication → Sign-in Providers.')
-        } else if (error.code === 'auth/argument-error') {
-            throw new Error('Firebase Auth configuration error. Please restart the app and try again.')
-        } else {
-            throw new Error(`Google login failed: ${error.message} (${error.code})`)
+        } catch (redirectErr) {
+            console.error('Redirect fallback failed:', redirectErr)
+            throw new Error(`Google login failed: ${error.message || 'Internal connection error'}`)
         }
     }
 }
@@ -198,30 +233,34 @@ async function _saveGoogleProfile(user) {
     console.log('💾 Saving profile for uid:', uid)
     
     const userRef = doc(db, 'users', uid, 'profile', 'info')
-    const userProfile = await getDoc(userRef)
-    
-    if (!userProfile.exists()) {
-        await setDoc(userRef, {
-            phone: uid,
-            username: user.displayName || user.email.split('@')[0] || 'Google User',
-            email: user.email,
-            photoURL: user.photoURL || null,
-            authProvider: 'google',
-            createdAt: serverTimestamp(),
-        })
-        console.log('✅ New user profile created')
-    } else {
-        await setDoc(userRef, {
-            photoURL: user.photoURL || null,
-            email: user.email,
-            username: userProfile.data().username || user.displayName || uid,
-            authProvider: 'google',
-            lastLogin: serverTimestamp()
-        }, { merge: true })
-        console.log('✅ Existing user profile updated')
+    try {
+        const userProfile = await getDoc(userRef)
+        
+        if (!userProfile.exists()) {
+            await setDoc(userRef, {
+                phone: uid,
+                username: user.displayName || user.email.split('@')[0] || 'Google User',
+                email: user.email,
+                photoURL: user.photoURL || null,
+                authProvider: 'google',
+                createdAt: serverTimestamp(),
+            })
+            console.log('✅ New user profile created')
+        } else {
+            await setDoc(userRef, {
+                photoURL: user.photoURL || null,
+                email: user.email,
+                username: userProfile.data().username || user.displayName || uid,
+                authProvider: 'google',
+                lastLogin: serverTimestamp()
+            }, { merge: true })
+            console.log('✅ Existing user profile updated')
+        }
+        
+        return uid
+    } catch (error) {
+        return handleFirestoreError(error)
     }
-    
-    return uid
 }
 
 // ═══════ Handle Google Redirect Result (call on app startup) ═══════
@@ -234,8 +273,9 @@ export async function handleGoogleRedirectResult() {
         }
         return null
     } catch (error) {
-        console.error('Redirect result error:', error.code)
-        return null
+        console.error('❌ Redirect result error:', error.code, error.message)
+        console.error('🔍 Redirect result error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
+        throw error
     }
 }
 
