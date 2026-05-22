@@ -56,7 +56,7 @@ const CATEGORY_EMOJI = {
 
 /* ═══════ AI Spending Prediction Card ═══════ */
 function PredictionCard() {
-  const { transactions, budgets } = useApp()
+  const { transactions, budgets, darkMode } = useApp()
   const prediction = useMemo(() => predictSpending(transactions), [transactions])
   const dailyInfo  = useMemo(() => getDailyBudgetInfo(budgets, transactions), [budgets, transactions])
   const [expanded, setExpanded] = useState(false)
@@ -135,13 +135,13 @@ function PredictionCard() {
                 <span className="text-xs font-medium text-gray-600 dark:text-white/60">{cat.category}</span>
                 <span className="text-[9px] px-1.5 py-0.5 rounded-md font-semibold"
                   style={{
-                    background: cat.trend === 'up' ? 'rgba(255,107,107,0.12)' : cat.trend === 'down' ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.06)',
-                    color: cat.trend === 'up' ? '#FF6B6B' : cat.trend === 'down' ? '#34D399' : 'rgba(255,255,255,0.40)',
+                    background: cat.trend === 'up' ? 'rgba(255,107,107,0.12)' : cat.trend === 'down' ? 'rgba(52,211,153,0.12)' : (darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+                    color: cat.trend === 'up' ? '#FF6B6B' : cat.trend === 'down' ? '#34D399' : (darkMode ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.50)'),
                   }}>
                   {cat.trend === 'up' ? '↑' : cat.trend === 'down' ? '↓' : '→'}
                 </span>
               </div>
-              <span className="font-mono text-xs font-semibold text-white/70">
+              <span className="font-mono text-xs font-semibold text-gray-700 dark:text-white/70">
                 ₹{cat.predicted.toLocaleString('en-IN')}
               </span>
             </div>
@@ -230,7 +230,7 @@ function BalanceSheetWidget() {
 
 /* ═══════ Net Worth Timeline ═══════ */
 function NetWorthTimeline() {
-  const { getNetWorthHistory } = useApp()
+  const { getNetWorthHistory, darkMode } = useApp()
   const data = getNetWorthHistory()
   if (data.length < 2) return null
   const latest  = data[data.length - 1]?.netWorth || 0
@@ -256,11 +256,18 @@ function NetWorthTimeline() {
       {/* Chart */}
       <ResponsiveContainer width="100%" height={110}>
         <LineChart data={data} margin={{ top:4, right:4, left:-28, bottom:0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-          <XAxis dataKey="month" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.30)' }} tickFormatter={m => m?.slice(5)} />
-          <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.30)' }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
+          <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)"} />
+          <XAxis dataKey="month" tick={{ fontSize: 9, fill: darkMode ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.45)' }} tickFormatter={m => m?.slice(5)} />
+          <YAxis tick={{ fontSize: 9, fill: darkMode ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.45)' }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
           <Tooltip
-            contentStyle={{ background: 'var(--mf-surface-2)', border: '1px solid var(--mf-border)', borderRadius: 12, fontSize: 11, color: 'rgba(255,255,255,0.90)' }}
+            contentStyle={{
+              background: darkMode ? 'var(--mf-surface-2)' : '#ffffff',
+              border: `1px solid ${darkMode ? 'var(--mf-border)' : 'rgba(0,0,0,0.08)'}`,
+              borderRadius: 12,
+              fontSize: 11,
+              color: darkMode ? 'rgba(255,255,255,0.90)' : 'rgba(0,0,0,0.90)',
+              boxShadow: darkMode ? 'none' : '0 4px 12px rgba(0,0,0,0.05)'
+            }}
             formatter={v => [`₹${v.toLocaleString('en-IN')}`, 'Net Worth']}
           />
           <Line type="monotone" dataKey="netWorth" stroke={growing ? '#34D399' : '#FF6B6B'}
@@ -274,7 +281,7 @@ function NetWorthTimeline() {
 
 /* ═══════ Today's Snapshot Widget ═══════ */
 export function TodayWidget() {
-  const { transactions, budgets } = useApp()
+  const { transactions, budgets, darkMode } = useApp()
   const today     = new Date().toISOString().split('T')[0]
   const todayTx   = transactions.filter(t => t.date === today)
   const todaySpent  = todayTx.filter(t => t.type === 'debit').reduce((s,t) => s + Number(t.amount), 0)
@@ -299,7 +306,7 @@ export function TodayWidget() {
         </div>
         <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Today's Snapshot</h3>
         <span className="ml-auto text-[10px] font-mono px-2 py-0.5 rounded-lg"
-          style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.40)' }}>
+          style={{ background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', color: darkMode ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.50)' }}>
           {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
         </span>
       </div>
@@ -323,14 +330,14 @@ export function TodayWidget() {
 
       {/* Budget progress bar */}
       {totalBudget > 0 && (
-        <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}` }}>
           <div className="flex justify-between items-center mb-2">
             <span className="text-[11px] font-medium text-gray-400 dark:text-white/40">Monthly Budget Used</span>
             <span className="text-[11px] font-mono font-semibold text-gray-600 dark:text-white/60">
               ₹{monthlySpent.toLocaleString('en-IN')} / ₹{totalBudget.toLocaleString('en-IN')}
             </span>
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)' }}>
             <div className="h-full rounded-full transition-all duration-700"
               style={{ width: `${budgetPct}%`, background: budgetColor, boxShadow: `0 0 6px ${budgetColor}44` }} />
           </div>
@@ -426,11 +433,11 @@ export function TransactionRow({ tx, compact = false, onEdit, onDelete, onToggle
           <p className="text-sm font-semibold truncate text-gray-800 dark:text-white/90">{tx.description}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="text-[11px] text-gray-400 dark:text-white/30">{tx.date}</span>
-            <span className="text-white/15">·</span>
+            <span className="text-gray-300 dark:text-white/15">·</span>
             <span className="text-[11px] text-gray-400 dark:text-white/30">{tx.category}</span>
             {tx.type === 'debit' && (
               <>
-                <span className="text-white/15">·</span>
+                <span className="text-gray-300 dark:text-white/15">·</span>
                 <button onClick={() => onToggleNeedWant?.(tx.id)}
                   className="text-[10px] px-1.5 py-0.5 rounded-lg font-semibold transition-colors"
                   style={{
@@ -470,7 +477,7 @@ export function TransactionRow({ tx, compact = false, onEdit, onDelete, onToggle
 
 /* ═══════════════ MAIN DASHBOARD ═══════════════ */
 export default function Dashboard({ onAddWithType }) {
-  const { getSummary, transactions, savingsGoal, setActiveTab, loading, goals } = useApp()
+  const { getSummary, transactions, savingsGoal, setActiveTab, loading, goals, darkMode } = useApp()
   const summary = getSummary()
   const animatedBalance = useCountUp(summary.balance)
   const streak = useStreak()
@@ -609,7 +616,7 @@ export default function Dashboard({ onAddWithType }) {
               {recent.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                    style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }}>
                     <Wallet size={22} className="text-gray-400 dark:text-white/30" />
                   </div>
                   <p className="text-sm font-medium text-gray-400 dark:text-white/40">No transactions yet</p>
@@ -696,16 +703,16 @@ export default function Dashboard({ onAddWithType }) {
                     <div className="flex justify-between text-xs mb-1.5">
                       <span className="flex items-center gap-1.5 text-gray-600 dark:text-white/60">
                         <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
-                          style={{ background: 'rgba(255,255,255,0.06)' }}>
+                          style={{ background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
                           {CATEGORY_EMOJI[cat] || '💡'}
                         </span>
                         {cat}
                       </span>
-                      <span className="font-mono font-semibold text-white/70">
+                      <span className="font-mono font-semibold text-gray-700 dark:text-white/70">
                         ₹{amt.toLocaleString('en-IN')} ({((amt/totalDebit)*100).toFixed(0)}%)
                       </span>
                     </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)' }}>
                       <div className="h-full rounded-full transition-all duration-700"
                         style={{
                           width: `${(amt/totalDebit)*100}%`,

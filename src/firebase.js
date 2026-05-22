@@ -1,7 +1,7 @@
 /**
- * firebase.js — Firestore with Offline Persistent Cache
+ * firebase.js — Firestore with Offline Persistent Cache + Firebase Auth
  * IndexedDB-based local cache → works offline, auto-syncs when back online
- * Also exports Auth for Google OAuth integration
+ * Auth uses getAuth() (required for signInWithPopup/signInWithRedirect)
  */
 import { initializeApp } from 'firebase/app'
 import {
@@ -9,7 +9,7 @@ import {
     persistentLocalCache,
     persistentMultipleTabManager
 } from 'firebase/firestore'
-import { initializeAuth, browserLocalPersistence } from 'firebase/auth'
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -29,8 +29,9 @@ export const db = initializeFirestore(app, {
     })
 })
 
-// 🔵 Firebase Auth for Google OAuth
-export const auth = initializeAuth(app, {
-    persistence: browserLocalPersistence
-})
+// 🔵 Firebase Auth — MUST use getAuth() for signInWithPopup/signInWithRedirect to work
+// initializeAuth() creates a separate instance incompatible with signInWithPopup
+export const auth = getAuth(app)
 
+// Set persistence to browserLocal so users stay logged in across sessions
+setPersistence(auth, browserLocalPersistence).catch(console.error)

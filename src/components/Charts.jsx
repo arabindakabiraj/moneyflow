@@ -22,13 +22,20 @@ function weekStart(daysAgo = 0) {
 
 /* Glass tooltip */
 const GlassTooltip = ({ active, payload, label }) => {
+  const { darkMode } = useApp()
   if (!active || !payload?.length) return null
+
+  const bg = darkMode ? 'rgba(30,30,34,0.90)' : 'rgba(255,255,255,0.92)'
+  const border = darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)'
+  const textLabelColor = darkMode ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.60)'
+  const shadow = darkMode ? '0 8px 24px rgba(0,0,0,0.50)' : '0 8px 24px rgba(0,0,0,0.08)'
+
   return (
     <div className="px-3 py-2.5 rounded-2xl text-xs"
-      style={{ background: 'rgba(6,30,20,0.90)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
-      <p className="font-bold mb-1.5" style={{ color: 'rgba(255,255,255,0.75)' }}>{label}</p>
+      style={{ background: bg, backdropFilter: 'blur(24px)', border, boxShadow: shadow }}>
+      <p className="font-bold mb-1.5" style={{ color: textLabelColor }}>{label}</p>
       {payload.map((p, i) => (
-        <p key={i} className="font-mono" style={{ color: p.color }}>
+        <p key={i} className="font-mono font-semibold" style={{ color: p.color }}>
           {p.name}: ₹{Number(p.value).toLocaleString('en-IN')}
         </p>
       ))}
@@ -37,7 +44,7 @@ const GlassTooltip = ({ active, payload, label }) => {
 }
 
 export default function Charts() {
-  const { transactions, setActiveTab, getPLStatement, getMLPredictions } = useApp()
+  const { transactions, setActiveTab, getPLStatement, getMLPredictions, darkMode } = useApp()
   const currentMonth = new Date().toISOString().slice(0,7)
   const pl = getPLStatement(currentMonth)
   const predictions = getMLPredictions()
@@ -100,21 +107,21 @@ export default function Charts() {
   const lastWeekTotal = weeklyData.reduce((s,d) => s+d.lastWeek, 0)
   const weekDiff = lastWeekTotal ? ((thisWeekTotal-lastWeekTotal)/lastWeekTotal*100).toFixed(0) : 0
 
-  const axisStyle  = { fontSize:10, fill:'rgba(255,255,255,0.38)' }
-  const gridStyle  = { stroke:'rgba(255,255,255,0.06)', strokeDasharray:'3 3' }
+  const axisStyle  = { fontSize: 10, fill: darkMode ? 'rgba(255,255,255,0.38)' : 'rgba(0,0,0,0.50)' }
+  const gridStyle  = { stroke: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', strokeDasharray: '3 3' }
 
   if (transactions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
         <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5"
-          style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 8px 32px rgba(0,0,0,0.20)' }}>
+          style={{ background: darkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.04)', border: darkMode ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(0,0,0,0.08)', boxShadow: darkMode ? '0 8px 32px rgba(0,0,0,0.20)' : 'none' }}>
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(74,222,128,0.80)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
             <line x1="2" y1="20" x2="22" y2="20"/>
           </svg>
         </div>
-        <p className="font-semibold text-lg" style={{ color:'rgba(255,255,255,0.70)' }}>No data yet</p>
-        <p className="text-sm mt-1.5" style={{ color:'rgba(255,255,255,0.38)' }}>Add transactions to see charts!</p>
+        <p className="font-semibold text-lg text-gray-700 dark:text-white/70">No data yet</p>
+        <p className="text-sm mt-1.5 text-gray-400 dark:text-white/40">Add transactions to see charts!</p>
       </div>
     )
   }
@@ -125,18 +132,18 @@ export default function Charts() {
       <div className="flex items-center gap-3">
         <button onClick={() => setActiveTab('settings')}
           className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors active:scale-95 lg-chip">
-          <ArrowLeft size={18} style={{ color: 'rgba(255,255,255,0.70)' }} />
+          <ArrowLeft size={18} className="text-gray-600 dark:text-white/70" />
         </button>
         <div>
-          <h2 className="font-display font-bold text-xl" style={{ color: 'rgba(255,255,255,0.95)' }}>Analytics 📊</h2>
-          <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Income & expense analysis</p>
+          <h2 className="font-display font-bold text-xl text-gray-800 dark:text-white/95">Analytics 📊</h2>
+          <p className="text-sm mt-0.5 text-gray-500 dark:text-white/45">Income & expense analysis</p>
         </div>
       </div>
 
       {/* Weekly comparison */}
       <div className="lg-surface rounded-3xl p-4">
         <div className="flex items-center justify-between mb-3 relative z-10">
-          <h3 className="font-semibold text-sm" style={{ color: 'rgba(255,255,255,0.90)' }}>📆 This Week vs Last Week</h3>
+          <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">📆 This Week vs Last Week</h3>
           <span className="text-xs font-bold px-2 py-1 rounded-xl"
             style={Number(weekDiff) > 0
               ? { background:'rgba(244,63,94,0.15)', color:'#f87171', border:'1px solid rgba(244,63,94,0.25)' }
@@ -145,11 +152,11 @@ export default function Charts() {
           </span>
         </div>
         <div className="flex gap-4 text-xs mb-3 relative z-10">
-          <span style={{ color:'rgba(255,255,255,0.45)' }}>
-            This week: <strong className="font-mono" style={{ color:'rgba(255,255,255,0.85)' }}>₹{thisWeekTotal.toLocaleString('en-IN')}</strong>
+          <span className="text-gray-500 dark:text-white/45">
+            This week: <strong className="font-mono text-gray-800 dark:text-white/85">₹{thisWeekTotal.toLocaleString('en-IN')}</strong>
           </span>
-          <span style={{ color:'rgba(255,255,255,0.45)' }}>
-            Last week: <strong className="font-mono" style={{ color:'rgba(255,255,255,0.55)' }}>₹{lastWeekTotal.toLocaleString('en-IN')}</strong>
+          <span className="text-gray-500 dark:text-white/45">
+            Last week: <strong className="font-mono text-gray-500 dark:text-white/55">₹{lastWeekTotal.toLocaleString('en-IN')}</strong>
           </span>
         </div>
         <div className="relative z-10">
@@ -159,12 +166,12 @@ export default function Charts() {
               <YAxis tick={axisStyle} axisLine={false} tickLine={false} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
               <Tooltip content={<GlassTooltip />} />
               <Bar dataKey="thisWeek" name="This Week" fill="#4ade80" radius={[5,5,0,0]} />
-              <Bar dataKey="lastWeek" name="Last Week" fill="rgba(255,255,255,0.20)" radius={[5,5,0,0]} />
+              <Bar dataKey="lastWeek" name="Last Week" fill={darkMode ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.12)"} radius={[5,5,0,0]} />
             </BarChart>
           </ResponsiveContainer>
           <div className="flex gap-4 justify-center mt-1">
-            <span className="flex items-center gap-1.5 text-xs" style={{ color:'rgba(255,255,255,0.45)' }}><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background:'#4ade80' }} />This Week</span>
-            <span className="flex items-center gap-1.5 text-xs" style={{ color:'rgba(255,255,255,0.45)' }}><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background:'rgba(255,255,255,0.25)' }} />Last Week</span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/45"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background:'#4ade80' }} />This Week</span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/45"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: darkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.20)' }} />Last Week</span>
           </div>
         </div>
       </div>
@@ -172,7 +179,7 @@ export default function Charts() {
       {/* Monthly overview */}
       {monthlyData.length > 0 && (
         <div className="lg-surface rounded-3xl p-4">
-          <h3 className="font-semibold text-sm mb-4 relative z-10" style={{ color:'rgba(255,255,255,0.90)' }}>📅 Monthly Overview</h3>
+          <h3 className="font-semibold text-sm mb-4 relative z-10 text-gray-800 dark:text-white/90">📅 Monthly Overview</h3>
           <div className="relative z-10">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={monthlyData} barSize={18} barGap={4}>
@@ -184,8 +191,8 @@ export default function Charts() {
               </BarChart>
             </ResponsiveContainer>
             <div className="flex gap-4 justify-center mt-2">
-              <span className="flex items-center gap-1.5 text-xs" style={{ color:'rgba(255,255,255,0.45)' }}><span className="w-3 h-3 rounded-full inline-block" style={{ background:'#4ade80' }} />Income</span>
-              <span className="flex items-center gap-1.5 text-xs" style={{ color:'rgba(255,255,255,0.45)' }}><span className="w-3 h-3 rounded-full inline-block" style={{ background:'#f87171' }} />Expense</span>
+              <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/45"><span className="w-3 h-3 rounded-full inline-block" style={{ background:'#4ade80' }} />Income</span>
+              <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/45"><span className="w-3 h-3 rounded-full inline-block" style={{ background:'#f87171' }} />Expense</span>
             </div>
           </div>
         </div>
@@ -194,7 +201,7 @@ export default function Charts() {
       {/* Cash Flow */}
       {cashFlowData.length > 2 && (
         <div className="lg-surface rounded-3xl p-4">
-          <h3 className="font-semibold text-sm mb-4 relative z-10" style={{ color:'rgba(255,255,255,0.90)' }}>📈 Cash Flow (30 Days)</h3>
+          <h3 className="font-semibold text-sm mb-4 relative z-10 text-gray-800 dark:text-white/90">📈 Cash Flow (30 Days)</h3>
           <div className="relative z-10">
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={cashFlowData}>
@@ -216,7 +223,7 @@ export default function Charts() {
 
       {/* Spending by day */}
       <div className="lg-surface rounded-3xl p-4">
-        <h3 className="font-semibold text-sm mb-4 relative z-10" style={{ color:'rgba(255,255,255,0.90)' }}>🗓️ Spending by Day</h3>
+        <h3 className="font-semibold text-sm mb-4 relative z-10 text-gray-800 dark:text-white/90">🗓️ Spending by Day</h3>
         <div className="relative z-10">
           <ResponsiveContainer width="100%" height={150}>
             <BarChart data={dowData} barSize={20}>
@@ -230,14 +237,14 @@ export default function Charts() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          <p className="text-[10px] text-center mt-1" style={{ color:'rgba(255,255,255,0.30)' }}>Purple bar = today's day of week</p>
+          <p className="text-[10px] text-center mt-1 text-gray-400 dark:text-white/30">Purple bar = today's day of week</p>
         </div>
       </div>
 
       {/* Category pie */}
       {catData.length > 0 && (
         <div className="lg-surface rounded-3xl p-4">
-          <h3 className="font-semibold text-sm mb-4 relative z-10" style={{ color:'rgba(255,255,255,0.90)' }}>🏷️ Expense by Category</h3>
+          <h3 className="font-semibold text-sm mb-4 relative z-10 text-gray-800 dark:text-white/90">🏷️ Expense by Category</h3>
           <div className="relative z-10">
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
@@ -246,8 +253,8 @@ export default function Charts() {
                   {catData.map((_, i) => <Cell key={i} fill={COLORS[i%COLORS.length]} stroke="transparent" />)}
                 </Pie>
                 <Tooltip formatter={val => [`₹${Number(val).toLocaleString('en-IN')}`, '']}
-                  contentStyle={{ background:'rgba(6,30,20,0.90)', backdropFilter:'blur(24px)', border:'1px solid rgba(255,255,255,0.16)', borderRadius:12, fontSize:11, color:'rgba(255,255,255,0.85)' }} />
-                <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 11, color:'rgba(255,255,255,0.60)' }} />
+                  contentStyle={{ background: darkMode ? 'rgba(30,30,34,0.90)' : 'rgba(255,255,255,0.95)', border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', borderRadius:12, fontSize:11, color: darkMode ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.85)', boxShadow: darkMode ? 'none' : '0 4px 12px rgba(0,0,0,0.05)' }} />
+                <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 11, color: darkMode ? 'rgba(255,255,255,0.60)' : 'rgba(0,0,0,0.60)' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -263,8 +270,8 @@ export default function Charts() {
           { label:'Categories Used', value:new Set(transactions.map(t=>t.category)).size },
         ].map(({ label, value }) => (
           <div key={label} className="lg-surface rounded-2xl p-3 text-center">
-            <p className="text-xs mb-1 relative z-10" style={{ color:'rgba(255,255,255,0.40)' }}>{label}</p>
-            <p className="font-display font-bold relative z-10" style={{ color:'rgba(255,255,255,0.90)' }}>{value}</p>
+            <p className="text-xs mb-1 relative z-10 text-gray-500 dark:text-white/40">{label}</p>
+            <p className="font-display font-bold relative z-10 text-gray-800 dark:text-white/90">{value}</p>
           </div>
         ))}
       </div>
@@ -277,8 +284,8 @@ export default function Charts() {
             <span className="text-sm">📋</span>
           </div>
           <div>
-            <h3 className="font-bold text-sm" style={{ color:'rgba(255,255,255,0.90)' }}>P&amp;L Statement</h3>
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color:'rgba(255,255,255,0.38)' }}>{currentMonth}</p>
+            <h3 className="font-bold text-sm text-gray-800 dark:text-white/90">P&amp;L Statement</h3>
+            <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 dark:text-white/38">{currentMonth}</p>
           </div>
         </div>
         <div className="space-y-1 relative z-10">
@@ -286,19 +293,19 @@ export default function Charts() {
             { label:'📥 Total Income',  value:`+₹${pl.income.toLocaleString('en-IN')}`,   color:'#4ade80' },
             { label:'📤 Total Expenses', value:`-₹${pl.expense.toLocaleString('en-IN')}`, color:'#f87171' },
           ].map(({ label, value, color }) => (
-            <div key={label} className="flex justify-between items-center py-2.5" style={{ borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
-              <span className="text-xs" style={{ color:'rgba(255,255,255,0.50)' }}>{label}</span>
+            <div key={label} className="flex justify-between items-center py-2.5" style={{ borderBottom: `1px solid ${darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'}` }}>
+              <span className="text-xs text-gray-500 dark:text-white/50">{label}</span>
               <span className="font-mono font-bold text-sm" style={{ color }}>{value}</span>
             </div>
           ))}
           {Object.entries(pl.catBreakdown).sort(([,a],[,b])=>b-a).map(([cat, amt]) => (
             <div key={cat} className="flex justify-between items-center py-1.5 pl-6">
-              <span className="text-[11px]" style={{ color:'rgba(255,255,255,0.35)' }}>{cat}</span>
+              <span className="text-[11px] text-gray-400 dark:text-white/35">{cat}</span>
               <span className="font-mono text-[11px]" style={{ color:'#f87171aa' }}>₹{amt.toLocaleString('en-IN')}</span>
             </div>
           ))}
-          <div className="flex justify-between items-center py-2.5" style={{ borderTop:'2px solid rgba(255,255,255,0.12)', marginTop:4 }}>
-            <span className="text-xs font-bold" style={{ color:'rgba(255,255,255,0.80)' }}>💰 Net Savings</span>
+          <div className="flex justify-between items-center py-2.5" style={{ borderTop: `2px solid ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`, marginTop:4 }}>
+            <span className="text-xs font-bold text-gray-800 dark:text-white/80">💰 Net Savings</span>
             <span className="font-mono font-bold text-sm" style={{ color: pl.grossSavings >= 0 ? '#4ade80' : '#f87171' }}>
               {pl.grossSavings >= 0 ? '+' : ''}₹{pl.grossSavings.toLocaleString('en-IN')}
             </span>
@@ -306,7 +313,7 @@ export default function Charts() {
           {/* Savings rate bar */}
           <div className="pt-1 pb-1">
             <div className="flex justify-between items-center mb-1.5">
-              <span className="text-xs" style={{ color:'rgba(255,255,255,0.40)' }}>📊 Savings Rate</span>
+              <span className="text-xs text-gray-500 dark:text-white/40">📊 Savings Rate</span>
               <span className="text-xs font-bold px-2 py-0.5 rounded-lg"
                 style={pl.savingsRate >= 20
                   ? { background:'rgba(34,197,94,0.15)', color:'#4ade80', border:'1px solid rgba(34,197,94,0.25)' }
@@ -316,7 +323,7 @@ export default function Charts() {
                 {pl.savingsRate}%
               </span>
             </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background:'rgba(255,255,255,0.08)' }}>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}>
               <div className="h-full rounded-full transition-all duration-700"
                 style={{
                   width:`${Math.min(Math.max(pl.savingsRate,0),100)}%`,
@@ -325,7 +332,7 @@ export default function Charts() {
                     : 'linear-gradient(90deg, #f87171, #ef4444)',
                 }} />
             </div>
-            <p className="text-[9px] mt-1.5" style={{ color:'rgba(255,255,255,0.35)' }}>
+            <p className="text-[9px] mt-1.5 text-gray-400 dark:text-white/35">
               {pl.savingsRate >= 20 ? "🎉 Great! You're saving well this month."
                : pl.savingsRate >= 0 ? '💡 Tip: Try to save at least 20% of your income.'
                : '⚠️ Spending exceeds income this month.'}
@@ -343,14 +350,14 @@ export default function Charts() {
               <span className="text-sm">🤖</span>
             </div>
             <div>
-              <h3 className="font-bold text-sm" style={{ color:'rgba(255,255,255,0.90)' }}>ML Spending Prediction</h3>
-              <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color:'rgba(255,255,255,0.38)' }}>Next Month Forecast</p>
+              <h3 className="font-bold text-sm text-gray-800 dark:text-white/90">ML Spending Prediction</h3>
+              <p className="text-[9px] uppercase tracking-widest font-semibold text-gray-400 dark:text-white/38">Next Month Forecast</p>
             </div>
           </div>
-          <p className="text-[10px] mb-1 mt-2 relative z-10" style={{ color:'rgba(255,255,255,0.40)' }}>
+          <p className="text-[10px] mb-1 mt-2 relative z-10 text-gray-500 dark:text-white/40">
             Highest predicted: <strong style={{ color:'#a78bfa' }}>{predictions.sort((a,b)=>b.predicted-a.predicted)[0]?.category}</strong>
           </p>
-          <p className="text-[10px] mb-4 relative z-10" style={{ color:'rgba(255,255,255,0.40)' }}>
+          <p className="text-[10px] mb-4 relative z-10 text-gray-500 dark:text-white/40">
             Total: <strong style={{ color:'#a78bfa' }}>₹{predictions.reduce((s,p)=>s+p.predicted,0).toLocaleString('en-IN')}</strong>
           </p>
           <div className="relative z-10">
@@ -359,7 +366,7 @@ export default function Charts() {
                 <XAxis type="number" tick={axisStyle} tickFormatter={v => `₹${v >= 1000 ? (v/1000).toFixed(0)+'k' : v}`} />
                 <YAxis type="category" dataKey="category" tick={axisStyle} width={75} />
                 <Tooltip content={<GlassTooltip />} />
-                <Bar dataKey="lastMonth" name="Last Month" fill="rgba(255,255,255,0.20)" radius={[0,4,4,0]} />
+                <Bar dataKey="lastMonth" name="Last Month" fill={darkMode ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.12)"} radius={[0,4,4,0]} />
                 <Bar dataKey="predicted"  name="Predicted"  fill="#a78bfa"                 radius={[0,4,4,0]} />
               </BarChart>
             </ResponsiveContainer>

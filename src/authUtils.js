@@ -1,12 +1,12 @@
 /**
  * authUtils.js — Custom auth helpers + Google OAuth
  * Phone + Password using pure-JS SHA-256 + Firestore
- * Google OAuth via Firebase Auth
+ * Google OAuth via Firebase Auth — uses getAuth() + signInWithPopup
  * Works on HTTP, HTTPS, local network.
  */
 import { db, auth } from './firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signOut } from 'firebase/auth'
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from 'firebase/auth'
 
 // Pure JS SHA-256 — works on HTTP, HTTPS, and local network IPs
 function sha256(ascii) {
@@ -147,86 +147,95 @@ export function validateFirebaseConfig() {
 export async function loginWithGoogle() {
     try {
         console.log('📱 Starting Google Login...')
-        
-        // Step 1: Validate Firebase is properly initialized
-        console.log('Step 1: Validating Firebase configuration...')
         validateFirebaseConfig()
-        console.log('  ✓ Firebase validated')
-        
-        // Step 2: Create Google Provider
-        console.log('Step 2: Creating GoogleAuthProvider...')
-        console.log('  Auth type:', typeof auth)
-        console.log('  Auth value:', auth)
         
         const provider = new GoogleAuthProvider()
-        console.log('  ✓ GoogleAuthProvider created:', provider)
-        console.log('  ✓ Provider type:', provider.constructor.name)
-        
-        // Step 3: Set custom parameters
-        console.log('Step 3: Setting custom parameters...')
+        provider.addScope('email')
+        provider.addScope('profile')
         provider.setCustomParameters({ prompt: 'select_account' })
-        console.log('  ✓ Custom parameters set')
         
-        // Step 4: Call signInWithPopup
-        console.log('Step 4: Calling signInWithPopup...')
-        console.log('  Passing auth:', typeof auth === 'object' ? '✓ Object' : '✗ Not an object')
-        console.log('  Passing provider:', typeof provider === 'object' ? '✓ Object' : '✗ Not an object')
-        
+        console.log('🔐 Attempting signInWithPopup...')
         const result = await signInWithPopup(auth, provider)
         const user = result.user
-        console.log('  ✓ Google sign-in successful')
-        console.log('  User:', { email: user.email, displayName: user.displayName })
+        console.log('✅ Google sign-in successful:', user.email)
         
-        // Step 5: Normalize uid
-        console.log('Step 5: Creating user profile...')
-        const uid = user.phoneNumber || user.email.split('@')[0]
-        console.log('  Generated UID:', uid)
-        
-        // Step 6: Check if user profile exists in Firestore
-        const userRef = doc(db, 'users', uid, 'profile', 'info')
-        let userProfile = await getDoc(userRef)
-        
-        if (!userProfile.exists()) {
-            // First time Google login — create profile
-            console.log('  Creating new user profile...')
-            await setDoc(userRef, {
-                phone: uid,
-                username: user.displayName || 'Google User',
-                email: user.email,
-                photoURL: user.photoURL,
-                authProvider: 'google',
-                createdAt: serverTimestamp(),
-            })
-            console.log('  ✓ User profile created')
-        } else {
-            // Update profile with latest Google data
-            console.log('  Updating existing user profile...')
-            await setDoc(userRef, {
-                photoURL: user.photoURL,
-                email: user.email,
-                authProvider: 'google',
-                lastLogin: serverTimestamp()
-            }, { merge: true })
-            console.log('  ✓ User profile updated')
-        }
-        
-        console.log('✅ Google login completed successfully')
-        return uid
+        return await _saveGoogleProfile(user)
     } catch (error) {
-        console.error('❌ Google login error:', error)
-        console.error('  Error code:', error.code)
-        console.error('  Error message:', error.message)
-        console.error('  Full error:', error)
+        console.error('❌ Google login error:', error.code, error.message)
         
-        if (error.code === 'auth/popup-closed-by-user') {
-            throw new Error('Google login cancelled.')
-        } else if (error.code === 'auth/popup-blocked') {
-            throw new Error('Pop-up blocked. Please allow pop-ups for this site.')
-        } else if (error.code === 'auth/argument-error') {
-            throw new Error('Firebase configuration error. Please check: 1) Google Sign-In is enabled in Firebase Console, 2) OAuth Consent Screen is configured, 3) The app domain is authorized.')
-        } else {
-            throw new Error(`Google login failed: ${error.message}`)
+        // Popup blocked — fall back to redirect flow
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-cancelled') {
+            console.log('↪️ Popup blocked — switching to redirect flow')
+            const provider = new GoogleAuthProvider()
+            provider.addScope('email')
+            provider.addScope('profile')
+            provider.setCustomParameters({ prompt: 'select_account' })
+            await signInWithRedirect(auth, provider)
+            // Page will reload — caller must handle getRedirectResult on next load
+            return null
         }
+        
+        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            throw new Error('Google login cancelled. Please try again.')
+        } else if (error.code === 'auth/network-request-failed') {
+            throw new Error('Network error. Please check your internet connection and try again.')
+        } else if (error.code === 'auth/unauthorized-domain') {
+            throw new Error('This domain is not authorized for Google Sign-In. Please add it in Firebase Console → Authentication → Authorized Domains.')
+        } else if (error.code === 'auth/operation-not-allowed') {
+            throw new Error('Google Sign-In is not enabled. Please enable it in Firebase Console → Authentication → Sign-in Providers.')
+        } else if (error.code === 'auth/argument-error') {
+            throw new Error('Firebase Auth configuration error. Please restart the app and try again.')
+        } else {
+            throw new Error(`Google login failed: ${error.message} (${error.code})`)
+        }
+    }
+}
+
+// Helper: Save Google user profile to Firestore and return uid
+async function _saveGoogleProfile(user) {
+    // Use email prefix as uid (consistent with app's uid scheme)
+    const uid = user.email.split('@')[0]
+    console.log('💾 Saving profile for uid:', uid)
+    
+    const userRef = doc(db, 'users', uid, 'profile', 'info')
+    const userProfile = await getDoc(userRef)
+    
+    if (!userProfile.exists()) {
+        await setDoc(userRef, {
+            phone: uid,
+            username: user.displayName || user.email.split('@')[0] || 'Google User',
+            email: user.email,
+            photoURL: user.photoURL || null,
+            authProvider: 'google',
+            createdAt: serverTimestamp(),
+        })
+        console.log('✅ New user profile created')
+    } else {
+        await setDoc(userRef, {
+            photoURL: user.photoURL || null,
+            email: user.email,
+            username: userProfile.data().username || user.displayName || uid,
+            authProvider: 'google',
+            lastLogin: serverTimestamp()
+        }, { merge: true })
+        console.log('✅ Existing user profile updated')
+    }
+    
+    return uid
+}
+
+// ═══════ Handle Google Redirect Result (call on app startup) ═══════
+export async function handleGoogleRedirectResult() {
+    try {
+        const result = await getRedirectResult(auth)
+        if (result?.user) {
+            console.log('✅ Google redirect result:', result.user.email)
+            return await _saveGoogleProfile(result.user)
+        }
+        return null
+    } catch (error) {
+        console.error('Redirect result error:', error.code)
+        return null
     }
 }
 

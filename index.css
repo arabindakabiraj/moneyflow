@@ -787,3 +787,69 @@ html.dark {
 .app-menu-backdrop {
   animation: menuBackdropIn 0.2s ease both;
 }
+
+/* ═══════════════════════════════════════════════════════
+   COLLAPSIBLE SIDEBAR TOOLTIPS
+   ═══════════════════════════════════════════════════════ */
+.sidebar-tooltip {
+  position: absolute;
+  left: 64px;
+  background: rgba(26, 26, 29, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 5px 10px;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-4px) scale(0.95);
+  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 100;
+}
+
+/* Dark/Light Adaptability for tooltips */
+html:not(.dark) .sidebar-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #111827;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -4px;
+  transform: translateY(-50%) rotate(45deg);
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html:not(.dark) .sidebar-tooltip::before {
+  border-left: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.group\/tab:hover .sidebar-tooltip,
+.group\/tool:hover .sidebar-tooltip {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+/* ── Google reCAPTCHA v2 Invisible — Badge Styling ── */
+/* Move badge slightly up from browser bottom edge */
+.grecaptcha-badge {
+  bottom: 80px !important;
+  z-index: 9999 !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15) !important;
+  border-radius: 4px !important;
+  transition: right 0.3s ease !important;
+}

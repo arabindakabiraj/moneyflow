@@ -6,37 +6,37 @@ import { useState } from 'react'
 import { Wallet, Building2, Smartphone, Pencil, Check, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
-const ACCOUNT_META = {
-  cash: {
-    label: 'Cash', emoji: '💵', Icon: Wallet,
-    gradient: 'from-emerald-500 to-green-600',
-    glow: 'rgba(34,197,94,0.45)',
-    border: 'rgba(34,197,94,0.35)',
-    accent: '#4ade80',
-    bg: 'rgba(34,197,94,0.10)',
-  },
-  bank: {
-    label: 'Bank', emoji: '🏦', Icon: Building2,
-    gradient: 'from-blue-500 to-indigo-600',
-    glow: 'rgba(59,130,246,0.45)',
-    border: 'rgba(59,130,246,0.35)',
-    accent: '#60a5fa',
-    bg: 'rgba(59,130,246,0.10)',
-  },
-  upi: {
-    label: 'UPI', emoji: '📱', Icon: Smartphone,
-    gradient: 'from-violet-500 to-purple-600',
-    glow: 'rgba(139,92,246,0.45)',
-    border: 'rgba(139,92,246,0.35)',
-    accent: '#a78bfa',
-    bg: 'rgba(139,92,246,0.10)',
-  },
-}
-
 export default function Accounts() {
-  const { accounts, updateAccountBalance, transactions } = useApp()
+  const { accounts, updateAccountBalance, transactions, darkMode } = useApp()
   const [editing, setEditing] = useState(null)
   const [input, setInput]     = useState('')
+
+  const accountMeta = {
+    cash: {
+      label: 'Cash', emoji: '💵', Icon: Wallet,
+      gradient: 'from-emerald-500 to-green-600',
+      glow: darkMode ? 'rgba(34,197,94,0.45)' : 'rgba(16,185,129,0.25)',
+      border: darkMode ? 'rgba(34,197,94,0.35)' : 'rgba(16,185,129,0.35)',
+      accent: darkMode ? '#4ade80' : '#047857',
+      bg: darkMode ? 'rgba(34,197,94,0.10)' : 'rgba(16,185,129,0.08)',
+    },
+    bank: {
+      label: 'Bank', emoji: '🏦', Icon: Building2,
+      gradient: 'from-blue-500 to-indigo-600',
+      glow: darkMode ? 'rgba(59,130,246,0.45)' : 'rgba(29,78,216,0.25)',
+      border: darkMode ? 'rgba(59,130,246,0.35)' : 'rgba(29,78,216,0.35)',
+      accent: darkMode ? '#60a5fa' : '#1d4ed8',
+      bg: darkMode ? 'rgba(59,130,246,0.10)' : 'rgba(59,130,246,0.08)',
+    },
+    upi: {
+      label: 'UPI', emoji: '📱', Icon: Smartphone,
+      gradient: 'from-violet-500 to-purple-600',
+      glow: darkMode ? 'rgba(139,92,246,0.45)' : 'rgba(109,40,217,0.25)',
+      border: darkMode ? 'rgba(139,92,246,0.35)' : 'rgba(109,40,217,0.35)',
+      accent: darkMode ? '#a78bfa' : '#6d28d9',
+      bg: darkMode ? 'rgba(139,92,246,0.10)' : 'rgba(139,92,246,0.08)',
+    },
+  }
 
   const save = (key) => {
     if (!isNaN(Number(input))) updateAccountBalance(key, Number(input))
@@ -90,7 +90,7 @@ export default function Accounts() {
           ₹{totalBalance.toLocaleString('en-IN')}
         </p>
         <div className="flex items-center justify-center gap-2 mt-3 relative z-10 flex-wrap">
-          {Object.entries(ACCOUNT_META).map(([key, { emoji, accent, bg }]) => (
+          {Object.entries(accountMeta).map(([key, { emoji, accent, bg }]) => (
             <span key={key} className="text-xs px-2.5 py-1 rounded-xl font-mono font-semibold"
               style={{ background: bg, color: accent, border: `1px solid ${accent}55` }}>
               {emoji} ₹{getBal(key).toLocaleString('en-IN')}
@@ -100,7 +100,7 @@ export default function Accounts() {
       </div>
 
       {/* ── Account cards — depth-stacked with slight offset ── */}
-      {Object.entries(ACCOUNT_META).map(([key, { label, emoji, Icon, gradient, glow, border, accent, bg }], idx) => {
+      {Object.entries(accountMeta).map(([key, { label, emoji, Icon, gradient, glow, border, accent, bg }], idx) => {
         const bal            = getBal(key)
         const baseBal        = accounts[key] ?? 0
         const totals         = acctTotals[key] || { credit: 0, debit: 0 }
@@ -111,25 +111,27 @@ export default function Accounts() {
           <div key={key} className="lg-surface rounded-3xl p-4 stagger-item transition-all"
             style={{
               borderLeft: `3px solid ${border}`,
-              boxShadow: `0 8px 32px rgba(0,0,0,0.20), 0 0 0 1px rgba(255,255,255,0.12), 0 0 24px ${glow.replace('0.45','0.12')}`,
+              boxShadow: darkMode 
+                ? `0 8px 32px rgba(0,0,0,0.20), 0 0 0 1px rgba(255,255,255,0.12), 0 0 24px ${glow.replace('0.45','0.12')}`
+                : `0 4px 12px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.05)`,
               animationDelay: `${idx * 60}ms`,
             }}>
 
             {/* Header */}
             <div className="flex items-center gap-3 mb-3 relative z-10">
               <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center`}
-                style={{ boxShadow: `0 4px 16px ${glow}` }}>
+                style={{ boxShadow: darkMode ? `0 4px 16px ${glow}` : '0 4px 12px rgba(0,0,0,0.08)' }}>
                 <Icon size={18} className="text-white" />
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-gray-900 dark:text-white/90">{emoji} {label}</p>
-                <p className="text-xs text-gray-500 dark:text-white/40">{txCount} transactions</p>
+                <p className="text-xs text-gray-500 dark:text-white/44">{txCount} transactions</p>
               </div>
               {editing === key ? (
                 <div className="flex items-center gap-1.5">
                   <input autoFocus type="number" value={input} onChange={e => setInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') save(key); if (e.key === 'Escape') setEditing(null) }}
-                    className="w-28 px-2 py-1.5 rounded-xl text-sm font-mono outline-none bg-black/[0.05] dark:bg-white/10 border text-gray-900 dark:text-white/90"
+                    className="w-28 px-2 py-1.5 rounded-xl text-sm font-mono outline-none bg-black/[0.05] dark:bg-white/10 border border-black/10 dark:border-white/10 text-gray-900 dark:text-white/90 focus:border-opacity-100"
                     style={{ borderColor: `${accent}77` }}
                     placeholder="₹ Base" />
                   <button onClick={() => save(key)} className="w-7 h-7 rounded-lg flex items-center justify-center text-white"
@@ -156,19 +158,25 @@ export default function Accounts() {
             {/* Income & Expense mini */}
             <div className="flex gap-2 mb-3 relative z-10">
               <div className="flex-1 flex items-center gap-1.5 rounded-xl px-2.5 py-1.5"
-                style={{ background:'rgba(34,197,94,0.10)', border:'1px solid rgba(34,197,94,0.20)' }}>
-                <ArrowDownLeft size={12} style={{ color:'#4ade80', flexShrink:0 }} />
+                style={{ 
+                  background: darkMode ? 'rgba(52,211,153,0.10)' : 'rgba(34,197,94,0.08)',
+                  border: darkMode ? '1px solid rgba(52,211,153,0.20)' : '1px solid rgba(34,197,94,0.25)' 
+                }}>
+                <ArrowDownLeft size={12} style={{ color: 'var(--mf-success)', flexShrink: 0 }} />
                 <div>
                   <p className="text-[10px] text-black/40 dark:text-white/38">Income</p>
-                  <p className="text-xs font-mono font-bold" style={{ color:'#4ade80' }}>₹{totals.credit.toLocaleString('en-IN')}</p>
+                  <p className="text-xs font-mono font-bold" style={{ color: 'var(--mf-success)' }}>₹{totals.credit.toLocaleString('en-IN')}</p>
                 </div>
               </div>
               <div className="flex-1 flex items-center gap-1.5 rounded-xl px-2.5 py-1.5"
-                style={{ background:'rgba(244,63,94,0.10)', border:'1px solid rgba(244,63,94,0.20)' }}>
-                <ArrowUpRight size={12} style={{ color:'#f87171', flexShrink:0 }} />
+                style={{ 
+                  background: darkMode ? 'rgba(255,107,107,0.10)' : 'rgba(239,68,68,0.08)',
+                  border: darkMode ? '1px solid rgba(255,107,107,0.20)' : '1px solid rgba(239,68,68,0.25)' 
+                }}>
+                <ArrowUpRight size={12} style={{ color: 'var(--mf-error)', flexShrink: 0 }} />
                 <div>
                   <p className="text-[10px] text-black/40 dark:text-white/38">Expense</p>
-                  <p className="text-xs font-mono font-bold" style={{ color:'#f87171' }}>₹{totals.debit.toLocaleString('en-IN')}</p>
+                  <p className="text-xs font-mono font-bold" style={{ color: 'var(--mf-error)' }}>₹{totals.debit.toLocaleString('en-IN')}</p>
                 </div>
               </div>
             </div>
@@ -181,7 +189,7 @@ export default function Accounts() {
                   <span className="text-xs truncate max-w-[60%] text-gray-600 dark:text-white/65">
                     {lastTransaction.description || lastTransaction.category}
                   </span>
-                  <span className="text-xs font-mono font-bold" style={{ color: lastTransaction.type === 'credit' ? '#4ade80' : '#f87171' }}>
+                  <span className="text-xs font-mono font-bold" style={{ color: lastTransaction.type === 'credit' ? 'var(--mf-success)' : 'var(--mf-error)' }}>
                     {lastTransaction.type === 'credit' ? '+' : '-'}₹{Number(lastTransaction.amount).toLocaleString('en-IN')}
                   </span>
                 </div>
