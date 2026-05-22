@@ -6,7 +6,7 @@
  */
 import { db, auth } from './firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut } from 'firebase/auth'
+import { signOut } from 'firebase/auth'
 
 // Pure JS SHA-256 — works on HTTP, HTTPS, and local network IPs
 function sha256(ascii) {
@@ -69,15 +69,31 @@ export function normalizePhone(phone) {
 }
 // Error helper to catch Firestore permissions errors and output direct user guidance
 function handleFirestoreError(error) {
-    console.error("Firestore database error:", error)
+    const configProjId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'undefined';
+    const configAppId = import.meta.env.VITE_FIREBASE_APP_ID || 'undefined';
+    const configAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'undefined';
+
+    console.error("Firestore database error details:", {
+        code: error.code,
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        details: error.details,
+        activeConfig: {
+            projectId: configProjId,
+            appId: configAppId,
+            authDomain: configAuthDomain
+        }
+    })
+    const rawInfo = `[Raw Details: ${error.code || 'unknown-code'} — ${error.message || 'No message provided'}]`
     if (
         error.code === 'permission-denied' || 
         error.message?.toLowerCase().includes('permission') || 
         error.message?.toLowerCase().includes('insufficient')
     ) {
-        throw new Error('🔒 Firestore Permission Error: You must copy the rules from "firestore.rules" and paste them in your Firebase Console -> Cloud Firestore -> Rules tab to allow user access.')
+        throw new Error(`🔒 Firestore Permission Error:\n\n${rawInfo}\n\n💡 Current Config:\n- Project ID: ${configProjId}\n- App ID: ${configAppId}\n- Auth Domain: ${configAuthDomain}\n\nPlease check these items in your Firebase Console:\n1. Verify the Project ID in the console matches "${configProjId}". If they don't, you are changing rules in the wrong project.\n2. Ensure you pasted the security rules from "firestore.rules" into the correct project's Cloud Firestore -> Rules tab and published them.\n3. Make sure Firebase App Check is not blocking local/unauthenticated requests (set it to "Unenforce" in Console).\n4. If you have multiple databases in your Firebase Console, make sure rules are applied to the default one, or configure the named database in the SDK.`)
     }
-    throw error
+    throw new Error(`❌ Firestore Database Error:\n\n${rawInfo}\n\nPlease check your Firebase Console connection, API Key restrictions, or network.`)
 }
 
 // Register new user (with username)
@@ -107,7 +123,14 @@ export async function loginUser(phone, password) {
     const uid = normalizePhone(phone)
     const userRef = doc(db, 'users', uid, 'profile', 'info')
     try {
-        const snap = await getDoc(userRef)
+        let snap
+        try {
+            // Attempt to load from IndexedDB local cache first for instant near 0ms login
+            snap = await getDoc(userRef, { source: 'cache' })
+        } catch (_) {
+            // Fallback to standard server fetch if cache is empty or fails
+            snap = await getDoc(userRef)
+        }
         if (!snap.exists()) {
             throw new Error('Account not found. Please register first.')
         }
@@ -140,7 +163,14 @@ export async function resetPassword(phone, newPassword) {
 // Get user profile (username etc.)
 export async function getUserProfile(uid) {
     try {
-        const snap = await getDoc(doc(db, 'users', uid, 'profile', 'info'))
+        const userRef = doc(db, 'users', uid, 'profile', 'info')
+        let snap
+        try {
+            // Fast cache-first retrieval for near 0ms latency
+            snap = await getDoc(userRef, { source: 'cache' })
+        } catch (_) {
+            snap = await getDoc(userRef)
+        }
         return snap.exists() ? snap.data() : {}
     } catch (error) {
         return handleFirestoreError(error)
@@ -156,127 +186,6 @@ export function getSession() {
 }
 export function clearSession() {
     localStorage.removeItem('mf_uid')
-}
-
-// ═══════ Firebase Configuration Validator ═══════
-export function validateFirebaseConfig() {
-    console.log('🔍 Firebase Config Validation:')
-    console.log('  Auth object:', auth ? '✓ Initialized' : '✗ NOT initialized')
-    console.log('  DB object:', db ? '✓ Initialized' : '✗ NOT initialized')
-    console.log('  Current user:', auth?.currentUser ? `✓ ${auth.currentUser.email}` : '✗ None')
-    
-    if (!auth) {
-        throw new Error('Firebase Auth is not initialized. Check firebase.js configuration.')
-    }
-    return true
-}
-
-// ═══════ Google OAuth Login ═══════
-export async function loginWithGoogle() {
-    try {
-        console.log('📱 Starting Google Login...')
-        validateFirebaseConfig()
-        
-        const provider = new GoogleAuthProvider()
-        provider.addScope('email')
-        provider.addScope('profile')
-        provider.setCustomParameters({ prompt: 'select_account' })
-        
-        console.log('🔐 Attempting signInWithPopup...')
-        const result = await signInWithPopup(auth, provider)
-        const user = result.user
-        console.log('✅ Google sign-in successful:', user.email)
-        
-        return await _saveGoogleProfile(user)
-    } catch (error) {
-        console.error('❌ Google login error:', error.code, error.message)
-        console.error('🔍 Google login error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
-        
-        // If the user cancelled it manually, abort nicely
-        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-            throw new Error('Google login cancelled. Please try again.')
-        }
-        
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port;
-        
-        if (error.code === 'auth/popup-blocked') {
-            if (isLocal) {
-                throw new Error('POPUP_BLOCKED')
-            }
-        }
-        
-        if (isLocal) {
-            // Localhost HTTP cannot use redirect due to modern browsers blocking cross-origin storage/cookies
-            throw new Error(error.message || 'Google login failed. Please allow popups or check Firebase console.')
-        }
-        
-        // In production, fallback to redirect flow if popup was blocked
-        console.log('↪️ Switching to secure redirect flow to bypass browser/cookie restrictions...')
-        try {
-            const provider = new GoogleAuthProvider()
-            provider.addScope('email')
-            provider.addScope('profile')
-            provider.setCustomParameters({ prompt: 'select_account' })
-            await signInWithRedirect(auth, provider)
-            return null
-        } catch (redirectErr) {
-            console.error('Redirect fallback failed:', redirectErr)
-            throw new Error(`Google login failed: ${error.message || 'Internal connection error'}`)
-        }
-    }
-}
-
-// Helper: Save Google user profile to Firestore and return uid
-async function _saveGoogleProfile(user) {
-    // Use email prefix as uid (consistent with app's uid scheme)
-    const uid = user.email.split('@')[0]
-    console.log('💾 Saving profile for uid:', uid)
-    
-    const userRef = doc(db, 'users', uid, 'profile', 'info')
-    try {
-        const userProfile = await getDoc(userRef)
-        
-        if (!userProfile.exists()) {
-            await setDoc(userRef, {
-                phone: uid,
-                username: user.displayName || user.email.split('@')[0] || 'Google User',
-                email: user.email,
-                photoURL: user.photoURL || null,
-                authProvider: 'google',
-                createdAt: serverTimestamp(),
-            })
-            console.log('✅ New user profile created')
-        } else {
-            await setDoc(userRef, {
-                photoURL: user.photoURL || null,
-                email: user.email,
-                username: userProfile.data().username || user.displayName || uid,
-                authProvider: 'google',
-                lastLogin: serverTimestamp()
-            }, { merge: true })
-            console.log('✅ Existing user profile updated')
-        }
-        
-        return uid
-    } catch (error) {
-        return handleFirestoreError(error)
-    }
-}
-
-// ═══════ Handle Google Redirect Result (call on app startup) ═══════
-export async function handleGoogleRedirectResult() {
-    try {
-        const result = await getRedirectResult(auth)
-        if (result?.user) {
-            console.log('✅ Google redirect result:', result.user.email)
-            return await _saveGoogleProfile(result.user)
-        }
-        return null
-    } catch (error) {
-        console.error('❌ Redirect result error:', error.code, error.message)
-        console.error('🔍 Redirect result error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
-        throw error
-    }
 }
 
 // ═══════ Logout ═══════

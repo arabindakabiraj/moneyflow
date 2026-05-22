@@ -6,7 +6,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Lock, Eye, EyeOff, RefreshCw, UserPlus, LogIn, User, KeyRound, ArrowLeft, Phone, CheckCircle2, AlertCircle, Sparkles, CloudOff, ChevronRight } from 'lucide-react'
-import { registerUser, loginUser, resetPassword, saveSession, loginWithGoogle, handleGoogleRedirectResult } from '../authUtils'
+import { registerUser, loginUser, resetPassword, saveSession } from '../authUtils'
 
 const RECAPTCHA_SITE_KEY = '6LeNy_YsAAAAACKDzdg_oMc2Ty9jVEvxLuL0qGAN'
 
@@ -315,73 +315,7 @@ export default function AuthScreen({ onAuth }) {
   const [showSuccess, setShowSuccess] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [recaptchaToken, setRecaptchaToken] = useState('')
-  const [debugLogs, setDebugLogs] = useState(() => {
-    const saved = localStorage.getItem('mf_debug_logs')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        return Array.isArray(parsed) ? parsed : []
-      } catch (_) {}
-    }
-    return []
-  })
-  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(() => {
-    const saved = localStorage.getItem('mf_debug_logs')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        return Array.isArray(parsed) && parsed.length > 0
-      } catch (_) {}
-    }
-    return false
-  })
-  const [copiedLogs, setCopiedLogs] = useState(false)
 
-  // Helper to append logs and persist them
-  const appendLog = useCallback((formattedMsg) => {
-    setDebugLogs(p => {
-      const next = [...p.slice(-15), formattedMsg] // Keep more lines for extensive redirects!
-      localStorage.setItem('mf_debug_logs', JSON.stringify(next))
-      return next
-    })
-  }, [])
-
-  // Live Console Diagnostic Overlay for Developer debugging
-  useEffect(() => {
-    const originalConsoleError = console.error
-    const originalConsoleLog = console.log
-    const originalConsoleWarn = console.warn
-
-    console.error = (...args) => {
-      originalConsoleError(...args)
-      const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ')
-      if (!msg.includes('react-hooks/exhaustive-deps') && !msg.includes('Vite Hot Module Replacement') && !msg.includes('Fast Refresh')) {
-        appendLog(`❌ ${msg}`)
-      }
-    }
-
-    console.log = (...args) => {
-      originalConsoleLog(...args)
-      const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ')
-      if (!msg.includes('[vite]') && !msg.includes('HMR') && !msg.includes('hmr') && !msg.includes('Checking') && !msg.includes('Firebase Config Validation')) {
-        appendLog(`ℹ️ ${msg}`)
-      }
-    }
-
-    console.warn = (...args) => {
-      originalConsoleWarn(...args)
-      const msg = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ')
-      if (!msg.includes('[vite]') && !msg.includes('HMR')) {
-        appendLog(`⚠️ ${msg}`)
-      }
-    }
-
-    return () => {
-      console.error = originalConsoleError
-      console.log = originalConsoleLog
-      console.warn = originalConsoleWarn
-    }
-  }, [appendLog])
   const recaptchaWidgetId = useRef(null)
   const recaptchaContainerRef = useRef(null)
   const recaptchaPendingResolve = useRef(null)
@@ -397,19 +331,7 @@ export default function AuthScreen({ onAuth }) {
     }
   }, [reset])
 
-  // Handle Google redirect result (fallback when popup was blocked)
-  useEffect(() => {
-    handleGoogleRedirectResult().then(uid => {
-      if (uid) {
-        saveSession(uid)
-        setShowSuccess(true)
-        setTimeout(() => onAuth(uid), 1200)
-      }
-    }).catch(err => {
-      console.error("Redirect auth error:", err)
-      setError(err.message || 'Google Redirect Login failed. Please try again.')
-    })
-  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // Mount reCAPTCHA v2 Invisible widget once on load
   useEffect(() => {
@@ -487,117 +409,7 @@ export default function AuthScreen({ onAuth }) {
     }
   }, [])
 
-  const renderDiagnostics = () => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port;
-    if (!isLocal) return null;
 
-    const copyLogsToClipboard = () => {
-      navigator.clipboard.writeText(debugLogs.join('\n')).then(() => {
-        setCopiedLogs(true);
-        setTimeout(() => setCopiedLogs(false), 2000);
-      });
-    };
-
-    return (
-      <div
-        className="mt-4 rounded-2xl overflow-hidden border transition-all duration-300"
-        style={{
-          background: 'var(--mf-surface-2)',
-          borderColor: isDiagnosticsOpen ? '#14B8A6' : 'var(--mf-border)',
-        }}
-      >
-        {/* Accordion Header */}
-        <button
-          type="button"
-          onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}
-          className="w-full px-4 py-3 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider transition-colors duration-200"
-          style={{
-            color: isDiagnosticsOpen ? '#14B8A6' : 'var(--mf-text-secondary)',
-            background: 'rgba(0,0,0,0.02)',
-          }}
-        >
-          <span className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
-            </span>
-            Developer Diagnostics
-          </span>
-          <ChevronRight
-            size={14}
-            style={{
-              transform: isDiagnosticsOpen ? 'rotate(90deg)' : 'rotate(0deg)',
-              transition: 'transform 0.3s ease',
-            }}
-          />
-        </button>
-
-        {/* Accordion Content */}
-        <div
-          style={{
-            maxHeight: isDiagnosticsOpen ? '250px' : '0px',
-            opacity: isDiagnosticsOpen ? 1 : 0,
-            transition: 'all 0.3s ease-in-out',
-            overflow: 'hidden',
-          }}
-        >
-          <div className="p-4 border-t border-black/[0.05] dark:border-white/[0.05] flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-gray-500 dark:text-white/40">
-                Live Console Output (Last {debugLogs.length} entries)
-              </span>
-              {debugLogs.length > 0 && (
-                <button
-                  type="button"
-                  onClick={copyLogsToClipboard}
-                  className="text-[10px] font-bold px-2 py-1 rounded-lg border transition-all duration-150 active:scale-95 flex items-center gap-1"
-                  style={{
-                    color: copiedLogs ? 'var(--mf-success)' : 'var(--mf-text-secondary)',
-                    borderColor: copiedLogs ? 'var(--mf-success)' : 'var(--mf-border)',
-                    background: 'transparent',
-                  }}
-                >
-                  {copiedLogs ? '✓ Copied!' : 'Copy Logs'}
-                </button>
-              )}
-            </div>
-
-            <div
-              className="rounded-xl p-3 font-mono text-[10px] space-y-1.5 max-h-[140px] overflow-y-auto"
-              style={{
-                background: 'var(--mf-surface-3)',
-                border: '1px solid var(--mf-border)',
-                lineHeight: '1.4',
-              }}
-            >
-              {debugLogs.length === 0 ? (
-                <div className="text-center text-gray-400 dark:text-white/30 py-3">
-                  No logs recorded yet. Click Google Sign-in to trigger diagnostics.
-                </div>
-              ) : (
-                debugLogs.map((log, index) => {
-                  let color = 'var(--mf-text-secondary)';
-                  if (log.startsWith('❌')) color = 'var(--mf-error)';
-                  if (log.startsWith('⚠️')) color = 'var(--mf-warning)';
-                  if (log.startsWith('✅')) color = 'var(--mf-success)';
-                  if (log.includes('Starting') || log.includes('Attempting') || log.includes('Switching')) color = '#14B8A6';
-
-                  return (
-                    <div key={index} style={{ color, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
-                      {log}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-            <div className="text-[9px] leading-relaxed text-gray-400 dark:text-white/30">
-              ℹ️ If you see a <code className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10">auth/internal-error</code> details with restricted IP/API keys, check Google Cloud Console API restrictions.
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // Real-time validation
   const validateField = useCallback((field, value) => {
@@ -949,7 +761,7 @@ export default function AuthScreen({ onAuth }) {
               apply.
             </p>
 
-            {renderDiagnostics()}
+
           </div>
         ) : (
           /* SIGN IN / SIGN UP CARD */
@@ -1073,69 +885,15 @@ export default function AuthScreen({ onAuth }) {
               {/* Global Error Display */}
               {error && (
                 <div
-                  className="flex flex-col gap-2 text-sm mb-4 px-4 py-3.5 rounded-2xl font-medium animate-slide-up animate-fade-in text-left"
+                  className="flex items-start gap-2 text-sm mb-4 px-4 py-3 rounded-2xl font-medium animate-slide-up animate-fade-in text-left"
                   style={{
-                    background: error === 'POPUP_BLOCKED' ? 'rgba(245,158,11,0.08)' : error.includes('internal-error') ? 'rgba(239,68,68,0.06)' : 'rgba(255,107,107,0.08)',
-                    color: error === 'POPUP_BLOCKED' ? '#D97706' : error.includes('internal-error') ? '#F87171' : 'var(--mf-error)',
-                    border: error === 'POPUP_BLOCKED' ? '1px solid rgba(245,158,11,0.2)' : error.includes('internal-error') ? '1px solid rgba(239,68,68,0.18)' : '1px solid rgba(255,107,107,0.15)',
+                    background: 'rgba(255,107,107,0.08)',
+                    color: 'var(--mf-error)',
+                    border: '1px solid rgba(255,107,107,0.15)',
                   }}
                 >
-                  {error === 'POPUP_BLOCKED' ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 font-bold text-[13px]">
-                        <AlertCircle size={16} className="shrink-0 text-amber-500" />
-                        <span>Google Sign-In Popup Blocked!</span>
-                      </div>
-                      <p className="text-[11px] leading-relaxed opacity-90 font-normal">
-                        Your browser blocked the secure Google sign-in window. To allow it:
-                      </p>
-                      <ol className="text-[11px] space-y-1.5 list-decimal pl-4.5 opacity-90 leading-relaxed font-semibold">
-                        <li>Look at the right end of your browser's address bar (URL bar).</li>
-                        <li>Click the small <span className="underline">"Popup Blocked"</span> icon (usually a window with a red 'x').</li>
-                        <li>Select <span>"Always allow popups and redirects from http://localhost:5173"</span> and click <span className="font-black">Done</span>.</li>
-                        <li>Click the <span className="text-[#14B8A6] font-bold">Google</span> button again to log in!</li>
-                      </ol>
-                      <div className="text-[10px] pt-1 opacity-60 leading-normal font-normal">
-                        *Note: If you use Brave, disable Brave Shields for localhost, or try in an Incognito window.*
-                      </div>
-                    </div>
-                  ) : error.includes('internal-error') ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 font-bold text-[13.5px]" style={{ color: '#F87171' }}>
-                        <AlertCircle size={16} className="shrink-0 text-[#F87171]" />
-                        <span>Firebase Configuration Error (auth/internal-error)</span>
-                      </div>
-                      <p className="text-[11px] leading-relaxed opacity-90 font-normal">
-                        Google Sign-in failed due to a security/credentials configuration in your consoles. Please complete these three simple checks to fix it:
-                      </p>
-                      
-                      <div className="space-y-2 text-[11px] leading-relaxed font-normal text-white/90">
-                        <div className="p-2.5 rounded-xl bg-black/15 dark:bg-white/[0.02] border border-white/5">
-                          <strong className="text-[11.5px] block mb-0.5 text-amber-400 font-semibold">1. Firebase App Check (Most Probable)</strong>
-                          <span className="opacity-80">Go to <strong>Firebase Console &gt; App Check &gt; APIs</strong>. If <strong>Identity Toolkit</strong> (Authentication) is set to <strong>"Enforce"</strong>, click it and set it to <strong>"Unenforce"</strong>. App Check is not enabled on localhost in this app and will block development logins.</span>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-black/15 dark:bg-white/[0.02] border border-white/5">
-                          <strong className="text-[11.5px] block mb-0.5 text-amber-400 font-semibold">2. Web SDK Client Secret Mismatch</strong>
-                          <span className="opacity-80">In <strong>Firebase Console &gt; Authentication &gt; Sign-in method &gt; Google</strong>, expand <strong>"Web SDK configuration"</strong>. Verify the Client ID and Client Secret match the OAuth client named <code>Web client (auto created by Google Service)</code> in your <strong>Google Cloud Console &gt; Credentials</strong> exactly. If they don't match, copy-paste the correct ones or clear them.</span>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-black/15 dark:bg-white/[0.02] border border-white/5">
-                          <strong className="text-[11.5px] block mb-0.5 text-amber-400 font-semibold">3. Authorized Domains &amp; API Key Restrictions</strong>
-                          <span className="opacity-80">Confirm <code>localhost</code> is in <strong>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</strong>. Also check if your API Key in Google Cloud Console is restricted, and ensure it allows the <strong>Identity Toolkit API</strong> and requests from <code>localhost:5173</code>.</span>
-                        </div>
-                      </div>
-                      
-                      <div className="text-[10px] text-center pt-1 opacity-60 font-normal leading-normal">
-                        *Tip: Open the Developer Diagnostics logs below to copy the raw API trace!*
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-2">
-                      <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                      <span>{error}</span>
-                    </div>
-                  )}
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  <span>{error}</span>
                 </div>
               )}
 
@@ -1173,72 +931,7 @@ export default function AuthScreen({ onAuth }) {
                 </button>
               )}
 
-              {/* Custom social divider */}
-              <div className="flex items-center gap-3 my-3">
-                <div className="flex-1 h-[1px]" style={{ background: 'var(--mf-border)' }} />
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--mf-text-muted)' }}>
-                  or continue with
-                </span>
-                <div className="flex-1 h-[1px]" style={{ background: 'var(--mf-border)' }} />
-              </div>
 
-              {/* Google + Apple social logins */}
-              <div className="flex gap-3 mb-2">
-                <button
-                  disabled={loading}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-[0.97] duration-200 disabled:opacity-50"
-                  style={{
-                    background: 'var(--mf-surface-2)',
-                    border: '1px solid var(--mf-border)',
-                    color: 'var(--mf-text-secondary)',
-                  }}
-                  onClick={async () => {
-                    setLoading(true)
-                    try {
-                      await executeRecaptcha()
-                      const uid = await loginWithGoogle()
-                      if (uid) {
-                        saveSession(uid)
-                        setShowSuccess(true)
-                        setTimeout(() => onAuth(uid), 1200)
-                      }
-                    } catch (err) {
-                      resetRecaptcha()
-                      setError(err.message || 'Google login failed. Please try again.')
-                      setLoading(false)
-                    }
-                  }}
-                >
-                  {loading ? (
-                    <RefreshCw size={16} className="animate-spin" />
-                  ) : (
-                    <>
-                      <svg width="16" height="16" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                      </svg>
-                      Google
-                    </>
-                  )}
-                </button>
-                <button
-                  disabled={loading}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-[0.97] duration-200 disabled:opacity-50"
-                  style={{
-                    background: 'var(--mf-surface-2)',
-                    border: '1px solid var(--mf-border)',
-                    color: 'var(--mf-text-secondary)',
-                  }}
-                  onClick={() => setError('Apple login coming soon! Use phone + password or Google login for now.')}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                  </svg>
-                  Apple
-                </button>
-              </div>
 
               {/* Flex spacer and Trust Strip */}
               <div className="flex-1 min-h-[12px]" />
@@ -1256,7 +949,7 @@ export default function AuthScreen({ onAuth }) {
                 apply.
               </p>
 
-              {renderDiagnostics()}
+
             </div>
           </div>
         )}
