@@ -93,92 +93,103 @@ export default function Transactions({ onEdit }) {
         </button>
       </div>
 
-      {/* Search bar */}
-      <div className="flex items-center gap-2 rounded-xl px-3 py-3"
-        style={{ background: 'var(--mf-surface)', border: '1.5px solid var(--mf-border)' }}>
-        <Search size={15} className="text-gray-400 dark:text-white/30 flex-shrink-0" />
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search by name, category or amount..."
-          className="flex-1 bg-transparent text-sm outline-none text-gray-800 dark:text-white/90"
-          style={{ caretColor: '#4F8EF7' }} />
-        {search && (
-          <button onClick={() => setSearch('')} className="text-gray-400 dark:text-white/30"><X size={14}/></button>
-        )}
-      </div>
-
-      {/* Filter bar */}
-      <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter size={14} className="text-gray-400 dark:text-white/35" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">Filter</span>
-        </div>
-        <div className="flex gap-2 mb-3">
-          {[
-            { mode:'all',   label:'All' },
-            { mode:'day',   label:'By Day',   Icon:Calendar },
-            { mode:'month', label:'By Month', Icon:CalendarRange },
-          ].map(({ mode, label, Icon }) => (
-            <button key={mode} onClick={() => { setFilterMode(mode); if (mode==='all') clearFilters() }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95"
-              style={filterMode===mode
-                ? { background: '#4F8EF7', color: 'white', boxShadow: '0 4px 12px rgba(79,142,247,0.30)' }
-                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)' }}>
-              {Icon && <Icon size={12}/>} {label}
-            </button>
-          ))}
-        </div>
-        {filterMode==='day' && (
-          <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-            style={{ background: 'var(--mf-surface-2)', border: '1.5px solid var(--mf-border)', color: 'rgba(255,255,255,0.90)' }} />
-        )}
-        {filterMode==='month' && (
-          <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-            style={{ background: 'var(--mf-surface-2)', border: '1.5px solid var(--mf-border)', color: 'rgba(255,255,255,0.90)' }} />
-        )}
-        {(filterDate||filterMonth||search) && (
-          <button onClick={clearFilters}
-            className="flex items-center gap-1 mt-2 text-xs font-medium text-[#FF6B6B]">
-            <X size={12}/> Clear all filters
-          </button>
-        )}
-      </div>
-
-      {/* Mini summary */}
-      <div className="grid grid-cols-3 gap-2.5">
-        {[
-          { label:'Balance', amount:summary.balance,     color:'rgba(255,255,255,0.90)', bg:'rgba(255,255,255,0.05)' },
-          { label:'Credit',  amount:summary.totalCredit, color:'#34D399',                bg:'rgba(52,211,153,0.08)' },
-          { label:'Debit',   amount:summary.totalDebit,  color:'#FF6B6B',                bg:'rgba(255,107,107,0.08)' },
-        ].map(({ label, amount, color, bg }) => (
-          <div key={label} className="text-center p-3 rounded-xl"
-            style={{ background: bg }}>
-            <p className="text-[10px] mb-1 text-gray-400 dark:text-white/35">{label}</p>
-            <p className="font-mono font-bold text-sm" style={{ color }}>₹{Number(amount).toLocaleString('en-IN')}</p>
+      {/* Responsive Grid Shell */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Column: Search & Filter Controls + Stats Dashboard */}
+        <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-6">
+          
+          {/* Search bar */}
+          <div className="flex items-center gap-2 rounded-xl px-3 py-3"
+            style={{ background: 'var(--mf-surface)', border: '1.5px solid var(--mf-border)' }}>
+            <Search size={15} className="text-gray-400 dark:text-white/30 flex-shrink-0" />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name, category or amount..."
+              className="flex-1 bg-transparent text-sm outline-none text-gray-800 dark:text-white/90"
+              style={{ caretColor: '#4F8EF7' }} />
+            {search && (
+              <button onClick={() => setSearch('')} className="text-gray-400 dark:text-white/30"><X size={14}/></button>
+            )}
           </div>
-        ))}
-      </div>
 
-      {/* Transaction list */}
-      <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-3">
-        {filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-              style={{ background: 'rgba(255,255,255,0.05)' }}>
-              <Search size={22} className="text-gray-300 dark:text-white/25" />
+          {/* Filter bar */}
+          <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter size={14} className="text-gray-400 dark:text-white/35" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">Filter</span>
             </div>
-            <p className="text-sm font-medium text-gray-400 dark:text-white/40">
-              {search ? `No results for "${search}"` : 'No transactions found'}
-            </p>
+            <div className="flex gap-2 mb-3">
+              {[
+                { mode:'all',   label:'All' },
+                { mode:'day',   label:'By Day',   Icon:Calendar },
+                { mode:'month', label:'By Month', Icon:CalendarRange },
+              ].map(({ mode, label, Icon }) => (
+                <button key={mode} onClick={() => { setFilterMode(mode); if (mode==='all') clearFilters() }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95"
+                  style={filterMode===mode
+                    ? { background: '#4F8EF7', color: 'white', boxShadow: '0 4px 12px rgba(79,142,247,0.30)' }
+                    : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)' }}>
+                  {Icon && <Icon size={12}/>} {label}
+                </button>
+              ))}
+            </div>
+            {filterMode==='day' && (
+              <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none text-gray-800 dark:text-white/90"
+                style={{ background: 'var(--mf-surface-2)', border: '1.5px solid var(--mf-border)' }} />
+            )}
+            {filterMode==='month' && (
+              <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none text-gray-800 dark:text-white/90"
+                style={{ background: 'var(--mf-surface-2)', border: '1.5px solid var(--mf-border)' }} />
+            )}
+            {(filterDate||filterMonth||search) && (
+              <button onClick={clearFilters}
+                className="flex items-center gap-1 mt-2 text-xs font-medium text-[#FF6B6B] hover:text-[#FF8E8E] transition-colors">
+                <X size={12}/> Clear all filters
+              </button>
+            )}
           </div>
-        ) : (
-          <div className="space-y-1.5">
-            {filtered.map(tx => (
-              <TransactionRow key={tx.id} tx={tx} onEdit={onEdit} onDelete={handleDelete} onToggleNeedWant={toggleNeedWant} />
+
+          {/* Mini summary */}
+          <div className="grid grid-cols-3 gap-2.5">
+            {[
+              { label:'Balance', amount:summary.balance,     color:'rgba(255,255,255,0.90)', bg:'rgba(255,255,255,0.05)' },
+              { label:'Credit',  amount:summary.totalCredit, color:'#34D399',                bg:'rgba(52,211,153,0.08)' },
+              { label:'Debit',   amount:summary.totalDebit,  color:'#FF6B6B',                bg:'rgba(255,107,107,0.08)' },
+            ].map(({ label, amount, color, bg }) => (
+              <div key={label} className="text-center p-3 rounded-xl border border-black/[0.03] dark:border-white/[0.03] shadow-xs"
+                style={{ background: bg }}>
+                <p className="text-[10px] mb-1 text-gray-400 dark:text-white/35 font-medium">{label}</p>
+                <p className="font-mono font-bold text-sm" style={{ color }}>₹{Number(amount).toLocaleString('en-IN')}</p>
+              </div>
             ))}
           </div>
-        )}
+        </div>
+
+        {/* Right Column: Dynamic Transaction List Ledger */}
+        <div className="lg:col-span-8 space-y-4 w-full">
+          <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-3 shadow-md">
+            {filtered.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}>
+                  <Search size={22} className="text-gray-300 dark:text-white/25" />
+                </div>
+                <p className="text-sm font-medium text-gray-400 dark:text-white/40">
+                  {search ? `No results for "${search}"` : 'No transactions found'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {filtered.map(tx => (
+                  <TransactionRow key={tx.id} tx={tx} onEdit={onEdit} onDelete={handleDelete} onToggleNeedWant={toggleNeedWant} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {undoTx && <UndoToast tx={undoTx} onUndo={handleUndo} onDismiss={() => setUndoTx(null)} />}

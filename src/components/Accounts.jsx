@@ -68,8 +68,8 @@ export default function Accounts() {
   return (
     <div className="space-y-4 animate-fade-in">
       <div>
-        <h2 className="font-display font-bold text-xl" style={{ color: 'rgba(255,255,255,0.95)' }}>Wallet 💳</h2>
-        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>All accounts in one place</p>
+        <h2 className="font-display font-bold text-xl text-gray-900 dark:text-white/95">Wallet 💳</h2>
+        <p className="text-sm text-gray-500 dark:text-white/45">All accounts in one place</p>
       </div>
 
       {/* ── Total Balance Hero ── */}
@@ -83,10 +83,9 @@ export default function Accounts() {
             filter:'blur(24px)',
           }} />
         </div>
-        <p className="text-xs mb-1 relative z-10" style={{ color:'rgba(255,255,255,0.50)' }}>Total Balance</p>
-        <p className="font-display font-bold text-4xl relative z-10" style={{
-          color:'rgba(255,255,255,0.97)',
-          textShadow:'0 2px 20px rgba(74,222,128,0.35)',
+        <p className="text-xs mb-1 relative z-10 text-black/50 dark:text-white/50">Total Balance</p>
+        <p className="font-display font-bold text-4xl relative z-10 text-gray-900 dark:text-white/97" style={{
+          textShadow:'0 2px 20px rgba(74,222,128,0.25)',
         }}>
           ₹{totalBalance.toLocaleString('en-IN')}
         </p>
@@ -123,22 +122,21 @@ export default function Accounts() {
                 <Icon size={18} className="text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold" style={{ color:'rgba(255,255,255,0.90)' }}>{emoji} {label}</p>
-                <p className="text-xs" style={{ color:'rgba(255,255,255,0.40)' }}>{txCount} transactions</p>
+                <p className="font-semibold text-gray-900 dark:text-white/90">{emoji} {label}</p>
+                <p className="text-xs text-gray-500 dark:text-white/40">{txCount} transactions</p>
               </div>
               {editing === key ? (
                 <div className="flex items-center gap-1.5">
                   <input autoFocus type="number" value={input} onChange={e => setInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') save(key); if (e.key === 'Escape') setEditing(null) }}
-                    className="w-28 px-2 py-1.5 rounded-xl text-sm font-mono outline-none"
-                    style={{ background:'rgba(255,255,255,0.10)', border:`1.5px solid ${accent}77`, color:'rgba(255,255,255,0.90)' }}
+                    className="w-28 px-2 py-1.5 rounded-xl text-sm font-mono outline-none bg-black/[0.05] dark:bg-white/10 border text-gray-900 dark:text-white/90"
+                    style={{ borderColor: `${accent}77` }}
                     placeholder="₹ Base" />
                   <button onClick={() => save(key)} className="w-7 h-7 rounded-lg flex items-center justify-center text-white"
                     style={{ background: `linear-gradient(135deg, ${accent}, ${accent}cc)` }}>
                     <Check size={13} />
                   </button>
-                  <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{ background:'rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.60)' }}>
+                  <button onClick={() => setEditing(null)} className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/[0.05] dark:bg-white/10 text-gray-500 dark:text-white/60">
                     <X size={13} />
                   </button>
                 </div>
@@ -148,8 +146,7 @@ export default function Accounts() {
                     ₹{bal.toLocaleString('en-IN')}
                   </span>
                   <button onClick={() => { setEditing(key); setInput(String(baseBal)) }}
-                    className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors"
-                    style={{ background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.45)' }}>
+                    className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors bg-black/[0.04] dark:bg-white/[0.08] text-gray-500 dark:text-white/45 hover:bg-black/[0.08] dark:hover:bg-white/20">
                     <Pencil size={13} />
                   </button>
                 </div>
@@ -162,7 +159,7 @@ export default function Accounts() {
                 style={{ background:'rgba(34,197,94,0.10)', border:'1px solid rgba(34,197,94,0.20)' }}>
                 <ArrowDownLeft size={12} style={{ color:'#4ade80', flexShrink:0 }} />
                 <div>
-                  <p className="text-[10px]" style={{ color:'rgba(255,255,255,0.38)' }}>Income</p>
+                  <p className="text-[10px] text-black/40 dark:text-white/38">Income</p>
                   <p className="text-xs font-mono font-bold" style={{ color:'#4ade80' }}>₹{totals.credit.toLocaleString('en-IN')}</p>
                 </div>
               </div>
@@ -170,7 +167,7 @@ export default function Accounts() {
                 style={{ background:'rgba(244,63,94,0.10)', border:'1px solid rgba(244,63,94,0.20)' }}>
                 <ArrowUpRight size={12} style={{ color:'#f87171', flexShrink:0 }} />
                 <div>
-                  <p className="text-[10px]" style={{ color:'rgba(255,255,255,0.38)' }}>Expense</p>
+                  <p className="text-[10px] text-black/40 dark:text-white/38">Expense</p>
                   <p className="text-xs font-mono font-bold" style={{ color:'#f87171' }}>₹{totals.debit.toLocaleString('en-IN')}</p>
                 </div>
               </div>
@@ -178,10 +175,10 @@ export default function Accounts() {
 
             {/* Last transaction */}
             {lastTransaction && (
-              <div className="relative z-10 pt-2" style={{ borderTop:'1px solid rgba(255,255,255,0.08)' }}>
-                <p className="text-[10px] mb-1" style={{ color:'rgba(255,255,255,0.35)' }}>Last transaction</p>
+              <div className="relative z-10 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
+                <p className="text-[10px] mb-1 text-black/35 dark:text-white/35">Last transaction</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs truncate max-w-[60%]" style={{ color:'rgba(255,255,255,0.65)' }}>
+                  <span className="text-xs truncate max-w-[60%] text-gray-600 dark:text-white/65">
                     {lastTransaction.description || lastTransaction.category}
                   </span>
                   <span className="text-xs font-mono font-bold" style={{ color: lastTransaction.type === 'credit' ? '#4ade80' : '#f87171' }}>
@@ -194,7 +191,7 @@ export default function Accounts() {
         )
       })}
 
-      <p className="text-xs text-center" style={{ color:'rgba(255,255,255,0.28)' }}>
+      <p className="text-xs text-center text-gray-400 dark:text-white/30">
         Set base balance. Income − Expense will auto-calculate.
       </p>
     </div>

@@ -65,12 +65,12 @@ function SuccessToast({ data, onClose, onGoHome }) {
   const dismiss = () => { setExiting(true); setTimeout(() => onClose(), 400) }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center">
+    <div className="fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-4">
       <div className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${visible && !exiting ? 'opacity-100' : 'opacity-0'}`}
         onClick={dismiss} />
-      <div className={`relative w-full max-w-md transition-all duration-500 ease-out ${visible && !exiting ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
-        {/* Glass bottom sheet */}
-        <div className="rounded-t-3xl p-6 pb-10"
+      <div className={`relative w-full max-w-md transition-all duration-500 ease-out ${visible && !exiting ? 'translate-y-0 lg:scale-100 lg:opacity-100' : 'translate-y-full lg:scale-95 lg:opacity-0 opacity-0'}`}>
+        {/* Glass bottom sheet / desktop dialog */}
+        <div className="rounded-t-3xl lg:rounded-3xl p-6 pb-10 lg:pb-6"
           style={{
             background: isCredit
               ? 'linear-gradient(145deg, rgba(34,197,94,0.75) 0%, rgba(16,185,129,0.70) 100%)'
@@ -78,9 +78,9 @@ function SuccessToast({ data, onClose, onGoHome }) {
             backdropFilter: 'blur(40px)',
             WebkitBackdropFilter: 'blur(40px)',
             border: '1px solid rgba(255,255,255,0.20)',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.40)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.40)',
           }}>
-          <div className="w-10 h-1 bg-white/30 rounded-full mx-auto mb-5" />
+          <div className="w-10 h-1 bg-white/30 rounded-full mx-auto mb-5 lg:hidden" />
           <button onClick={dismiss}
             className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center"
             style={{ background: 'rgba(255,255,255,0.15)' }}>
@@ -259,7 +259,7 @@ function SmartAddBar({ nlpInput, setNlpInput, nlpParsing, nlpResult, nlpError, n
   )
 }
 
-/* ═══════ MAIN FORM ═══════ */
+/* ── MAIN FORM ── */
 export default function AddTransaction({ editData, onEditDone, defaultType, onTypeConsumed }) {
   const { addTransaction, updateTransaction, customCategories, transactions, parseNLPTransaction, setActiveTab } = useApp()
   const [form, setForm]             = useState(defaultForm)
@@ -327,167 +327,187 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
           </p>
         </div>
 
-        {/* Smart Add bar */}
-        {!isEdit && <SmartAddBar
-          nlpInput={nlpInput} setNlpInput={setNlpInput}
-          nlpParsing={nlpParsing} nlpResult={nlpResult}
-          nlpError={nlpError} nlpListening={nlpListening}
-          onParse={async () => {
-            if (!nlpInput.trim() || nlpParsing) return
-            setNlpParsing(true); setNlpError(''); setNlpResult(null)
-            const r = await parseNLPTransaction(nlpInput)
-            if (r) { setNlpResult(r); setForm(r); setNlpInput('') }
-            else setNlpError('Could not parse. Try again!')
-            setNlpParsing(false)
-          }}
-          onVoice={() => {
-            const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-            if (!SR) { alert('Voice input not supported. Use Chrome.'); return }
-            if (nlpListening) { nlpRecogRef.current?.stop(); setNlpListening(false); return }
-            const r = new SR(); r.lang = navigator.language || 'en-US'; r.interimResults = false
-            r.onresult = e => { setNlpInput(e.results[0][0].transcript); setNlpListening(false) }
-            r.onerror = r.onend = () => setNlpListening(false)
-            nlpRecogRef.current = r; r.start(); setNlpListening(true)
-          }}
-          onClearResult={() => setNlpResult(null)}
-        />}
+        {/* Responsive dual-column layout on desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* Left Column: Transaction Core Data */}
+          <div className="lg:col-span-5 space-y-4">
+            
+            {/* Smart Add bar */}
+            {!isEdit && (
+              <SmartAddBar
+                nlpInput={nlpInput} setNlpInput={setNlpInput}
+                nlpParsing={nlpParsing} nlpResult={nlpResult}
+                nlpError={nlpError} nlpListening={nlpListening}
+                onParse={async () => {
+                  if (!nlpInput.trim() || nlpParsing) return
+                  setNlpParsing(true); setNlpError(''); setNlpResult(null)
+                  const r = await parseNLPTransaction(nlpInput)
+                  if (r) { setNlpResult(r); setForm(r); setNlpInput('') }
+                  else setNlpError('Could not parse. Try again!')
+                  setNlpParsing(false)
+                }}
+                onVoice={() => {
+                  const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+                  if (!SR) { alert('Voice input not supported. Use Chrome.'); return }
+                  if (nlpListening) { nlpRecogRef.current?.stop(); setNlpListening(false); return }
+                  const r = new SR(); r.lang = navigator.language || 'en-US'; r.interimResults = false
+                  r.onresult = e => { setNlpInput(e.results[0][0].transcript); setNlpListening(false) }
+                  r.onerror = r.onend = () => setNlpListening(false)
+                  nlpRecogRef.current = r; r.start(); setNlpListening(true)
+                }}
+                onClearResult={() => setNlpResult(null)}
+              />
+            )}
 
-        {/* Debit / Credit toggle */}
-        <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl"
-          style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)' }}>
-          {[
-            { value:'debit',  label:'💸 Debit (Expense)', activeGrad:'linear-gradient(135deg,rgba(244,63,94,0.85),rgba(239,68,68,0.80))', activeShadow:'rgba(244,63,94,0.40)' },
-            { value:'credit', label:'💰 Credit (Income)', activeGrad:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', activeShadow:'rgba(34,197,94,0.40)' },
-          ].map(({ value, label, activeGrad, activeShadow }) => (
-            <button key={value} onClick={() => handleChange('type', value)}
-              className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95"
-              style={form.type === value
-                ? { background:activeGrad, color:'white', boxShadow:`0 4px 16px ${activeShadow}` }
-                : { color:'rgba(255,255,255,0.40)' }}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Amount */}
-        <div>
-          <GlassLabel>Amount (₹) *</GlassLabel>
-          <GlassInput
-            type="number" inputMode="decimal" placeholder="0.00"
-            value={form.amount}
-            onChange={e => handleChange('amount', e.target.value)}
-            className="font-display font-bold text-2xl"
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <GlassLabel>Description *</GlassLabel>
-          <GlassInput
-            type="text" placeholder="e.g. College tiffin, Bus fare..."
-            value={form.description}
-            onChange={e => handleChange('description', e.target.value)}
-          />
-          {suggestion && !suggestionApplied && form.category !== suggestion.category && (
-            <button onClick={() => { handleChange('category', suggestion.category); setSuggestionApplied(true) }}
-              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold animate-fade-in active:scale-95 transition-transform"
-              style={{ background:'rgba(139,92,246,0.18)', color:'#c4b5fd', border:'1px solid rgba(139,92,246,0.30)' }}>
-              <Sparkles size={12} />
-              Auto: <span className="font-bold">{suggestion.category}</span>
-              <span style={{ color:'rgba(167,139,250,0.60)' }}>· {suggestion.source==='history'?'from history':'suggested'}</span>
-            </button>
-          )}
-        </div>
-
-        {/* Date */}
-        <div>
-          <GlassLabel>Date *</GlassLabel>
-          <GlassInput
-            type="date"
-            value={form.date}
-            onChange={e => handleChange('date', e.target.value)}
-          />
-        </div>
-
-        {/* Category chips */}
-        <div>
-          <GlassLabel>Category</GlassLabel>
-          <div className="flex flex-wrap gap-2">
-            {customCategories.map(cat => (
-              <button key={cat} onClick={() => handleChange('category', cat)}
-                className="px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95"
-                style={form.category === cat
-                  ? { background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', color:'white', boxShadow:'0 4px 12px rgba(34,197,94,0.40)', border:'1px solid rgba(34,197,94,0.50)' }
-                  : { background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.55)', border:'1px solid rgba(255,255,255,0.12)' }}>
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tags */}
-        <TagsInput tags={form.tags||[]} onChange={t => handleChange('tags',t)} allTransactions={transactions} />
-
-        {/* Notes */}
-        <div>
-          <GlassLabel><StickyNote size={11} className="inline mr-1" />Notes (optional)</GlassLabel>
-          <textarea
-            placeholder="Add any extra notes..."
-            value={form.notes||''}
-            onChange={e => handleChange('notes', e.target.value)}
-            rows={2}
-            className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none transition-all duration-200"
-            style={{ background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.16)', color:'rgba(255,255,255,0.90)' }}
-            onFocus={e => { e.target.style.borderColor='rgba(34,197,94,0.65)'; e.target.style.boxShadow='0 0 0 3px rgba(34,197,94,0.18)' }}
-            onBlur={e => { e.target.style.borderColor='rgba(255,255,255,0.16)'; e.target.style.boxShadow='none' }}
-          />
-        </div>
-
-        {/* Account type */}
-        <div>
-          <GlassLabel>Account Type</GlassLabel>
-          <div className="space-y-2">
-            <button onClick={() => handleChange('account','Cash')}
-              className="w-full py-3 rounded-2xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 active:scale-95"
-              style={form.account==='Cash'
-                ? { background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', color:'white', boxShadow:'0 4px 16px rgba(34,197,94,0.40)' }
-                : { background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.50)', border:'1px solid rgba(255,255,255,0.12)' }}>
-              💵 Cash
-            </button>
-            <div className="grid grid-cols-2 gap-2">
+            {/* Debit / Credit toggle */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl"
+              style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)' }}>
               {[
-                { key:'Bank', emoji:'🏦', grad:'linear-gradient(135deg,rgba(59,130,246,0.85),rgba(99,102,241,0.80))', glow:'rgba(59,130,246,0.40)' },
-                { key:'UPI',  emoji:'📱', grad:'linear-gradient(135deg,rgba(139,92,246,0.85),rgba(109,40,217,0.80))', glow:'rgba(139,92,246,0.40)' },
-              ].map(({ key, emoji, grad, glow }) => (
-                <button key={key} onClick={() => handleChange('account', key)}
-                  className="py-3 rounded-2xl text-sm font-semibold transition-all flex items-center justify-center gap-2 active:scale-95"
-                  style={form.account===key
-                    ? { background:grad, color:'white', boxShadow:`0 4px 16px ${glow}` }
-                    : { background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.50)', border:'1px solid rgba(255,255,255,0.12)' }}>
-                  {emoji} {key}
+                { value:'debit',  label:'💸 Debit (Expense)', activeGrad:'linear-gradient(135deg,rgba(244,63,94,0.85),rgba(239,68,68,0.80))', activeShadow:'rgba(244,63,94,0.40)' },
+                { value:'credit', label:'💰 Credit (Income)', activeGrad:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', activeShadow:'rgba(34,197,94,0.40)' },
+              ].map(({ value, label, activeGrad, activeShadow }) => (
+                <button key={value} onClick={() => handleChange('type', value)}
+                  className="py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95"
+                  style={form.type === value
+                    ? { background:activeGrad, color:'white', boxShadow:`0 4px 16px ${activeShadow}` }
+                    : { color:'rgba(255,255,255,0.40)' }}>
+                  {label}
                 </button>
               ))}
             </div>
+
+            {/* Amount */}
+            <div>
+              <GlassLabel>Amount (₹) *</GlassLabel>
+              <GlassInput
+                type="number" inputMode="decimal" placeholder="0.00"
+                value={form.amount}
+                onChange={e => handleChange('amount', e.target.value)}
+                className="font-display font-bold text-2xl"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <GlassLabel>Description *</GlassLabel>
+              <GlassInput
+                type="text" placeholder="e.g. College tiffin, Bus fare..."
+                value={form.description}
+                onChange={e => handleChange('description', e.target.value)}
+              />
+              {suggestion && !suggestionApplied && form.category !== suggestion.category && (
+                <button onClick={() => { handleChange('category', suggestion.category); setSuggestionApplied(true) }}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold animate-fade-in active:scale-95 transition-transform"
+                  style={{ background:'rgba(139,92,246,0.18)', color:'#c4b5fd', border:'1px solid rgba(139,92,246,0.30)' }}>
+                  <Sparkles size={12} />
+                  Auto: <span className="font-bold">{suggestion.category}</span>
+                  <span style={{ color:'rgba(167,139,250,0.60)' }}>· {suggestion.source==='history'?'from history':'suggested'}</span>
+                </button>
+              )}
+            </div>
+
           </div>
+
+          {/* Right Column: Transaction Parameters & Metadata */}
+          <div className="lg:col-span-7 space-y-4 bg-white/[0.01] dark:bg-[#1A1A1D]/25 border border-black/[0.04] dark:border-white/[0.04] lg:p-6 lg:rounded-3xl shadow-xs">
+            
+            {/* Date */}
+            <div>
+              <GlassLabel>Date *</GlassLabel>
+              <GlassInput
+                type="date"
+                value={form.date}
+                onChange={e => handleChange('date', e.target.value)}
+              />
+            </div>
+
+            {/* Category selection */}
+            <div>
+              <GlassLabel>Category</GlassLabel>
+              <div className="flex flex-wrap gap-2">
+                {customCategories.map(cat => (
+                  <button key={cat} onClick={() => handleChange('category', cat)}
+                    className="px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95"
+                    style={form.category === cat
+                      ? { background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', color:'white', boxShadow:'0 4px 12px rgba(34,197,94,0.40)', border:'1px solid rgba(34,197,94,0.50)' }
+                      : { background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.55)', border:'1px solid rgba(255,255,255,0.12)' }}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tags */}
+            <TagsInput tags={form.tags||[]} onChange={t => handleChange('tags',t)} allTransactions={transactions} />
+
+            {/* Notes */}
+            <div>
+              <GlassLabel><StickyNote size={11} className="inline mr-1" />Notes (optional)</GlassLabel>
+              <textarea
+                placeholder="Add any extra notes..."
+                value={form.notes||''}
+                onChange={e => handleChange('notes', e.target.value)}
+                rows={2}
+                className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none transition-all duration-200"
+                style={{ background:'rgba(255,255,255,0.08)', border:'1.5px solid rgba(255,255,255,0.16)', color:'rgba(255,255,255,0.90)' }}
+                onFocus={e => { e.target.style.borderColor='rgba(34,197,94,0.65)'; e.target.style.boxShadow='0 0 0 3px rgba(34,197,94,0.18)' }}
+                onBlur={e => { e.target.style.borderColor='rgba(255,255,255,0.16)'; e.target.style.boxShadow='none' }}
+              />
+            </div>
+
+            {/* Account type selection */}
+            <div>
+              <GlassLabel>Account Type</GlassLabel>
+              <div className="space-y-2">
+                <button onClick={() => handleChange('account','Cash')}
+                  className="w-full py-3 rounded-2xl text-sm font-semibold transition-all duration-150 flex items-center justify-center gap-2 active:scale-95"
+                  style={form.account==='Cash'
+                    ? { background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', color:'white', boxShadow:'0 4px 16px rgba(34,197,94,0.40)' }
+                    : { background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.50)', border:'1px solid rgba(255,255,255,0.12)' }}>
+                  💵 Cash
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key:'Bank', emoji:'🏦', grad:'linear-gradient(135deg,rgba(59,130,246,0.85),rgba(99,102,241,0.80))', glow:'rgba(59,130,246,0.40)' },
+                    { key:'UPI',  emoji:'📱', grad:'linear-gradient(135deg,rgba(139,92,246,0.85),rgba(109,40,217,0.80))', glow:'rgba(139,92,246,0.40)' },
+                  ].map(({ key, emoji, grad, glow }) => (
+                    <button key={key} onClick={() => handleChange('account', key)}
+                      className="py-3 rounded-2xl text-sm font-semibold transition-all flex items-center justify-center gap-2 active:scale-95"
+                      style={form.account===key
+                        ? { background:grad, color:'white', boxShadow:`0 4px 16px ${glow}` }
+                        : { background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.50)', border:'1px solid rgba(255,255,255,0.12)' }}>
+                      {emoji} {key}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="space-y-2.5 pt-2">
+              <button onClick={handleSubmit}
+                disabled={submitting || !form.amount || !form.description?.trim()}
+                className="w-full py-4 rounded-2xl font-display font-bold text-base flex items-center justify-center gap-2 transition-all active:scale-95"
+                style={submitting || !form.amount || !form.description?.trim()
+                  ? { background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.28)', cursor:'not-allowed', border:'1px solid rgba(255,255,255,0.10)' }
+                  : { background:'linear-gradient(135deg,rgba(34,197,94,0.90),rgba(16,185,129,0.85))', color:'white', boxShadow:'0 6px 24px rgba(34,197,94,0.45)', border:'1px solid rgba(34,197,94,0.50)' }}>
+                {submitting ? 'Saving...' : <><PlusCircle size={18}/> {isEdit ? 'Update Transaction' : 'Add Transaction'}</>}
+              </button>
+
+              {isEdit && (
+                <button onClick={onEditDone}
+                  className="w-full py-3 rounded-2xl font-semibold text-sm transition-colors active:scale-95"
+                  style={{ background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.45)', border:'1px solid rgba(255,255,255,0.12)' }}>
+                  Cancel
+                </button>
+              )}
+            </div>
+
+          </div>
+
         </div>
 
-        {/* Submit */}
-        <button onClick={handleSubmit}
-          disabled={submitting || !form.amount || !form.description?.trim()}
-          className="w-full py-4 rounded-2xl font-display font-bold text-base flex items-center justify-center gap-2 transition-all active:scale-95"
-          style={submitting || !form.amount || !form.description?.trim()
-            ? { background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.28)', cursor:'not-allowed', border:'1px solid rgba(255,255,255,0.10)' }
-            : { background:'linear-gradient(135deg,rgba(34,197,94,0.90),rgba(16,185,129,0.85))', color:'white', boxShadow:'0 6px 24px rgba(34,197,94,0.45)', border:'1px solid rgba(34,197,94,0.50)' }}>
-          {submitting ? 'Saving...' : <><PlusCircle size={18}/> {isEdit ? 'Update Transaction' : 'Add Transaction'}</>}
-        </button>
-
-        {isEdit && (
-          <button onClick={onEditDone}
-            className="w-full py-3 rounded-2xl font-semibold text-sm transition-colors active:scale-95"
-            style={{ background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.45)', border:'1px solid rgba(255,255,255,0.12)' }}>
-            Cancel
-          </button>
-        )}
       </div>
     </>
   )

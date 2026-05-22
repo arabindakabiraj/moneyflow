@@ -2,7 +2,7 @@
  * GroupExpenses.jsx — Premium group expense tracker with advanced splits, settlements, and PDF export
  */
 import { useState, useMemo } from 'react'
-import { ArrowLeft, Plus, Trash2, Users, Receipt, ArrowRightLeft, Share2, X, ChevronRight, CheckCircle, UserPlus, Settings, PieChart, Info, Edit3, DollarSign, FileText, Phone } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Users, Receipt, ArrowRightLeft, Share2, X, ChevronRight, CheckCircle, UserPlus, Settings, PieChart, Info, Edit3, DollarSign, FileText, Phone, Send, Copy } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 
 // ═══════ Settlement calculator — minimize transfers ═══════
@@ -56,6 +56,21 @@ function calculateSettlements(members, expenses) {
 }
 
 const GROUP_EMOJIS = ['🍕', '🏠', '✈️', '🎉', '🍻', '🛒', '⛽', '🎬', '💼', '🎓', '🏖️', '🚗', '🏕️', '💡', '🎸']
+
+// ═══════ Share Settlement via WhatsApp ═══════
+function shareSettlementViaWhatsApp(from, to, amount) {
+  const message = `Hi ${to},\n\nI need to settle up from our group expense.\n\n💰 ${from} owes you ₹${amount.toLocaleString('en-IN')}\n\nPlease let me know when you're free!\n\n(via MoneyFlow)`
+  const encoded = encodeURIComponent(message)
+  window.open(`https://wa.me/?text=${encoded}`, '_blank')
+}
+
+// ═══════ Copy Settlement to Clipboard ═══════
+function copySettlementText(from, to, amount) {
+  const text = `${from} owes ${to} ₹${amount.toLocaleString('en-IN')}`
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Settlement copied to clipboard!')
+  })
+}
 
 // ═══════ PDF Export ═══════
 function exportGroupPDF(group, expenses, settlements, balances) {
@@ -636,55 +651,83 @@ export default function GroupExpenses() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-3xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 p-5">
-                  <h3 className="font-bold text-sm text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-2">
-                    <ArrowRightLeft size={16} /> Suggested Settlements
+                <div className="rounded-3xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/15 dark:to-orange-900/15 border border-amber-200 dark:border-amber-900/40 p-6">
+                  <h3 className="font-bold text-sm text-amber-900 dark:text-amber-300 mb-4 flex items-center gap-2">
+                    <ArrowRightLeft size={16} /> Settlement Plan
                   </h3>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {settlements.map((s, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 bg-white/60 dark:bg-black/20 rounded-xl">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{s.from}</span>
-                          <span className="text-gray-400 dark:text-white/30 text-xs">owes</span>
-                          <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{s.to}</span>
+                      <div key={i} className="overflow-hidden rounded-2xl border border-amber-200/70 dark:border-amber-900/50 bg-white/70 dark:bg-black/20 hover:bg-white/90 dark:hover:bg-black/30 transition-colors">
+                        <div className="p-4 space-y-3">
+                          {/* Settlement Flow Visualization */}
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-gray-900 dark:text-white/95 truncate">{s.from}</p>
+                              <p className="text-xs text-gray-500 dark:text-white/50">pays</p>
+                            </div>
+                            <div className="flex flex-col items-center gap-1 px-3">
+                              <ArrowRightLeft size={16} className="text-amber-600 dark:text-amber-400" />
+                              <span className="font-mono font-bold text-lg text-amber-600 dark:text-amber-400">₹{s.amount.toLocaleString('en-IN', {maximumFractionDigits:2})}</span>
+                            </div>
+                            <div className="flex-1 min-w-0 text-right">
+                              <p className="font-bold text-sm text-gray-900 dark:text-white/95 truncate">{s.to}</p>
+                              <p className="text-xs text-gray-500 dark:text-white/50">receives</p>
+                            </div>
+                          </div>
+                          
+                          {/* Action Buttons */}
+                          <div className="flex gap-2 pt-2 border-t border-amber-200/50 dark:border-amber-900/30">
+                            <button 
+                              onClick={() => shareSettlementViaWhatsApp(s.from, s.to, s.amount)}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 text-green-700 dark:text-green-400 text-xs font-bold transition-all active:scale-95">
+                              <Send size={13} /> WhatsApp
+                            </button>
+                            <button 
+                              onClick={() => copySettlementText(s.from, s.to, s.amount)}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-100 dark:bg-gray-800/50 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-bold transition-all active:scale-95">
+                              <Copy size={13} /> Copy
+                            </button>
+                          </div>
                         </div>
-                        <span className="font-mono font-bold text-amber-600 dark:text-[#FBBF24]">₹{s.amount.toLocaleString('en-IN', {maximumFractionDigits:2})}</span>
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => {
-                    if (settlements[0]) {
-                      setSettlePayer(settlements[0].from); setSettleReceiver(settlements[0].to)
-                      setSettleAmount(settlements[0].amount.toFixed(2)); setView('settleUp')
-                    }
-                  }}
-                    className="w-full mt-4 py-3 bg-[#FBBF24] text-white rounded-xl text-sm font-bold shadow-md shadow-amber-500/20 active:scale-95 transition-transform">
-                    Record a Payment
-                  </button>
+                  
+                  {settlements.length > 0 && (
+                    <button onClick={() => {
+                      if (settlements[0]) {
+                        setSettlePayer(settlements[0].from); setSettleReceiver(settlements[0].to)
+                        setSettleAmount(settlements[0].amount.toFixed(2)); setView('settleUp')
+                      }
+                    }}
+                      className="w-full mt-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold shadow-md shadow-amber-500/30 active:scale-95 transition-all">
+                      ✓ Mark Payment as Done
+                    </button>
+                  )}
                 </div>
 
                 <div className="px-1">
-                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-white/40 mb-2">Member Net Balances</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-white/40 mb-3">Member Net Balances</p>
                   <div className="space-y-2">
                     {group.members.map(m => {
                       const bal = balances[m] || 0
                       if (Math.abs(bal) < 0.1) return null
                       const isOwed = bal > 0
                       return (
-                        <div key={m} className="flex items-center justify-between p-3 rounded-2xl bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08]">
+                        <div key={m} className="flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900/30 dark:to-gray-800/30 border border-gray-200 dark:border-gray-800/50 hover:from-gray-100 hover:to-gray-200 dark:hover:from-gray-900/50 dark:hover:to-gray-800/50 transition-all">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-[#222226] dark:bg-gray-200 dark:bg-[#2A2A2F] flex items-center justify-center font-bold text-xs text-gray-600 dark:text-gray-300">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white ${isOwed ? 'bg-emerald-500' : 'bg-rose-500'}`}>
                               {m.charAt(0).toUpperCase()}
                             </div>
                             <div>
                               <p className="font-semibold text-sm text-gray-900 dark:text-white/95">{m}</p>
-                              <p className={`text-[10px] font-bold ${isOwed ? 'text-[#34D399]' : 'text-[#FF6B6B]'}`}>
-                                {isOwed ? 'Gets back' : 'Owes overall'}
+                              <p className={`text-[10px] font-bold ${isOwed ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                {isOwed ? '↓ Gets back' : '↑ Owes overall'}
                               </p>
                             </div>
                           </div>
-                          <p className={`font-mono font-bold text-sm ${isOwed ? 'text-[#34D399]' : 'text-[#FF6B6B]'}`}>
-                            {isOwed ? '+' : '-'}₹{Math.abs(bal).toLocaleString('en-IN', {maximumFractionDigits:2})}
+                          <p className={`font-mono font-bold text-sm ${isOwed ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                            {isOwed ? '+' : '−'}₹{Math.abs(bal).toLocaleString('en-IN', {maximumFractionDigits:2})}
                           </p>
                         </div>
                       )

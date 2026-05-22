@@ -2,7 +2,7 @@
  * Settings.jsx — Clean, modern profile & settings page
  */
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert, Users, Heart, MessageSquare, Smartphone } from 'lucide-react'
+import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert, Users, Heart, MessageSquare, Smartphone, FileText } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 // ThemeContext import removed — Accent Theme section removed
 import { setupPin, clearPin, isPinSet, isBiometricCapable, isBiometricEnabled, checkPlatformAuthenticator, registerBiometric, clearBiometric, getAutoLockMinutes, setAutoLockMinutes } from './AppLock'
@@ -727,6 +727,16 @@ export default function Settings() {
             </div>
             <span className="text-xs font-mono text-gray-400 dark:text-white/35 bg-gray-100 dark:bg-[#222226] px-2.5 py-1 rounded-lg">v2.0</span>
           </div>
+          <SettingsRow
+            icon={Shield} iconBg="bg-[#34D399]/15" iconColor="text-[#34D399]"
+            label="Privacy Policy" desc="Read our privacy policy"
+            onClick={() => setActiveTab('privacy')}
+          />
+          <SettingsRow
+            icon={FileText} iconBg="bg-[#4F8EF7]/15" iconColor="text-[#4F8EF7]"
+            label="Terms of Service" desc="Read our terms of service"
+            onClick={() => setActiveTab('terms')}
+          />
           <SettingsRow
             icon={LogOut} iconBg="bg-[#FF6B6B]/15" iconColor="text-[#FF6B6B]"
             label="Log Out" danger onClick={() => setShowLogoutModal(true)}

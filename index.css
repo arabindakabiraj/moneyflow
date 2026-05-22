@@ -32,9 +32,9 @@
   --mf-border:     rgba(0,0,0,0.08);
   --mf-border-active: rgba(0,0,0,0.14);
 
-  /* Hero card gradient — always dark premium (CRED-style) */
-  --mf-hero-from:  #1E1E22;
-  --mf-hero-to:    #16161A;
+  /* Hero card gradient — elegant light colors for Light Mode */
+  --mf-hero-from:  #FFFFFF;
+  --mf-hero-to:    #F8F9FA;
 
   /* Accent colors (same in both modes) */
   --mf-accent:     #4F8EF7;

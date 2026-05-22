@@ -4,12 +4,13 @@
  * Includes App Menu popover for Finance Tools
  */
 import { useState, useRef, useEffect } from 'react'
-import { Bell, LayoutGrid, Target, RefreshCw, Calculator, Scissors, TrendingDown, Users, MessageSquare, Heart, X } from 'lucide-react'
+import { Bell, LayoutGrid, Target, RefreshCw, Calculator, Scissors, TrendingDown, Users, MessageSquare, Heart, X, BookOpen, BarChart3, Wallet } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useNotificationCount } from '../hooks/useNotifications'
 
 /* Finance Tools config — moved from Settings */
 const FINANCE_TOOLS = [
+  { label: 'Ledger',        icon: BookOpen,       color: 'from-indigo-400 to-blue-600',   tab: 'ledger' },
   { label: 'Savings Goals', icon: Target,         color: 'from-brand-400 to-emerald-500', tab: 'goals' },
   { label: 'Bill Reminders', icon: Bell,           color: 'from-amber-400 to-orange-500', tab: 'bills' },
   { label: 'Recurring',     icon: RefreshCw,       color: 'from-blue-400 to-blue-600',    tab: 'recurring' },
@@ -17,6 +18,8 @@ const FINANCE_TOOLS = [
   { label: 'Bill Split',    icon: Scissors,        color: 'from-green-400 to-emerald-600', tab: 'split' },
   { label: 'Debt Tracker',  icon: TrendingDown,    color: 'from-rose-400 to-rose-600',    tab: 'debts' },
   { label: 'Group Expense', icon: Users,           color: 'from-indigo-400 to-indigo-600', tab: 'groups' },
+  { label: 'Budget vs Actual', icon: BarChart3,   color: 'from-purple-400 to-pink-500',  tab: 'budgetvactual' },
+  { label: 'Net Worth',     icon: Wallet,          color: 'from-emerald-400 to-teal-600', tab: 'networth' },
   { label: 'SMS Import',    icon: MessageSquare,   color: 'from-cyan-400 to-cyan-600',    tab: 'smsimport' },
   { label: 'Family Mode',   icon: Heart,           color: 'from-pink-400 to-pink-600',    tab: 'family' },
 ]

@@ -1,11 +1,12 @@
-  /**
- * authUtils.js — Custom auth helpers
+/**
+ * authUtils.js — Custom auth helpers + Google OAuth
  * Phone + Password using pure-JS SHA-256 + Firestore
+ * Google OAuth via Firebase Auth
  * Works on HTTP, HTTPS, local network.
- * No Firebase Auth SDK needed!
  */
-import { db } from './firebase'
+import { db, auth } from './firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signOut } from 'firebase/auth'
 
 // Pure JS SHA-256 — works on HTTP, HTTPS, and local network IPs
 function sha256(ascii) {
@@ -127,4 +128,116 @@ export function getSession() {
 }
 export function clearSession() {
     localStorage.removeItem('mf_uid')
+}
+
+// ═══════ Firebase Configuration Validator ═══════
+export function validateFirebaseConfig() {
+    console.log('🔍 Firebase Config Validation:')
+    console.log('  Auth object:', auth ? '✓ Initialized' : '✗ NOT initialized')
+    console.log('  DB object:', db ? '✓ Initialized' : '✗ NOT initialized')
+    console.log('  Current user:', auth?.currentUser ? `✓ ${auth.currentUser.email}` : '✗ None')
+    
+    if (!auth) {
+        throw new Error('Firebase Auth is not initialized. Check firebase.js configuration.')
+    }
+    return true
+}
+
+// ═══════ Google OAuth Login ═══════
+export async function loginWithGoogle() {
+    try {
+        console.log('📱 Starting Google Login...')
+        
+        // Step 1: Validate Firebase is properly initialized
+        console.log('Step 1: Validating Firebase configuration...')
+        validateFirebaseConfig()
+        console.log('  ✓ Firebase validated')
+        
+        // Step 2: Create Google Provider
+        console.log('Step 2: Creating GoogleAuthProvider...')
+        console.log('  Auth type:', typeof auth)
+        console.log('  Auth value:', auth)
+        
+        const provider = new GoogleAuthProvider()
+        console.log('  ✓ GoogleAuthProvider created:', provider)
+        console.log('  ✓ Provider type:', provider.constructor.name)
+        
+        // Step 3: Set custom parameters
+        console.log('Step 3: Setting custom parameters...')
+        provider.setCustomParameters({ prompt: 'select_account' })
+        console.log('  ✓ Custom parameters set')
+        
+        // Step 4: Call signInWithPopup
+        console.log('Step 4: Calling signInWithPopup...')
+        console.log('  Passing auth:', typeof auth === 'object' ? '✓ Object' : '✗ Not an object')
+        console.log('  Passing provider:', typeof provider === 'object' ? '✓ Object' : '✗ Not an object')
+        
+        const result = await signInWithPopup(auth, provider)
+        const user = result.user
+        console.log('  ✓ Google sign-in successful')
+        console.log('  User:', { email: user.email, displayName: user.displayName })
+        
+        // Step 5: Normalize uid
+        console.log('Step 5: Creating user profile...')
+        const uid = user.phoneNumber || user.email.split('@')[0]
+        console.log('  Generated UID:', uid)
+        
+        // Step 6: Check if user profile exists in Firestore
+        const userRef = doc(db, 'users', uid, 'profile', 'info')
+        let userProfile = await getDoc(userRef)
+        
+        if (!userProfile.exists()) {
+            // First time Google login — create profile
+            console.log('  Creating new user profile...')
+            await setDoc(userRef, {
+                phone: uid,
+                username: user.displayName || 'Google User',
+                email: user.email,
+                photoURL: user.photoURL,
+                authProvider: 'google',
+                createdAt: serverTimestamp(),
+            })
+            console.log('  ✓ User profile created')
+        } else {
+            // Update profile with latest Google data
+            console.log('  Updating existing user profile...')
+            await setDoc(userRef, {
+                photoURL: user.photoURL,
+                email: user.email,
+                authProvider: 'google',
+                lastLogin: serverTimestamp()
+            }, { merge: true })
+            console.log('  ✓ User profile updated')
+        }
+        
+        console.log('✅ Google login completed successfully')
+        return uid
+    } catch (error) {
+        console.error('❌ Google login error:', error)
+        console.error('  Error code:', error.code)
+        console.error('  Error message:', error.message)
+        console.error('  Full error:', error)
+        
+        if (error.code === 'auth/popup-closed-by-user') {
+            throw new Error('Google login cancelled.')
+        } else if (error.code === 'auth/popup-blocked') {
+            throw new Error('Pop-up blocked. Please allow pop-ups for this site.')
+        } else if (error.code === 'auth/argument-error') {
+            throw new Error('Firebase configuration error. Please check: 1) Google Sign-In is enabled in Firebase Console, 2) OAuth Consent Screen is configured, 3) The app domain is authorized.')
+        } else {
+            throw new Error(`Google login failed: ${error.message}`)
+        }
+    }
+}
+
+// ═══════ Logout ═══════
+export async function logoutUser() {
+    try {
+        await signOut(auth)
+        clearSession()
+    } catch (error) {
+        console.error('Logout error:', error)
+        // Still clear session even if logout fails
+        clearSession()
+    }
 }

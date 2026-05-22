@@ -133,7 +133,7 @@ export default function AIChat() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 64px - 72px)' }}>
+    <div className="flex flex-col h-[calc(100vh-150px)] lg:h-[calc(100vh-80px)] max-h-[1200px]">
 
       {/* Header */}
       <div className="flex-shrink-0">

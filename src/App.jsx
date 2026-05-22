@@ -17,6 +17,7 @@ import InstallBanner from './components/InstallBanner'
 import OnboardingModal from './components/OnboardingModal'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useNetwork } from './hooks/useNetwork'
+import DesktopSidebar from './components/DesktopSidebar'
 
 // ── Lazy-loaded tabs (code-split → faster initial load) ──
 const AIChat = lazy(() => import('./components/AIChat'))
@@ -36,6 +37,10 @@ const SMSImport = lazy(() => import('./components/SMSImport'))
 const FamilyMode = lazy(() => import('./components/FamilyMode'))
 const Ledger = lazy(() => import('./components/Ledger'))
 const CashFlow = lazy(() => import('./components/CashFlow'))
+const BudgetVsActual = lazy(() => import('./components/BudgetVsActual'))
+const NetWorthTracker = lazy(() => import('./components/NetWorthTracker'))
+const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'))
+const TermsOfService = lazy(() => import('./components/TermsOfService'))
 
 // ── Skeleton shown while a lazy tab is loading ──
 function TabFallback() {
@@ -161,45 +166,68 @@ function AppContent() {
       case 'family': return <FamilyMode />
       case 'ledger': return <Ledger />
       case 'cashflow': return <CashFlow />
+      case 'budgetvactual': return <BudgetVsActual />
+      case 'networth': return <NetWorthTracker />
       case 'settings': return <Settings />
+      case 'privacy': return <PrivacyPolicy />
+      case 'terms': return <TermsOfService />
       default: return <Dashboard />
     }
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--mf-bg)' }}>
+    <div className="min-h-screen lg:flex" style={{ background: 'var(--mf-bg)' }}>
       {/* PWA Install Banner */}
       <InstallBanner />
 
-      {/* Offline banner */}
-      {!isOnline && (
-        <div className="bg-[#FBBF24]/10 border-b border-[#FBBF24]/20 text-[#FBBF24] text-center py-2.5 text-xs font-semibold animate-slide-up flex items-center justify-center gap-1.5">
-          ⚠️ You are offline — data will sync when connected
+      {/* Desktop Sidebar (visible only on desktop) */}
+      <DesktopSidebar />
+
+      {/* Main Layout Area */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
+        {/* Offline banner */}
+        {!isOnline && (
+          <div className="bg-[#FBBF24]/10 border-b border-[#FBBF24]/20 text-[#FBBF24] text-center py-2.5 text-xs font-semibold animate-slide-up flex items-center justify-center gap-1.5">
+            ⚠️ You are offline — data will sync when connected
+          </div>
+        )}
+
+        {/* Mobile Header (hidden on desktop) */}
+        <div className="lg:hidden">
+          <Header />
         </div>
-      )}
 
-      <Header />
+        {error && (
+          <div className="mx-4 mt-3 p-3 rounded-xl text-xs font-medium animate-slide-up"
+            style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.20)', color: '#FBBF24' }}>
+            ⚠️ {error}
+          </div>
+        )}
 
-      {error && (
-        <div className="mx-4 mt-3 p-3 rounded-xl text-xs font-medium animate-slide-up"
-          style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.20)', color: '#FBBF24' }}>
-          ⚠️ {error}
+        <main
+          key={activeTab}
+          className={`px-4 pt-4 w-full animate-tab-enter mx-auto ${
+            activeTab === 'ai'
+              ? 'pb-0 overflow-hidden lg:h-screen lg:pt-6 lg:px-8'
+              : 'pb-28 lg:pb-12 lg:max-w-4xl xl:max-w-5xl lg:px-8 lg:py-8'
+          }`}
+          style={{
+            minHeight: activeTab === 'ai' ? undefined : 'calc(100vh - 64px)',
+            maxWidth: activeTab === 'ai' ? '100%' : undefined
+          }}
+        >
+          <ErrorBoundary key={activeTab}>
+            <Suspense fallback={<TabFallback />}>
+              {renderTab()}
+            </Suspense>
+          </ErrorBoundary>
+        </main>
+
+        {/* Mobile Bottom Nav (hidden on desktop) */}
+        <div className="lg:hidden">
+          <BottomNav />
         </div>
-      )}
-
-      <main
-        key={activeTab}
-        className={`px-4 pt-4 max-w-md mx-auto animate-tab-enter ${activeTab === 'ai' ? 'pb-0 overflow-hidden' : 'pb-28'}`}
-        style={{ minHeight: activeTab === 'ai' ? undefined : 'calc(100vh - 64px)' }}
-      >
-        <ErrorBoundary key={activeTab}>
-          <Suspense fallback={<TabFallback />}>
-            {renderTab()}
-          </Suspense>
-        </ErrorBoundary>
-      </main>
-
-      <BottomNav />
+      </div>
 
       {/* Onboarding modal — shown once after first login */}
       {onboardingDone === false && (

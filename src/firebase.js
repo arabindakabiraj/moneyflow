@@ -1,6 +1,7 @@
 /**
  * firebase.js — Firestore with Offline Persistent Cache
  * IndexedDB-based local cache → works offline, auto-syncs when back online
+ * Also exports Auth for Google OAuth integration
  */
 import { initializeApp } from 'firebase/app'
 import {
@@ -8,6 +9,7 @@ import {
     persistentLocalCache,
     persistentMultipleTabManager
 } from 'firebase/firestore'
+import { initializeAuth, browserLocalPersistence } from 'firebase/auth'
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,3 +28,9 @@ export const db = initializeFirestore(app, {
         tabManager: persistentMultipleTabManager()
     })
 })
+
+// 🔵 Firebase Auth for Google OAuth
+export const auth = initializeAuth(app, {
+    persistence: browserLocalPersistence
+})
+

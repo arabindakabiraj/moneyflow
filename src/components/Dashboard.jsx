@@ -518,201 +518,208 @@ export default function Dashboard({ onAddWithType }) {
     { label: 'AI Chat',  icon: MessageCircle, color: '#A78BFA', bg: 'rgba(167,139,250,0.10)', action: () => setActiveTab('ai') },
     { label: 'Analytics', icon: BarChart3,    color: '#FBBF24', bg: 'rgba(251,191,36,0.10)', action: () => setActiveTab('charts') },
   ]
-
   return (
-    <div className="space-y-4 animate-fade-in">
-
-      {/* ═══ 1. BALANCE HERO CARD ═══════════════════ */}
-      <div className="rounded-[20px] p-6 relative" style={{ background: 'linear-gradient(145deg, var(--mf-hero-from) 0%, var(--mf-hero-to) 100%)', border: '1px solid var(--mf-border)', boxShadow: 'var(--mf-shadow-lg)' }}>
-        {/* Subtle accent glow */}
-        <div className="absolute inset-0 overflow-hidden rounded-[20px] pointer-events-none">
-          <div style={{
-            position: 'absolute', top: '-30%', right: '-15%',
-            width: '180px', height: '180px', borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(79,142,247,0.08) 0%, transparent 70%)',
-            filter: 'blur(30px)',
-          }} />
-        </div>
-
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-white/40">
-              Current Balance
-            </span>
-            <div className="px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.06)' }}>
-              <span className="text-[10px] font-semibold text-white/50">
-                {new Date().toLocaleString('en', { month: 'short' })} {new Date().getFullYear()}
-              </span>
+    <div className="space-y-6 animate-fade-in">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Account Summary, Timeline, Recent Ledger */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* ═══ 1. BALANCE HERO CARD ═══════════════════ */}
+          <div className="rounded-[20px] p-6 relative" style={{ background: 'linear-gradient(145deg, var(--mf-hero-from) 0%, var(--mf-hero-to) 100%)', border: '1px solid var(--mf-border)', boxShadow: 'var(--mf-shadow-lg)' }}>
+            {/* Subtle accent glow */}
+            <div className="absolute inset-0 overflow-hidden rounded-[20px] pointer-events-none">
+              <div style={{
+                position: 'absolute', top: '-30%', right: '-15%',
+                width: '180px', height: '180px', borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(79,142,247,0.08) 0%, transparent 70%)',
+                filter: 'blur(30px)',
+              }} />
             </div>
-          </div>
 
-          {/* Balance hide/show */}
-          <button onClick={toggleBalance}
-            className="flex items-center gap-1.5 mb-3 transition-all active:scale-95 text-white/30">
-            {balanceHidden ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
-            <span className="text-[10px] font-semibold tracking-wide">
-              {balanceHidden ? 'Show balance' : 'Hide balance'}
-            </span>
-          </button>
-
-          {/* Big balance number */}
-          <p className="font-display font-bold text-[44px] leading-none mb-6 tracking-tight text-white/95">
-            {balanceHidden ? '₹ ●●●●●●' : `₹${animatedBalance.toLocaleString('en-IN')}`}
-          </p>
-
-          {/* Income & Expense mini-cards */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'Income',  Icon: TrendingUp,   value: summary.totalCredit, color: '#34D399', bg: 'rgba(52,211,153,0.10)' },
-              { label: 'Expense', Icon: TrendingDown,  value: summary.totalDebit,  color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)' },
-            ].map(({ label, Icon, value, color, bg }) => (
-              <div key={label} className="flex items-center gap-2.5 px-3 py-3 rounded-xl"
-                style={{ background: bg }}>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                  style={{ background: color + '20' }}>
-                  <Icon size={13} style={{ color }} />
-                </div>
-                <div>
-                  <p className="text-[9px] uppercase font-semibold text-white/35">{label}</p>
-                  <p className="font-bold text-sm font-mono" style={{ color }}>
-                    {balanceHidden ? '₹ ●●●●' : `₹${value.toLocaleString('en-IN')}`}
-                  </p>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
+                  Current Balance
+                </span>
+                <div className="px-2.5 py-1 rounded-lg bg-black/[0.04] dark:bg-white/[0.06]">
+                  <span className="text-[10px] font-semibold text-black/50 dark:text-white/50">
+                    {new Date().toLocaleString('en', { month: 'short' })} {new Date().getFullYear()}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* ═══ 2. QUICK ACTIONS ═════════════════════════════════════ */}
-      <div className="space-y-2.5">
-        {[primaryActions, secondaryActions].map((row, ri) => (
-          <div key={ri} className="grid grid-cols-3 gap-2.5">
-            {row.map(({ label, icon: QIcon, color, bg, action }) => (
-              <button key={label} onClick={action}
-                className="flex flex-col items-center gap-2 py-3.5 rounded-2xl active:scale-[0.97] transition-all duration-150"
-                style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: bg }}>
-                  <QIcon size={17} style={{ color }} />
-                </div>
-                <span className="text-[10px] font-semibold text-center leading-tight text-gray-600 dark:text-white/60">
-                  {label}
+              {/* Balance hide/show */}
+              <button onClick={toggleBalance}
+                className="flex items-center gap-1.5 mb-3 transition-all active:scale-95 text-black/30 dark:text-white/30">
+                {balanceHidden ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                <span className="text-[10px] font-semibold tracking-wide">
+                  {balanceHidden ? 'Show balance' : 'Hide balance'}
                 </span>
               </button>
-            ))}
-          </div>
-        ))}
-      </div>
 
-      {/* ═══ 3. TODAY'S SNAPSHOT ════════════════════════════════ */}
-      <TodayWidget />
+              {/* Big balance number */}
+              <p className="font-display font-bold text-[44px] leading-none mb-6 tracking-tight text-gray-900 dark:text-white/95">
+                {balanceHidden ? '₹ ●●●●●●' : `₹${animatedBalance.toLocaleString('en-IN')}`}
+              </p>
 
-      {/* ═══ 4. STREAK + SAVINGS GOAL ══════════════════════════ */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Streak */}
-        <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl p-5 flex flex-col items-center justify-center"
-          style={{ opacity: streak < 2 ? 0.5 : 1 }}>
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: 'rgba(251,191,36,0.12)' }}>
-            <Flame size={18} className="text-[#FBBF24]" />
-          </div>
-          <p className="font-display font-bold text-2xl text-[#FBBF24]">{streak}</p>
-          <p className="text-[10px] font-semibold mt-0.5 text-[#FBBF24]/60">
-            {streak >= 2 ? `🔥 ${streak}-day streak` : 'No streak yet'}
-          </p>
-        </div>
-
-        {/* Savings goal */}
-        <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl p-5 flex flex-col items-center justify-center">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: 'rgba(52,211,153,0.12)' }}>
-            <Target size={18} className="text-[#34D399]" />
-          </div>
-          <p className="font-display font-bold text-2xl text-[#34D399]">
-            {topGoal ? `${topGoalPct.toFixed(0)}%` : `${savingsPct.toFixed(0)}%`}
-          </p>
-          <p className="text-[10px] font-semibold mt-0.5 text-center leading-tight text-[#34D399]/60">
-            🎯 {topGoal ? (topGoal.name?.length > 12 ? topGoal.name.slice(0,12)+'…' : topGoal.name) : 'Savings goal'}
-          </p>
-        </div>
-      </div>
-
-      {/* ═══ 5. RECENT TRANSACTIONS ════════════════════════════ */}
-      <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Recent Transactions</h3>
-          <button onClick={() => setActiveTab('transactions')}
-            className="flex items-center gap-1 text-xs font-medium text-[#4F8EF7]">
-            See all <ChevronRight size={13} />
-          </button>
-        </div>
-        {loading && (
-          <div className="flex justify-center py-3">
-            <RefreshCw size={16} className="animate-spin text-[#4F8EF7]" />
-          </div>
-        )}
-        <div className="space-y-1.5">
-          {recent.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                style={{ background: 'rgba(255,255,255,0.05)' }}>
-                <Wallet size={22} className="text-gray-400 dark:text-white/30" />
+              {/* Income & Expense mini-cards */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Income',  Icon: TrendingUp,   value: summary.totalCredit, color: '#34D399', bg: 'rgba(52,211,153,0.10)' },
+                  { label: 'Expense', Icon: TrendingDown,  value: summary.totalDebit,  color: '#FF6B6B', bg: 'rgba(255,107,107,0.10)' },
+                ].map(({ label, Icon, value, color, bg }) => (
+                  <div key={label} className="flex items-center gap-2.5 px-3 py-3 rounded-xl"
+                    style={{ background: bg }}>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{ background: color + '20' }}>
+                      <Icon size={13} style={{ color }} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase font-semibold text-black/35 dark:text-white/35">{label}</p>
+                      <p className="font-bold text-sm font-mono" style={{ color }}>
+                        {balanceHidden ? '₹ ●●●●' : `₹${value.toLocaleString('en-IN')}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p className="text-sm font-medium text-gray-400 dark:text-white/40">No transactions yet</p>
-              <button onClick={() => setActiveTab('add')}
-                className="text-xs font-semibold mt-1.5 text-[#4F8EF7]">
-                + Add First Transaction
+            </div>
+          </div>
+
+          {/* ═══ 2. TODAY'S SNAPSHOT ════════════════════════════════ */}
+          <TodayWidget />
+
+          {/* ═══ 3. NET WORTH TIMELINE ═════════════════════════════ */}
+          <NetWorthTimeline />
+
+          {/* ═══ 4. RECENT TRANSACTIONS ════════════════════════════ */}
+          <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Recent Transactions</h3>
+              <button onClick={() => setActiveTab('transactions')}
+                className="flex items-center gap-1 text-xs font-medium text-[#4F8EF7]">
+                See all <ChevronRight size={13} />
               </button>
             </div>
-          ) : recent.map((tx, idx) => (
-            <div key={tx.id} className="stagger-item">
-              <TransactionRow tx={tx} compact />
+            {loading && (
+              <div className="flex justify-center py-3">
+                <RefreshCw size={16} className="animate-spin text-[#4F8EF7]" />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              {recent.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                    style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <Wallet size={22} className="text-gray-400 dark:text-white/30" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-400 dark:text-white/40">No transactions yet</p>
+                  <button onClick={() => setActiveTab('add')}
+                    className="text-xs font-semibold mt-1.5 text-[#4F8EF7]">
+                    + Add First Transaction
+                  </button>
+                </div>
+              ) : recent.map((tx, idx) => (
+                <div key={tx.id} className="stagger-item">
+                  <TransactionRow tx={tx} compact />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
-      </div>
 
-      {/* ═══ 6. AI PREDICTION ══════════════════════════════════ */}
-      <PredictionCard />
-
-      {/* ═══ 7. BALANCE SHEET ══════════════════════════════════ */}
-      <BalanceSheetWidget />
-
-      {/* ═══ 8. NET WORTH TIMELINE ═════════════════════════════ */}
-      <NetWorthTimeline />
-
-      {/* ═══ 9. EXPENSE BREAKDOWN ══════════════════════════════ */}
-      {Object.keys(catBreakdown).length > 0 && (
-        <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5">
-          <h3 className="font-semibold text-sm mb-4 text-gray-800 dark:text-white/90">Expense Breakdown</h3>
-          <div className="space-y-3">
-            {Object.entries(catBreakdown).sort((a,b) => b[1]-a[1]).map(([cat, amt]) => (
-              <div key={cat}>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="flex items-center gap-1.5 text-gray-600 dark:text-white/60">
-                    <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
-                      style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      {CATEGORY_EMOJI[cat] || '💡'}
+        {/* Right Column: Quick Links, Analytics, AI Predictors */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* ═══ 5. QUICK ACTIONS ═════════════════════════════════════ */}
+          <div className="space-y-2.5">
+            {[primaryActions, secondaryActions].map((row, ri) => (
+              <div key={ri} className="grid grid-cols-3 gap-2.5">
+                {row.map(({ label, icon: QIcon, color, bg, action }) => (
+                  <button key={label} onClick={action}
+                    className="flex flex-col items-center gap-2 py-3.5 rounded-2xl active:scale-[0.97] transition-all duration-150"
+                    style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: bg }}>
+                      <QIcon size={17} style={{ color }} />
+                    </div>
+                    <span className="text-[10px] font-semibold text-center leading-tight text-gray-600 dark:text-white/60">
+                      {label}
                     </span>
-                    {cat}
-                  </span>
-                  <span className="font-mono font-semibold text-white/70">
-                    ₹{amt.toLocaleString('en-IN')} ({((amt/totalDebit)*100).toFixed(0)}%)
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                  <div className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${(amt/totalDebit)*100}%`,
-                      background: '#FF6B6B',
-                    }} />
-                </div>
+                  </button>
+                ))}
               </div>
             ))}
           </div>
+
+          {/* ═══ 6. STREAK + SAVINGS GOAL ══════════════════════════ */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Streak */}
+            <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl p-5 flex flex-col items-center justify-center"
+              style={{ opacity: streak < 2 ? 0.5 : 1 }}>
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3"
+                style={{ background: 'rgba(251,191,36,0.12)' }}>
+                <Flame size={18} className="text-[#FBBF24]" />
+              </div>
+              <p className="font-display font-bold text-2xl text-[#FBBF24]">{streak}</p>
+              <p className="text-[10px] font-semibold mt-0.5 text-[#FBBF24]/60">
+                {streak >= 2 ? `🔥 ${streak}-day streak` : 'No streak yet'}
+              </p>
+            </div>
+
+            {/* Savings goal */}
+            <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl p-5 flex flex-col items-center justify-center">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3"
+                style={{ background: 'rgba(52,211,153,0.12)' }}>
+                <Target size={18} className="text-[#34D399]" />
+              </div>
+              <p className="font-display font-bold text-2xl text-[#34D399]">
+                {topGoal ? `${topGoalPct.toFixed(0)}%` : `${savingsPct.toFixed(0)}%`}
+              </p>
+              <p className="text-[10px] font-semibold mt-0.5 text-center leading-tight text-[#34D399]/60">
+                🎯 {topGoal ? (topGoal.name?.length > 12 ? topGoal.name.slice(0,12)+'…' : topGoal.name) : 'Savings goal'}
+              </p>
+            </div>
+          </div>
+
+          {/* ═══ 7. AI PREDICTION ══════════════════════════════════ */}
+          <PredictionCard />
+
+          {/* ═══ 8. BALANCE SHEET ══════════════════════════════════ */}
+          <BalanceSheetWidget />
+
+          {/* ═══ 9. EXPENSE BREAKDOWN ══════════════════════════════ */}
+          {Object.keys(catBreakdown).length > 0 && (
+            <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5">
+              <h3 className="font-semibold text-sm mb-4 text-gray-800 dark:text-white/90">Expense Breakdown</h3>
+              <div className="space-y-3">
+                {Object.entries(catBreakdown).sort((a,b) => b[1]-a[1]).map(([cat, amt]) => (
+                  <div key={cat}>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="flex items-center gap-1.5 text-gray-600 dark:text-white/60">
+                        <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
+                          style={{ background: 'rgba(255,255,255,0.06)' }}>
+                          {CATEGORY_EMOJI[cat] || '💡'}
+                        </span>
+                        {cat}
+                      </span>
+                      <span className="font-mono font-semibold text-white/70">
+                        ₹{amt.toLocaleString('en-IN')} ({((amt/totalDebit)*100).toFixed(0)}%)
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${(amt/totalDebit)*100}%`,
+                          background: '#FF6B6B',
+                        }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
+

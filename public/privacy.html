@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - MoneyFlow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        /* To match React app scrollbar hide */
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-white dark:bg-[#1A1A1D] text-gray-700 dark:text-gray-300 antialiased transition-colors duration-200">
+    <div class="max-w-3xl mx-auto px-4 pt-6 pb-12">
+        <header class="mb-8">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">Privacy Policy</h1>
+            <p class="text-gray-500 dark:text-gray-400 text-sm">Effective Date: Mar 26, 2026</p>
+        </header>
+
+        <section class="space-y-6 text-sm md:text-base leading-relaxed">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Introduction</h2>
+                <p>This Privacy Policy describes how MoneyFlow ("we," "us," or "our") collects, uses, and shares your personal information when you use our application. By using MoneyFlow, you agree to the collection and use of information in accordance with this policy.</p>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Information Collection</h2>
+                <p>When you sign in to MoneyFlow using Google Authentication, we collect basic information necessary to establish and maintain your account.</p>
+
+                <div class="overflow-x-auto mt-4 rounded-xl border border-gray-200 dark:border-white/[0.08]">
+                    <table class="min-w-full bg-white dark:bg-transparent text-sm">
+                        <thead class="bg-gray-50 dark:bg-white/[0.04]">
+                            <tr>
+                                <th class="py-3 px-4 text-left font-semibold text-gray-700 dark:text-white border-b border-gray-200 dark:border-white/[0.08]">Data Category</th>
+                                <th class="py-3 px-4 text-left font-semibold text-gray-700 dark:text-white border-b border-gray-200 dark:border-white/[0.08]">Specific Information Collected</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-white/[0.06]">
+                            <tr>
+                                <td class="py-3 px-4 font-medium text-gray-900 dark:text-white">Personal Identifiers</td>
+                                <td class="py-3 px-4 text-gray-600 dark:text-gray-400">Full Name, Email Address</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 font-medium text-gray-900 dark:text-white">Profile Information</td>
+                                <td class="py-3 px-4 text-gray-600 dark:text-gray-400">Google Profile Picture</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 font-medium text-gray-900 dark:text-white">Authentication Data</td>
+                                <td class="py-3 px-4 text-gray-600 dark:text-gray-400">Secure tokens provided via Google Auth</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Use of Information</h2>
+                <p class="mb-2">The data we collect is used strictly for the following purposes:</p>
+                <ul class="list-disc pl-5 space-y-1.5 marker:text-gray-400">
+                    <li><strong class="text-gray-900 dark:text-white">Authentication:</strong> To verify your identity and allow secure access to your account.</li>
+                    <li><strong class="text-gray-900 dark:text-white">Service Provision:</strong> To provide and maintain the core functionalities of MoneyFlow.</li>
+                    <li><strong class="text-gray-900 dark:text-white">Personalization:</strong> To tailor the user experience and interface based on your profile information.</li>
+                    <li><strong class="text-gray-900 dark:text-white">Improvement:</strong> To monitor usage patterns and improve the overall performance.</li>
+                </ul>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Data Storage and Security</h2>
+                <p>Your personal data is securely stored and managed using Firebase, a platform provided by Google. We implement industry-standard security protocols to ensure your data remains protected from unauthorized access, alteration, or disclosure.</p>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Third-Party Disclosure</h2>
+                <p class="mb-2">We prioritize your privacy. MoneyFlow maintains a strict policy regarding your personal data:</p>
+                <ul class="list-disc pl-5 space-y-1.5 marker:text-gray-400">
+                    <li>We do not sell your personal information to third parties.</li>
+                    <li>We do not trade or share your data for marketing or advertising purposes.</li>
+                    <li>Data is only shared with service providers (like Google Firebase) to the extent necessary to operate the application.</li>
+                </ul>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">User Consent</h2>
+                <p>By accessing or using MoneyFlow, you signify your acknowledgment and agreement to this Privacy Policy. If you do not agree with these terms, please refrain from using the application.</p>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Contact Information</h2>
+                <p class="mb-3">If you have any questions, concerns, or requests regarding this Privacy Policy or your personal data, please contact our support team:</p>
+                <div class="bg-gray-50 dark:bg-white/[0.04] p-5 rounded-xl border border-gray-200 dark:border-white/[0.08]">
+                    <p class="mb-1"><strong class="text-gray-900 dark:text-white">Email:</strong> <a href="mailto:info.arabindakabiraj@gmail.com" class="text-blue-600 dark:text-[#4F8EF7] hover:underline">info.arabindakabiraj@gmail.com</a></p>
+                    <p><strong class="text-gray-900 dark:text-white">Data Controller:</strong> Arabinda Kabiraj</p>
+                </div>
+            </div>
+        </section>
+        
+        <footer class="mt-12 pt-6 border-t border-gray-200 dark:border-white/[0.08] text-center text-gray-500 dark:text-gray-500 text-xs">
+            <p>&copy; 2026 MoneyFlow. All rights reserved. | <a href="/terms.html" class="dark:text-[#4F8EF7] text-blue-600 hover:underline">Terms of Service</a></p>
+        </footer>
+    </div>
+</body>
+</html>
