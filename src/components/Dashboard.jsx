@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, Plus, ArrowD
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { predictSpending, getDailyBudgetInfo } from '../utils/spendingPredictor'
+import { CATEGORY_EMOJI } from '../constants'
 
 /* ═══════ Counter animation hook ═══════ */
 function useCountUp(target, duration = 750) {
@@ -49,10 +50,7 @@ function DashboardSkeleton() {
   )
 }
 
-const CATEGORY_EMOJI = {
-  Tiffin:'🍱', Books:'📚', Travel:'🚌', Tuition:'🎓', Others:'💼',
-  Entertainment:'🎮', Health:'💊', Rent:'🏠',
-}
+// CATEGORY_EMOJI imported from constants
 
 /* ═══════ AI Spending Prediction Card ═══════ */
 function PredictionCard() {
@@ -489,19 +487,15 @@ export default function Dashboard({ onAddWithType }) {
     setBalanceHidden(h => { localStorage.setItem('mf_balance_hidden', String(!h)); return !h })
   }
 
-  const recent = useMemo(() => [...transactions].sort((a, b) => {
-    const dateDiff = new Date(b.date) - new Date(a.date)
-    if (dateDiff !== 0) return dateDiff
-    const aT = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ?? 0) * 1000
-    const bT = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ?? 0) * 1000
-    return bT - aT
-  }).slice(0, 5), [transactions])
+  const recent = useMemo(() => transactions.slice(0, 5), [transactions])
 
   if (loading && transactions.length === 0) return <DashboardSkeleton />
 
-  const catBreakdown = transactions
-    .filter(t => t.type === 'debit')
-    .reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + Number(t.amount); return acc }, {})
+  const catBreakdown = useMemo(() => {
+    return transactions
+      .filter(t => t.type === 'debit')
+      .reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + Number(t.amount); return acc }, {})
+  }, [transactions])
   const totalDebit = summary.totalDebit || 1
 
   const topGoal = goals?.length > 0

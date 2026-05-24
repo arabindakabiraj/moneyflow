@@ -107,21 +107,28 @@ function AppContent() {
     }
   }, [unlocked, lockApp])
 
-  // ── Back button navigation: go to Home instead of exiting app ──
+  // ── Back button navigation: return to dashboard on back, exit on dashboard back ──
+  const wasSubtab = useRef(false)
   useEffect(() => {
-    const handlePopState = (e) => {
-      e.preventDefault()
-      if (activeTab !== 'dashboard') {
-        setActiveTab('dashboard')
+    if (activeTab === 'dashboard') {
+      wasSubtab.current = false
+    } else {
+      if (!wasSubtab.current) {
+        window.history.pushState({ tab: activeTab }, '')
+        wasSubtab.current = true
+      } else {
+        window.history.replaceState({ tab: activeTab }, '')
       }
-      // Push state again so next back press also works
-      window.history.pushState({ tab: 'dashboard' }, '')
     }
-    // Push initial state
-    window.history.pushState({ tab: activeTab }, '')
+  }, [activeTab])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveTab('dashboard')
+    }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
-  }, [activeTab, setActiveTab])
+  }, [setActiveTab])
 
   if (!splashDone) return <SplashScreen onFinish={onSplashFinish} />
 

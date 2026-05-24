@@ -118,6 +118,9 @@ export function setAutoLockMinutes(mins) {
 }
 
 // ─── Lock screen component ───
+const MAX_PIN_ATTEMPTS = 5
+const LOCKOUT_SECONDS = 30
+
 export default function AppLock({ onUnlock }) {
     const [entered, setEntered] = useState('')
     const [error, setError] = useState(false)
@@ -125,6 +128,40 @@ export default function AppLock({ onUnlock }) {
     const [bioAvailable, setBioAvailable] = useState(false)
     const [bioAttempting, setBioAttempting] = useState(false)
     const triedAuto = useRef(false)
+
+    // PIN attempt limiting
+    const [attempts, setAttempts] = useState(() => {
+        return Number(sessionStorage.getItem('mf_pin_attempts') || '0')
+    })
+    const [lockoutEnd, setLockoutEnd] = useState(() => {
+        const stored = Number(sessionStorage.getItem('mf_pin_lockout') || '0')
+        return stored > Date.now() ? stored : 0
+    })
+    const [lockoutRemaining, setLockoutRemaining] = useState(0)
+    const isLockedOut = lockoutEnd > Date.now()
+
+    // Lockout countdown timer
+    useEffect(() => {
+        if (!lockoutEnd || lockoutEnd <= Date.now()) {
+            setLockoutRemaining(0)
+            return
+        }
+        const tick = () => {
+            const remaining = Math.ceil((lockoutEnd - Date.now()) / 1000)
+            if (remaining <= 0) {
+                setLockoutRemaining(0)
+                setLockoutEnd(0)
+                setAttempts(0)
+                sessionStorage.removeItem('mf_pin_lockout')
+                sessionStorage.removeItem('mf_pin_attempts')
+            } else {
+                setLockoutRemaining(remaining)
+            }
+        }
+        tick()
+        const interval = setInterval(tick, 1000)
+        return () => clearInterval(interval)
+    }, [lockoutEnd])
 
     // Check biometric on mount
     useEffect(() => {
@@ -144,19 +181,37 @@ export default function AppLock({ onUnlock }) {
         setBioAttempting(true)
         const ok = await authenticateBiometric()
         setBioAttempting(false)
-        if (ok) onUnlock()
+        if (ok) {
+            // Reset attempts on successful biometric
+            sessionStorage.removeItem('mf_pin_attempts')
+            sessionStorage.removeItem('mf_pin_lockout')
+            onUnlock()
+        }
     }, [onUnlock])
 
     const handleDigit = (d) => {
-        if (entered.length >= 4) return
+        if (entered.length >= 4 || isLockedOut) return
         const next = entered + d
         setEntered(next)
         setError(false)
         if (next.length === 4) {
             setTimeout(() => {
                 if (verifyPin(next)) {
+                    // Reset attempts on success
+                    sessionStorage.removeItem('mf_pin_attempts')
+                    sessionStorage.removeItem('mf_pin_lockout')
                     onUnlock()
                 } else {
+                    const newAttempts = attempts + 1
+                    setAttempts(newAttempts)
+                    sessionStorage.setItem('mf_pin_attempts', String(newAttempts))
+
+                    if (newAttempts >= MAX_PIN_ATTEMPTS) {
+                        const lockEnd = Date.now() + LOCKOUT_SECONDS * 1000
+                        setLockoutEnd(lockEnd)
+                        sessionStorage.setItem('mf_pin_lockout', String(lockEnd))
+                    }
+
                     setShake(true)
                     setError(true)
                     setTimeout(() => { setEntered(''); setShake(false) }, 600)
@@ -171,41 +226,58 @@ export default function AppLock({ onUnlock }) {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col items-center justify-center px-8">
-            <div className={`w-14 h-14 rounded-3xl bg-gradient-to-br from-brand-400 to-emerald-600 flex items-center justify-center mb-6 shadow-2xl shadow-brand-500/30 ${shake ? 'animate-bounce' : ''}`}>
+            <div className={`w-14 h-14 rounded-3xl bg-gradient-to-br from-brand-400 to-emerald-600 flex items-center justify-center mb-6 shadow-2xl shadow-brand-500/30 ${shake ? 'animate-bounce' : ''} ${isLockedOut ? 'from-rose-500 to-red-700 shadow-red-500/30' : ''}`}>
                 <Lock size={26} className="text-white" />
             </div>
-            <h1 className="font-display font-bold text-2xl text-white mb-1">Enter PIN</h1>
-            <p className="text-gray-400 text-sm mb-8">PIN is required to unlock MoneyFlow</p>
+            
+            {isLockedOut ? (
+                <>
+                    <h1 className="font-display font-bold text-2xl text-rose-500 mb-1 animate-pulse">Too Many Attempts</h1>
+                    <p className="text-gray-400 text-sm mb-8 text-center">
+                        Lockout active. Try again in <span className="font-mono font-bold text-rose-400 text-base">{lockoutRemaining}</span> seconds
+                    </p>
+                </>
+            ) : (
+                <>
+                    <h1 className="font-display font-bold text-2xl text-white mb-1">Enter PIN</h1>
+                    <p className="text-gray-400 text-sm mb-8">PIN is required to unlock MoneyFlow</p>
+                </>
+            )}
 
-            {/* Dots */}
+            {/* Dots (Hidden or colored Red if locked out) */}
             <div className={`flex gap-4 mb-8 ${shake ? 'translate-x-2' : ''} transition-transform`}>
                 {[0, 1, 2, 3].map(i => (
-                    <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${i < entered.length
-                        ? error ? 'bg-rose-500 border-rose-500' : 'bg-brand-400 border-brand-400'
-                        : 'border-gray-600'
+                    <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${
+                        isLockedOut ? 'bg-rose-950 border-rose-800' :
+                        i < entered.length
+                            ? error ? 'bg-rose-500 border-rose-500' : 'bg-brand-400 border-brand-400'
+                            : 'border-gray-600'
                         }`} />
                 ))}
             </div>
 
-            {error && <p className="text-rose-400 text-xs mb-4 animate-slide-up">❌ Wrong PIN!</p>}
+            {error && !isLockedOut && <p className="text-rose-400 text-xs mb-4 animate-slide-up">❌ Wrong PIN! ({MAX_PIN_ATTEMPTS - attempts} attempts left)</p>}
+            {isLockedOut && <p className="text-rose-400 text-xs mb-4 animate-pulse">🔒 Keypad disabled</p>}
 
             {/* Keypad */}
             <div className="grid grid-cols-3 gap-3 w-full max-w-[240px]">
                 {DIGITS.map((d, i) => (
                     <button key={i}
                         onClick={() => d === '⌫' ? handleDelete() : d !== '' ? handleDigit(d) : null}
-                        disabled={d === ''}
-                        className={`h-16 rounded-2xl font-display font-bold text-xl transition-all active:scale-90 ${d === '' ? 'invisible' :
+                        disabled={d === '' || isLockedOut}
+                        className={`h-16 rounded-2xl font-display font-bold text-xl transition-all active:scale-90 ${
+                            d === '' ? 'invisible' :
+                            isLockedOut ? 'bg-white/5 text-gray-600 border border-white/5 cursor-not-allowed opacity-30' :
                             d === '⌫' ? 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10' :
-                                'bg-white/5 text-white border border-white/10 hover:bg-white/15 active:bg-brand-500/30'
-                            }`}>
+                            'bg-white/5 text-white border border-white/10 hover:bg-white/15 active:bg-brand-500/30'
+                        }`}>
                         {d === '⌫' ? <Delete size={20} className="mx-auto" /> : d}
                     </button>
                 ))}
             </div>
 
             {/* Biometric button */}
-            {bioAvailable && (
+            {bioAvailable && !isLockedOut && (
                 <button onClick={attemptBiometric} disabled={bioAttempting}
                     className="mt-8 flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-white/10 border border-white/10 text-white font-semibold text-sm hover:bg-white/15 active:scale-95 transition-all disabled:opacity-50">
                     <Fingerprint size={20} className={bioAttempting ? 'animate-pulse text-brand-400' : ''} />

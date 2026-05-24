@@ -5,11 +5,17 @@
 import { useState } from 'react'
 import { Wallet, Building2, Smartphone, Pencil, Check, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { auth } from '../firebase'
+import OtpGuardModal from './OtpGuardModal'
 
 export default function Accounts() {
   const { accounts, updateAccountBalance, transactions, darkMode } = useApp()
   const [editing, setEditing] = useState(null)
   const [input, setInput]     = useState('')
+  
+  // OTP Verification States
+  const [isOtpOpen, setIsOtpOpen] = useState(false)
+  const [pendingUpdate, setPendingUpdate] = useState(null)
 
   const accountMeta = {
     cash: {
@@ -39,7 +45,11 @@ export default function Accounts() {
   }
 
   const save = (key) => {
-    if (!isNaN(Number(input))) updateAccountBalance(key, Number(input))
+    if (!isNaN(Number(input))) {
+      // Intercept and open verification modal
+      setPendingUpdate({ key, val: Number(input) })
+      setIsOtpOpen(true)
+    }
     setEditing(null); setInput('')
   }
 
@@ -202,6 +212,20 @@ export default function Accounts() {
       <p className="text-xs text-center text-gray-400 dark:text-white/30">
         Set base balance. Income − Expense will auto-calculate.
       </p>
+
+      {/* Reusable OTP Shield Modal */}
+      <OtpGuardModal 
+        isOpen={isOtpOpen}
+        onClose={() => { setIsOtpOpen(false); setPendingUpdate(null); }}
+        userEmail={auth.currentUser?.email || 'user@moneyflow.dev'}
+        purpose="action_verification"
+        onVerified={() => {
+          if (pendingUpdate) {
+            updateAccountBalance(pendingUpdate.key, pendingUpdate.val)
+          }
+        }}
+      />
     </div>
   )
 }
+

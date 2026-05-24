@@ -5,17 +5,68 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import axios from 'axios'
 import {
-  collection, query, orderBy, onSnapshot, where, getDocs,
+  collection, query, orderBy, onSnapshot,
   addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, serverTimestamp,
 } from 'firebase/firestore'
-import { db } from '../firebase'
-import { getSession, clearSession } from '../authUtils'
+import { db, auth } from '../firebase'
+import { onAuthStateChanged } from 'firebase/auth'
+import { getSession, clearSession, saveSession, logoutUser } from '../authUtils'
+import {
+  DEFAULT_CATEGORIES,
+  OPERATING_CATS, INVESTING_CATS, FINANCING_CATS,
+} from '../constants'
 
 const AppContext = createContext(null)
 const OR_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || ''
 const OR_MODEL = 'google/gemini-2.5-flash'
 
-const DEFAULT_CATEGORIES = ['Tiffin', 'Books', 'Travel', 'Tuition', 'Entertainment', 'Health', 'Rent', 'Others']
+// Pre-built Set lookups for O(1) cash flow classification
+const INVESTING_SET = new Set(INVESTING_CATS.map(c => c.toLowerCase()))
+const FINANCING_SET = new Set(FINANCING_CATS.map(c => c.toLowerCase()))
+
+// Binary search helper to find boundary index of contiguous date match in sorted array
+function findBoundary(arr, target, isStart, prefixSearch = false) {
+  let low = 0
+  let high = arr.length - 1
+  let result = -1
+
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    const val = arr[mid].date || ''
+    
+    let match = false
+    let cmp = 0
+    
+    if (prefixSearch) {
+      const valPrefix = val.slice(0, target.length)
+      if (valPrefix === target) {
+        match = true
+        cmp = valPrefix.localeCompare(target)
+      } else {
+        cmp = val.localeCompare(target)
+      }
+    } else {
+      if (val === target) {
+        match = true
+      }
+      cmp = val.localeCompare(target)
+    }
+
+    if (match) {
+      result = mid
+      if (isStart) {
+        high = mid - 1
+      } else {
+        low = mid + 1
+      }
+    } else if (cmp < 0) {
+      high = mid - 1
+    } else {
+      low = mid + 1
+    }
+  }
+  return result
+}
 
 export function AppProvider({ children }) {
   const [uid, setUid] = useState(undefined)
@@ -64,8 +115,31 @@ export function AppProvider({ children }) {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  // Session load
-  useEffect(() => { setUid(getSession()) }, [])
+  // Session load & Firebase Auth sync
+  useEffect(() => {
+    // 1. Initial quick load from local cache
+    const cachedUid = getSession()
+    if (cachedUid) {
+      setUid(cachedUid)
+    } else {
+      setUid(null)
+    }
+
+    // 2. Listen to real-time auth changes
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUid(user.uid)
+        saveSession(user.uid)
+      } else {
+        setUid(null)
+        clearSession()
+      }
+    })
+    return unsubscribe
+  }, [])
+
+  // Passwordless Email sign-in checks are removed in favor of FastAPI OTP verification.
+
 
   // Load username + photo from Firestore when uid changes (localStorage is primary cache)
   useEffect(() => {
@@ -400,6 +474,37 @@ export function AppProvider({ children }) {
     return unsub
   }, [uid])
 
+  // Real-time handshake for invite code generator
+  useEffect(() => {
+    if (!uid || !familySettings?.inviteCode || familySettings?.linkedUid) return
+
+    const unsub = onSnapshot(
+      doc(db, 'familyLinks', familySettings.inviteCode),
+      async snap => {
+        if (snap.exists()) {
+          const data = snap.data()
+          if (data.linkedUid) {
+            console.log('[Family] Partner entered invite code. Completing link...')
+            // Link partner in our own settings
+            await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
+              linkedUid: data.linkedUid,
+              linkedName: data.linkedName || 'Partner'
+            }, { merge: true })
+
+            // Clean up the invite code document so it can't be reused
+            try {
+              await deleteDoc(doc(db, 'familyLinks', familySettings.inviteCode))
+            } catch (e) {
+              console.warn('[Family] Failed to delete invite code doc (not critical):', e)
+            }
+          }
+        }
+      },
+      err => console.error('Invite code listener err:', err)
+    )
+    return unsub
+  }, [uid, familySettings?.inviteCode, familySettings?.linkedUid])
+
   // Listen to partner's transactions when linked
   useEffect(() => {
     if (!familySettings?.linkedUid) {
@@ -409,7 +514,14 @@ export function AppProvider({ children }) {
     const unsub = onSnapshot(
       query(collection(db, 'users', familySettings.linkedUid, 'transactions'), orderBy('date', 'desc')),
       snap => setFamilyTransactions(snap.docs.map(d => ({ id: d.id, ...d.data(), isPartner: true }))),
-      err => console.error('Family transactions err:', err)
+      err => {
+        console.error('Family transactions err:', err)
+        // If we get permission denied, it means partner unlinked us! Let's clear our link too.
+        if (err.code === 'permission-denied') {
+          console.log('[Family] Partner unlinked us. Cleaning up local link...')
+          unlinkPartner()
+        }
+      }
     )
     return unsub
   }, [familySettings?.linkedUid])
@@ -418,14 +530,14 @@ export function AppProvider({ children }) {
     if (!uid) return null
     const code = Math.random().toString(36).substring(2, 8).toUpperCase()
 
-    // Store in global familyLinks collection
+    // Store in global familyLinks collection (readable by any authenticated user)
     await setDoc(doc(db, 'familyLinks', code), {
       uid,
       name: username || 'Partner',
       createdAt: serverTimestamp()
     })
 
-    // Store in user's family settings
+    // Store in own family settings
     await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
       inviteCode: code,
       linkedUid: null,
@@ -449,15 +561,17 @@ export function AppProvider({ children }) {
         return { success: false, error: 'Cannot link to yourself' }
       }
 
-      // Update both users' family settings
-      await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
-        linkedUid: partnerData.uid,
-        linkedName: partnerData.name
-      }, { merge: true })
-
-      await setDoc(doc(db, 'users', partnerData.uid, 'settings', 'family'), {
+      // Update the invite code document to tell the partner we linked
+      await updateDoc(doc(db, 'familyLinks', code.toUpperCase()), {
         linkedUid: uid,
         linkedName: username || 'Partner'
+      })
+
+      // Update own family settings
+      await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
+        linkedUid: partnerData.uid,
+        linkedName: partnerData.name,
+        inviteCode: '' // Clear code since link is established
       }, { merge: true })
 
       return { success: true }
@@ -468,39 +582,41 @@ export function AppProvider({ children }) {
   }
 
   const unlinkPartner = async () => {
-    if (!uid || !familySettings?.linkedUid) return
+    if (!uid) return
 
-    const partnerUid = familySettings.linkedUid
-
-    // Remove link from both users
+    // Remove link from own settings only (partner will see change via their listener)
     await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
       linkedUid: null,
-      linkedName: null
-    }, { merge: true })
-
-    await setDoc(doc(db, 'users', partnerUid, 'settings', 'family'), {
-      linkedUid: null,
-      linkedName: null
+      linkedName: null,
+      inviteCode: ''
     }, { merge: true })
   }
 
-  const getFamilySummary = () => {
-    const combined = [...transactions, ...familyTransactions]
-    const totalCredit = combined.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
-    const totalDebit = combined.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
+  // Single-pass O(n) family summary instead of 8 separate filter+reduce passes
+  const getFamilySummary = useCallback(() => {
+    let myCredit = 0, myDebit = 0, partnerCredit = 0, partnerDebit = 0
 
-    const myCredit = transactions.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
-    const myDebit = transactions.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
-
-    const partnerCredit = familyTransactions.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
-    const partnerDebit = familyTransactions.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
+    for (const t of transactions) {
+      const amt = Number(t.amount)
+      if (t.type === 'credit') myCredit += amt
+      else myDebit += amt
+    }
+    for (const t of familyTransactions) {
+      const amt = Number(t.amount)
+      if (t.type === 'credit') partnerCredit += amt
+      else partnerDebit += amt
+    }
 
     return {
-      combined: { income: totalCredit, expense: totalDebit, balance: totalCredit - totalDebit },
+      combined: {
+        income: myCredit + partnerCredit,
+        expense: myDebit + partnerDebit,
+        balance: (myCredit + partnerCredit) - (myDebit + partnerDebit),
+      },
       me: { income: myCredit, expense: myDebit },
-      partner: { income: partnerCredit, expense: partnerDebit }
+      partner: { income: partnerCredit, expense: partnerDebit },
     }
-  }
+  }, [transactions, familyTransactions])
 
   const col = () => collection(db, 'users', uid, 'transactions')
 
@@ -578,7 +694,12 @@ export function AppProvider({ children }) {
   }, [transactions])
   const getAnomalies = useCallback(() => anomaliesCache, [anomaliesCache])
 
-  const logout = () => { clearSession(); setUid(null); setTx([]); setBudgets({}) }
+  const logout = async () => {
+    await logoutUser()
+    setUid(null)
+    setTx([])
+    setBudgets({})
+  }
   const setSavingsGoal = (v) => { setSavingsGoalState(v); localStorage.setItem('savingsGoal', v) }
 
   const getSummary = useCallback((txList = transactions) => {
@@ -619,10 +740,7 @@ export function AppProvider({ children }) {
   const getNetWorthHistory = useCallback(() => netWorthHistoryCache, [netWorthHistoryCache])
 
   // ── Cash Flow Statement — Operating / Investing / Financing ──
-  const OPERATING_CATS = ['Tiffin', 'Books', 'Travel', 'Entertainment', 'Health', 'Rent', 'Others', 'Mobile', 'Electricity', 'Groceries', 'Food', 'Clothing']
-  const INVESTING_CATS = ['Investment', 'Savings', 'Gold', 'Stocks', 'MF', 'FD', 'Insurance']
-  const FINANCING_CATS = ['Loan', 'Debt', 'Repayment', 'Credit Card', 'EMI', 'Tuition']
-
+  // Uses pre-built Set lookups for O(1) category classification (defined at module top)
   const getCashFlowData = useCallback((month = '') => {
     const filtered = month ? transactions.filter(t => t.date?.startsWith(month)) : transactions
     const result = {
@@ -630,12 +748,13 @@ export function AppProvider({ children }) {
       investing: { inflow: 0, outflow: 0, items: [] },
       financing: { inflow: 0, outflow: 0, items: [] },
     }
-    filtered.forEach(t => {
+    for (const t of filtered) {
       const amt = Number(t.amount)
-      const cat = t.category || 'Others'
-      let section = 'operating'
-      if (INVESTING_CATS.some(c => cat.toLowerCase().includes(c.toLowerCase()))) section = 'investing'
-      else if (FINANCING_CATS.some(c => cat.toLowerCase().includes(c.toLowerCase()))) section = 'financing'
+      const catLower = (t.category || 'Others').toLowerCase()
+      // O(1) Set lookup instead of O(k) .some() loop
+      const section = INVESTING_SET.has(catLower) ? 'investing'
+        : FINANCING_SET.has(catLower) ? 'financing'
+        : 'operating'
       if (t.type === 'credit') {
         result[section].inflow += amt
         result[section].items.push({ ...t, flowType: 'inflow' })
@@ -643,10 +762,10 @@ export function AppProvider({ children }) {
         result[section].outflow += amt
         result[section].items.push({ ...t, flowType: 'outflow' })
       }
-    })
-    Object.keys(result).forEach(k => {
-      result[k].net = result[k].inflow - result[k].outflow
-    })
+    }
+    result.operating.net = result.operating.inflow - result.operating.outflow
+    result.investing.net = result.investing.inflow - result.investing.outflow
+    result.financing.net = result.financing.inflow - result.financing.outflow
     result.totalNet = result.operating.net + result.investing.net + result.financing.net
     return result
   }, [transactions])
@@ -655,18 +774,25 @@ export function AppProvider({ children }) {
   const getPLStatement = useCallback((month = '') => {
     const target = month || new Date().toISOString().slice(0, 7)
     const filtered = transactions.filter(t => t.date?.startsWith(target))
-    const income = filtered.filter(t => t.type === 'credit').reduce((s, t) => s + Number(t.amount), 0)
-    const expense = filtered.filter(t => t.type === 'debit').reduce((s, t) => s + Number(t.amount), 0)
-    // Category breakdown of expenses
+    
+    let income = 0
+    let expense = 0
     const catBreakdown = {}
-    filtered.filter(t => t.type === 'debit').forEach(t => {
-      catBreakdown[t.category] = (catBreakdown[t.category] || 0) + Number(t.amount)
-    })
-    // Income breakdown
     const incomeBreakdown = {}
-    filtered.filter(t => t.type === 'credit').forEach(t => {
-      incomeBreakdown[t.category || 'Income'] = (incomeBreakdown[t.category || 'Income'] || 0) + Number(t.amount)
-    })
+
+    for (const t of filtered) {
+      const amt = Number(t.amount)
+      if (t.type === 'credit') {
+        income += amt
+        const cat = t.category || 'Income'
+        incomeBreakdown[cat] = (incomeBreakdown[cat] || 0) + amt
+      } else {
+        expense += amt
+        const cat = t.category || 'Others'
+        catBreakdown[cat] = (catBreakdown[cat] || 0) + amt
+      }
+    }
+
     const grossSavings = income - expense
     const savingsRate = income > 0 ? Math.round((grossSavings / income) * 100) : 0
     return { month: target, income, expense, grossSavings, savingsRate, catBreakdown, incomeBreakdown }
@@ -739,12 +865,25 @@ export function AppProvider({ children }) {
   const getMLPredictions = useCallback(() => mlPredictionsCache, [mlPredictionsCache])
 
   const getFilteredTransactions = useCallback(() => {
-    let f = [...transactions]
-    if (filterDate) f = f.filter(t => t.date === filterDate)
-    else if (filterMonth) f = f.filter(t => t.date?.startsWith(filterMonth))
-    return f.sort((a, b) => {
-      const dateDiff = new Date(b.date) - new Date(a.date)
-      if (dateDiff !== 0) return dateDiff
+    if (!filterDate && !filterMonth) return transactions
+
+    let sliced = []
+    if (filterDate) {
+      const start = findBoundary(transactions, filterDate, true, false)
+      if (start !== -1) {
+        const end = findBoundary(transactions, filterDate, false, false)
+        sliced = transactions.slice(start, end + 1)
+      }
+    } else if (filterMonth) {
+      const start = findBoundary(transactions, filterMonth, true, true)
+      if (start !== -1) {
+        const end = findBoundary(transactions, filterMonth, false, true)
+        sliced = transactions.slice(start, end + 1)
+      }
+    }
+
+    // Sort the small sliced subset by createdAt descending (extremely fast for small k)
+    return sliced.sort((a, b) => {
       const aT = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ?? 0) * 1000
       const bT = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ?? 0) * 1000
       return bT - aT

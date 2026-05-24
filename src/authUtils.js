@@ -1,201 +1,293 @@
 /**
- * authUtils.js — Custom auth helpers + Google OAuth
- * Phone + Password using pure-JS SHA-256 + Firestore
- * Google OAuth via Firebase Auth — uses getAuth() + signInWithPopup
- * Works on HTTP, HTTPS, local network.
+ * authUtils.js — V.2 Pure Firebase Authentication
+ * No OTP, no FastAPI dependency — direct Firebase Auth for instant login/signup.
+ * Phone login supported via Firestore phoneIndex lookup.
  */
 import { db, auth } from './firebase'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { signOut } from 'firebase/auth'
+import { doc, getDoc, setDoc, getDocs, query, where, collection, serverTimestamp } from 'firebase/firestore'
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+} from 'firebase/auth'
 
-// Pure JS SHA-256 — works on HTTP, HTTPS, and local network IPs
-function sha256(ascii) {
-    const K = [
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-    ]
-    let h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
-    const msg = unescape(encodeURIComponent(ascii))
-    const bytes = Array.from(msg).map(c => c.charCodeAt(0))
-    bytes.push(0x80)
-    while (bytes.length % 64 !== 56) bytes.push(0)
-    const bitLen = (ascii.length * 8)
-    for (let i = 7; i >= 0; i--) bytes.push((bitLen / Math.pow(2, i * 8)) & 0xff)
-    const rotr = (x, n) => (x >>> n) | (x << (32 - n))
-    for (let i = 0; i < bytes.length; i += 64) {
-        const w = Array(64).fill(0)
-        for (let j = 0; j < 16; j++)
-            w[j] = (bytes[i + j * 4] << 24) | (bytes[i + j * 4 + 1] << 16) | (bytes[i + j * 4 + 2] << 8) | bytes[i + j * 4 + 3]
-        for (let j = 16; j < 64; j++) {
-            const s0 = rotr(w[j - 15], 7) ^ rotr(w[j - 15], 18) ^ (w[j - 15] >>> 3)
-            const s1 = rotr(w[j - 2], 17) ^ rotr(w[j - 2], 19) ^ (w[j - 2] >>> 10)
-            w[j] = (w[j - 16] + s0 + w[j - 7] + s1) >>> 0
-        }
-        let [a, b, c, d, e, f, g, hh] = h
-        for (let j = 0; j < 64; j++) {
-            const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)
-            const ch = (e & f) ^ (~e & g)
-            const temp1 = (hh + S1 + ch + K[j] + w[j]) >>> 0
-            const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)
-            const maj = (a & b) ^ (a & c) ^ (b & c)
-            const temp2 = (S0 + maj) >>> 0
-            hh = g; g = f; f = e; e = (d + temp1) >>> 0; d = c; c = b; b = a; a = (temp1 + temp2) >>> 0
-        }
-        h = [h[0] + a, h[1] + b, h[2] + c, h[3] + d, h[4] + e, h[5] + f, h[6] + g, h[7] + hh].map(x => x >>> 0)
-    }
-    return h.map(x => x.toString(16).padStart(8, '0')).join('')
+// ─── Logging (dev-only) ───
+const isDev = import.meta.env.DEV
+const log = (...args) => { if (isDev) console.log('[Auth]', ...args) }
+
+// ─── Input detection ───
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/
+
+export function isEmail(input) {
+  return EMAIL_REGEX.test(input?.trim())
 }
 
-export async function hashPassword(password) {
-    return sha256('MoneyFlow2025:' + password)
+export function isPhone(input) {
+  return PHONE_REGEX.test(input?.trim())
 }
 
-// Sync hash for PIN (used by AppLock — localStorage only, no async needed)
-export function sha256ForPin(pin) {
-    return sha256('MF_PIN_2025:' + pin)
+/**
+ * Normalize phone number — ensure it has country code
+ */
+function normalizePhone(phone) {
+  const cleaned = phone.trim().replace(/[\s\-()]/g, '')
+  // If no country code, assume India (+91)
+  if (/^\d{10}$/.test(cleaned)) return `+91${cleaned}`
+  return cleaned
 }
 
-// Normalize phone → remove spaces/dashes, add +91 if needed
-export function normalizePhone(phone) {
-    let p = phone.replace(/[\s\-()]/g, '')
-    if (!p.startsWith('+')) p = '+91' + p
-    return p
-}
-// Error helper to catch Firestore permissions errors and output direct user guidance
-function handleFirestoreError(error) {
-    const configProjId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'undefined';
-    const configAppId = import.meta.env.VITE_FIREBASE_APP_ID || 'undefined';
-    const configAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'undefined';
-
-    console.error("Firestore database error details:", {
-        code: error.code,
-        message: error.message,
-        name: error.name,
-        stack: error.stack,
-        details: error.details,
-        activeConfig: {
-            projectId: configProjId,
-            appId: configAppId,
-            authDomain: configAuthDomain
-        }
-    })
-    const rawInfo = `[Raw Details: ${error.code || 'unknown-code'} — ${error.message || 'No message provided'}]`
-    if (
-        error.code === 'permission-denied' || 
-        error.message?.toLowerCase().includes('permission') || 
-        error.message?.toLowerCase().includes('insufficient')
-    ) {
-        throw new Error(`🔒 Firestore Permission Error:\n\n${rawInfo}\n\n💡 Current Config:\n- Project ID: ${configProjId}\n- App ID: ${configAppId}\n- Auth Domain: ${configAuthDomain}\n\nPlease check these items in your Firebase Console:\n1. Verify the Project ID in the console matches "${configProjId}". If they don't, you are changing rules in the wrong project.\n2. Ensure you pasted the security rules from "firestore.rules" into the correct project's Cloud Firestore -> Rules tab and published them.\n3. Make sure Firebase App Check is not blocking local/unauthenticated requests (set it to "Unenforce" in Console).\n4. If you have multiple databases in your Firebase Console, make sure rules are applied to the default one, or configure the named database in the SDK.`)
-    }
-    throw new Error(`❌ Firestore Database Error:\n\n${rawInfo}\n\nPlease check your Firebase Console connection, API Key restrictions, or network.`)
-}
-
-// Register new user (with username)
-export async function registerUser(phone, password, username) {
-    const uid = normalizePhone(phone)
-    const userRef = doc(db, 'users', uid, 'profile', 'info')
-    try {
-        const existing = await getDoc(userRef)
-        if (existing.exists()) {
-            throw new Error('🚫 An account already exists with this number! Please login.')
-        }
-        const hashed = await hashPassword(password)
-        await setDoc(userRef, {
-            phone: uid,
-            username: username || 'MoneyFlow User',
-            passwordHash: hashed,
-            createdAt: serverTimestamp(),
-        })
-        return uid
-    } catch (error) {
-        return handleFirestoreError(error)
-    }
-}
-
-// Login existing user
-export async function loginUser(phone, password) {
-    const uid = normalizePhone(phone)
-    const userRef = doc(db, 'users', uid, 'profile', 'info')
-    try {
-        let snap
-        try {
-            // Attempt to load from IndexedDB local cache first for instant near 0ms login
-            snap = await getDoc(userRef, { source: 'cache' })
-        } catch (_) {
-            // Fallback to standard server fetch if cache is empty or fails
-            snap = await getDoc(userRef)
-        }
-        if (!snap.exists()) {
-            throw new Error('Account not found. Please register first.')
-        }
-        const hashed = await hashPassword(password)
-        if (snap.data().passwordHash !== hashed) {
-            throw new Error('Wrong password! Please try again.')
-        }
-        return uid
-    } catch (error) {
-        return handleFirestoreError(error)
-    }
-}
-
-// Forgot/Reset password — set new password with phone number
-export async function resetPassword(phone, newPassword) {
-    const uid = normalizePhone(phone)
-    const userRef = doc(db, 'users', uid, 'profile', 'info')
-    try {
-        const snap = await getDoc(userRef)
-        if (!snap.exists()) {
-            throw new Error('No account found with this number.')
-        }
-        const hashed = await hashPassword(newPassword)
-        await setDoc(userRef, { passwordHash: hashed }, { merge: true })
-    } catch (error) {
-        return handleFirestoreError(error)
-    }
-}
-
-// Get user profile (username etc.)
-export async function getUserProfile(uid) {
-    try {
-        const userRef = doc(db, 'users', uid, 'profile', 'info')
-        let snap
-        try {
-            // Fast cache-first retrieval for near 0ms latency
-            snap = await getDoc(userRef, { source: 'cache' })
-        } catch (_) {
-            snap = await getDoc(userRef)
-        }
-        return snap.exists() ? snap.data() : {}
-    } catch (error) {
-        return handleFirestoreError(error)
-    }
-}
-
-// Persist session in localStorage
+// ─── Session helpers (synchronous, for fast startup) ───
 export function saveSession(uid) {
-    localStorage.setItem('mf_uid', uid)
-}
-export function getSession() {
-    return localStorage.getItem('mf_uid') || null
-}
-export function clearSession() {
-    localStorage.removeItem('mf_uid')
+  localStorage.setItem('mf_uid', uid)
 }
 
-// ═══════ Logout ═══════
-export async function logoutUser() {
-    try {
-        await signOut(auth)
-        clearSession()
-    } catch (error) {
-        console.error('Logout error:', error)
-        // Still clear session even if logout fails
-        clearSession()
+export function getSession() {
+  return localStorage.getItem('mf_uid') || null
+}
+
+export function clearSession() {
+  localStorage.removeItem('mf_uid')
+}
+
+// ─── Firestore Error Helper ───
+function normalizeError(error) {
+  const code = error?.code || ''
+  const map = {
+    'auth/email-already-in-use': 'This email is already registered. Try logging in.',
+    'auth/user-not-found': 'No account found. Please sign up first.',
+    'auth/wrong-password': 'Incorrect password. Please try again.',
+    'auth/invalid-email': 'Please enter a valid email address.',
+    'auth/weak-password': 'Password is too weak. Use at least 8 characters.',
+    'auth/too-many-requests': 'Too many attempts. Please wait a moment and try again.',
+    'auth/network-request-failed': 'Network error. Check your connection and try again.',
+    'auth/invalid-credential': 'Invalid email or password. Please try again.',
+  }
+  return map[code] || error?.message || 'Something went wrong. Please try again.'
+}
+
+/**
+ * 1. Register User
+ * Creates Firebase Auth account + Firestore profile + phone index
+ */
+export async function registerUser(name, email, password, phone = '') {
+  try {
+    log('Registering new user...')
+    const trimmedEmail = email.trim().toLowerCase()
+    const trimmedPhone = phone ? normalizePhone(phone) : ''
+
+    // Create Firebase Auth user
+    const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password)
+    const uid = cred.user.uid
+
+    // Store user profile in Firestore
+    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
+      username: name.trim(),
+      email: trimmedEmail,
+      phone: trimmedPhone,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+
+    // Store phone→uid index for phone login (if phone provided)
+    if (trimmedPhone) {
+      await setDoc(doc(db, 'phoneIndex', trimmedPhone), {
+        uid,
+        email: trimmedEmail,
+        createdAt: serverTimestamp(),
+      })
     }
+
+    saveSession(uid)
+    log('Registration complete:', uid)
+    return cred.user
+  } catch (error) {
+    throw new Error(normalizeError(error))
+  }
+}
+
+/**
+ * 2. Login User
+ * Accepts email OR phone number + password
+ * Phone login: looks up email from phoneIndex, then signs in with email+password
+ */
+export async function loginUser(identifier, password) {
+  try {
+    const trimmed = identifier.trim()
+    let email = trimmed
+
+    // If identifier looks like a phone number, resolve to email
+    if (isPhone(trimmed)) {
+      const normalized = normalizePhone(trimmed)
+      log('Phone login — looking up email for:', normalized)
+
+      const phoneDoc = await getDoc(doc(db, 'phoneIndex', normalized))
+      if (!phoneDoc.exists()) {
+        throw { code: 'auth/user-not-found' }
+      }
+      email = phoneDoc.data().email
+      log('Resolved phone to email:', email)
+    }
+
+    // Sign in with Firebase Auth
+    log('Signing in...')
+    const cred = await signInWithEmailAndPassword(auth, email.toLowerCase(), password)
+    saveSession(cred.user.uid)
+    log('Login complete:', cred.user.uid)
+    return cred.user
+  } catch (error) {
+    throw new Error(normalizeError(error))
+  }
+}
+
+/**
+ * 3. User Profile — Get
+ */
+export async function getUserProfile(uid) {
+  try {
+    const userRef = doc(db, 'users', uid, 'profile', 'info')
+    let snap
+    try {
+      // Fast cache-first retrieval for near 0ms latency
+      snap = await getDoc(userRef, { source: 'cache' })
+    } catch {
+      snap = await getDoc(userRef)
+    }
+    return snap.exists() ? snap.data() : {}
+  } catch (error) {
+    console.error('Profile read error:', error.code)
+    return {}
+  }
+}
+
+/**
+ * 4. User Profile — Setup/Update
+ */
+export async function setupUserProfile(uid, username, email = null, phone = null) {
+  const userRef = doc(db, 'users', uid, 'profile', 'info')
+  try {
+    const docSnap = await getDoc(userRef)
+    await setDoc(userRef, {
+      username: username || 'MoneyFlow User',
+      email: email || docSnap.data()?.email || '',
+      phone: phone || docSnap.data()?.phone || '',
+      updatedAt: serverTimestamp(),
+      ...(docSnap.exists() ? {} : { createdAt: serverTimestamp() }),
+    }, { merge: true })
+  } catch (error) {
+    console.error('Profile write error:', error.code)
+    throw error
+  }
+}
+
+/**
+ * 5. Log Out
+ */
+export async function logoutUser() {
+  try {
+    await signOut(auth)
+  } catch (error) {
+    console.error('Logout error:', error.code)
+  } finally {
+    clearSession()
+  }
+}
+
+/**
+ * 6. SHA-256 Hash (for local PIN verification)
+ * Uses Web Crypto API (hardware-accelerated) with synchronous fallback
+ */
+export async function sha256Async(message) {
+  try {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(message)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    // Fallback to sync implementation
+    return sha256ForPin(message)
+  }
+}
+
+/**
+ * Synchronous SHA-256 (pure JS fallback for environments without SubtleCrypto)
+ */
+export function sha256ForPin(ascii) {
+  function rotateRight(n, x) {
+    return (x >>> n) | (x << (32 - n))
+  }
+  const mathPow = Math.pow
+  const maxWord = mathPow(2, 32)
+  let result = ''
+  const words = []
+  const asciiLength = ascii.length * 8
+
+  let i, j
+  const hash = []
+  const k = []
+  let primeCounter = 0
+
+  const isPrime = (n) => {
+    for (let factor = 2; factor * factor <= n; factor++) {
+      if (n % factor === 0) return false
+    }
+    return true
+  }
+
+  let candidate = 2
+  while (primeCounter < 64) {
+    if (isPrime(candidate)) {
+      if (primeCounter < 8) {
+        hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0
+      }
+      k[primeCounter] = (mathPow(candidate, 1 / 3) * maxWord) | 0
+      primeCounter++
+    }
+    candidate++
+  }
+
+  ascii += '\x80'
+  while (ascii.length % 64 - 56) {
+    ascii += '\x00'
+  }
+  for (i = 0; i < ascii.length; i++) {
+    j = ascii.charCodeAt(i)
+    if (j >> 8) return
+    words[i >> 2] |= j << (24 - (i % 4) * 8)
+  }
+  words[words.length] = ((asciiLength / maxWord) | 0)
+  words[words.length] = (asciiLength | 0)
+
+  for (j = 0; j < words.length; j += 16) {
+    const w = words.slice(j, j + 16)
+    const oldHash = [].concat(hash)
+    for (i = 0; i < 64; i++) {
+      const w15 = w[i - 15], w2 = w[i - 2]
+      const s0 = rotateRight(7, w15) ^ rotateRight(18, w15) ^ (w15 >>> 3)
+      const s1 = rotateRight(17, w2) ^ rotateRight(19, w2) ^ (w2 >>> 10)
+      const ch = (hash[4] & hash[5]) ^ (~hash[4] & hash[6])
+      const maj = (hash[0] & hash[1]) ^ (hash[0] & hash[2]) ^ (hash[1] & hash[2])
+      const temp1 = hash[7] + (rotateRight(6, hash[4]) ^ rotateRight(11, hash[4]) ^ rotateRight(25, hash[4])) + ch + k[i] + (w[i] = (i < 16 ? w[i] : (w[i - 16] + s0 + w[i - 7] + s1) | 0))
+      const temp2 = (rotateRight(2, hash[0]) ^ rotateRight(13, hash[0]) ^ rotateRight(22, hash[0])) + maj
+      hash[7] = hash[6]
+      hash[6] = hash[5]
+      hash[5] = hash[4]
+      hash[4] = (hash[3] + temp1) | 0
+      hash[3] = hash[2]
+      hash[2] = hash[1]
+      hash[1] = hash[0]
+      hash[0] = (temp1 + temp2) | 0
+    }
+    for (i = 0; i < 8; i++) {
+      hash[i] = (hash[i] + oldHash[i]) | 0
+    }
+  }
+  for (i = 0; i < 8; i++) {
+    for (j = 3; j + 1; j--) {
+      const b = (hash[i] >> (j * 8)) & 255
+      result += (b < 16 ? '0' : '') + b.toString(16)
+    }
+  }
+  return result
 }

@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default rule for all user documents: only the authenticated user owning the document can read or write
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Specific rule for transactions: allow read if self or linked partner (based on family settings)
+    match /users/{userId}/transactions/{txId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        (exists(/databases/$(database)/documents/users/$(userId)/settings/family) &&
+         get(/databases/$(database)/documents/users/$(userId)/settings/family).data.linkedUid == request.auth.uid)
+      );
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Specific rule for family settings: allow read if self or linked partner
+    match /users/{userId}/settings/family {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        (exists(/databases/$(database)/documents/users/$(userId)/settings/family) &&
+         get(/databases/$(database)/documents/users/$(userId)/settings/family).data.linkedUid == request.auth.uid)
+      );
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // phoneIndex collection: allows resolving phone number to email before user is logged in
+    match /phoneIndex/{phone} {
+      allow get: if true;
+      allow create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    
+    // familyLinks collection: used for generating codes and real-time mutual handshake
+    match /familyLinks/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null && (
+        request.resource.data.uid == request.auth.uid || 
+        request.resource.data.linkedUid == request.auth.uid
+      );
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+  }
+}

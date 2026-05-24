@@ -12,10 +12,25 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          charts: ['recharts'],
-          icons: ['lucide-react']
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+              return 'vendor-react'
+            }
+            if (id.includes('firebase')) {
+              return 'vendor-firebase'
+            }
+            if (id.includes('recharts') || id.includes('d3')) {
+              return 'vendor-charts'
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons'
+            }
+            if (id.includes('jspdf') || id.includes('html2canvas')) {
+              return 'vendor-pdf'
+            }
+            return 'vendor-others'
+          }
         }
       }
     }
@@ -23,5 +38,6 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    strictPort: true,
   },
 })

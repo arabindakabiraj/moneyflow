@@ -6,7 +6,6 @@ import { useState, useRef, useCallback } from 'react'
 import { Calendar, CalendarRange, Filter, X, FileDown, Search, ArrowLeft, Undo2 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { TransactionRow } from './Dashboard'
-import { exportToPDF } from '../utils/pdfExport'
 
 /* ── Undo Toast ── */
 function UndoToast({ tx, onUndo, onDismiss }) {
@@ -86,7 +85,10 @@ export default function Transactions({ onEdit }) {
             <p className="text-xs text-gray-400 dark:text-white/35">{filtered.length} transactions</p>
           </div>
         </div>
-        <button onClick={() => exportToPDF(filtered, summary, filterMonth||filterDate||'All')}
+        <button onClick={async () => {
+          const { exportToPDF } = await import('../utils/pdfExport')
+          exportToPDF(filtered, summary, filterMonth||filterDate||'All')
+        }}
           className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all active:scale-95"
           style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.50)' }}>
           <FileDown size={14}/> PDF
