@@ -1,32 +1,4 @@
-/**
- * authUtils.js — V.2 Pure Firebase Authentication
- * No OTP, no FastAPI dependency — direct Firebase Auth for instant login/signup.
- * Phone login supported via Firestore phoneIndex lookup.
- *
- * CHANGES v2.1:
- *  - Fixed: referer/domain-blocked error handling (Vercel domain issue)
- *  - Fixed: phone login "No account found" after signup race condition
- *  - Added: resetPassword() — forgot password via email
- *  - Added: reauthenticateUser() — credential re-verification for sensitive ops
- *  - Added: deactivateAccount() / reactivateAccount()
- *  - Added: scheduleAccountDeletion() / cancelAccountDeletion() (30-day grace)
- *  - Added: permanentlyDeleteAccount() — wipes all data + auth account
- *  - loginUser() now returns { user, profile } so callers can check account status
- */
-import { db, auth } from './firebase'
-import {
-  doc, getDoc, setDoc, getDocs, collection,
-  serverTimestamp, deleteDoc, writeBatch, Timestamp,
-} from 'firebase/firestore'
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  sendPasswordResetEmail,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  deleteUser,
-} from 'firebase/auth'
+import { supabase } from './supabase'
 
 // ─── Logging (dev-only) ───
 const isDev = import.meta.env.DEV
@@ -44,12 +16,8 @@ export function isPhone(input) {
   return PHONE_REGEX.test(input?.trim())
 }
 
-/**
- * Normalize phone number — ensure it has country code
- */
 export function normalizePhone(phone) {
   const cleaned = phone.trim().replace(/[\s\-()]/g, '')
-  // If no country code, assume India (+91)
   if (/^\d{10}$/.test(cleaned)) return `+91${cleaned}`
   return cleaned
 }
@@ -69,80 +37,157 @@ export function clearSession() {
 
 // ─── Error Helper ───
 function normalizeError(error) {
-  // ✅ FIX: Always convert to string — Firebase sometimes returns objects/undefined
-  // that cause 'Cannot read properties of undefined (reading indexOf)'
-  const code = String(error?.code || '')
-  const message = String(error?.message || '')
-
-  // ✅ FIX: Domain/referer blocked — Firebase Auth unauthorized domain
-  // Error code is dynamic (includes the domain name), so we check the string
-  if (
-    code.includes('blocked') ||
-    code === 'auth/unauthorized-domain' ||
-    message.toLowerCase().includes('referer') ||
-    message.toLowerCase().includes('are-blocked')
-  ) {
-    return '🚫 This domain is not authorized in Firebase. Go to Firebase Console → Authentication → Settings → Authorized Domains → Add your Vercel domain (e.g. moneyflow-xyz.vercel.app)'
+  console.error('[Auth Error Detail]', error)
+  const message = String(error?.message || error || '')
+  
+  if (message.includes('Email already registered') || message.includes('already exists')) {
+    return 'This email is already registered. Try logging in instead.'
   }
-
-  const map = {
-    'auth/email-already-in-use':   'This email is already registered. Try logging in instead.',
-    'auth/user-not-found':         'No account found. Please sign up first.',
-    'auth/wrong-password':         'Incorrect password. Please try again.',
-    'auth/invalid-email':          'Please enter a valid email address.',
-    'auth/weak-password':          'Password too weak. Use at least 8 characters.',
-    'auth/too-many-requests':      'Too many attempts. Please wait a moment and try again.',
-    'auth/network-request-failed': 'Network error. Check your connection and try again.',
-    'auth/invalid-credential':     'Invalid email or password. Please check and try again.',
-    'auth/requires-recent-login':  'Please log in again to perform this action.',
-    'auth/user-disabled':          'This account has been disabled. Please contact support.',
-    'auth/operation-not-allowed':  'This sign-in method is not enabled. Contact support.',
-    'auth/popup-blocked':          'Popup blocked. Please allow popups and try again.',
+  if (message.includes('Invalid login credentials') || message.includes('invalid_credentials')) {
+    return 'Invalid email or password. Please check and try again.'
   }
+  if (message.includes('User not found') || message.includes('user-not-found')) {
+    return 'No account found. Please sign up first.'
+  }
+  if (message.includes('valid email')) {
+    return 'Please enter a valid email address.'
+  }
+  if (message.includes('Password should be')) {
+    return 'Password too weak. Use at least 6 characters.'
+  }
+  if (message.includes('too many requests') || message.includes('429')) {
+    return 'Too many attempts. Please wait a moment and try again.'
+  }
+  if (message.includes('network') || message.includes('fetch')) {
+    return 'Network error. Check your connection and try again.'
+  }
+  return message || 'Something went wrong.'
+}
 
-  return map[code] || message || 'Something went wrong. Please try again.'
+export function mapProfileFromDb(p) {
+  if (!p) return {}
+  return {
+    username: p.username,
+    email: p.email,
+    phone: p.phone,
+    photoURL: p.photo_url,
+    deactivated: p.deactivated,
+    deactivatedAt: p.deactivated_at,
+    deletionScheduled: p.deletion_scheduled,
+    scheduledDeletionAt: p.scheduled_deletion_at,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at
+  }
 }
 
 /* ─────────────────────────────────────────────────────────
    1. REGISTER USER
    ───────────────────────────────────────────────────────── */
-/**
- * Creates Firebase Auth account + Firestore profile + phone index.
- */
 export async function registerUser(name, email, password, phone = '') {
   try {
     log('Registering new user...')
+    if (!email) throw new Error('Email address is strictly required.')
     const trimmedPhone = phone ? normalizePhone(phone) : ''
-    const trimmedEmail = email ? email.trim().toLowerCase() : `phone_${trimmedPhone.replace('+', '')}@moneyflow.local`
+    const trimmedEmail = email.trim().toLowerCase()
 
-    // Create Firebase Auth user
-    const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password)
-    const uid = cred.user.uid
-
-    // Store user profile in Firestore (include account-status fields upfront)
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
-      username: name.trim(),
+    // Create Supabase Auth user
+    const { data, error } = await supabase.auth.signUp({
       email: trimmedEmail,
-      phone: trimmedPhone,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      deactivated: false,
-      deletionScheduled: false,
-      scheduledDeletionAt: null,
+      password,
+      options: {
+        data: {
+          username: name.trim(),
+          phone: trimmedPhone
+        }
+      }
     })
 
-    // Store phone→uid index for phone login (if phone provided)
-    if (trimmedPhone) {
-      await setDoc(doc(db, 'phoneIndex', trimmedPhone), {
-        uid,
-        email: trimmedEmail,
-        createdAt: serverTimestamp(),
-      })
-    }
+    if (error) throw error
+    const user = data.user
+    if (!user) throw new Error('Failed to register user.')
 
-    saveSession(uid)
-    log('Registration complete:', uid)
-    return cred.user
+    if (data.session) {
+      saveSession(user.id)
+    }
+    log('Registration complete:', user.id)
+    return { user, session: data.session }
+  } catch (error) {
+    throw new Error(normalizeError(error))
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   OTP VERIFICATION HELPERS
+   ───────────────────────────────────────────────────────── */
+export async function verifySignupOtp(email, token) {
+  try {
+    log('Verifying signup OTP for:', email)
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: token.trim(),
+      type: 'signup'
+    })
+    if (error) throw error
+    
+    const user = data.user
+    const session = data.session
+    if (!user) throw new Error('Failed to verify OTP.')
+    
+    saveSession(user.id)
+    log('OTP verification successful, user logged in:', user.id)
+    return { user, session }
+  } catch (error) {
+    throw new Error(normalizeError(error))
+  }
+}
+
+export async function resendSignupOtp(email) {
+  try {
+    log('Resending signup OTP for:', email)
+    const { error } = await supabase.auth.resend({
+      email: email.trim().toLowerCase(),
+      type: 'signup'
+    })
+    if (error) throw error
+    log('Signup OTP resent successfully')
+  } catch (error) {
+    throw new Error(normalizeError(error))
+  }
+}
+
+export async function sendLoginOtp(email) {
+  try {
+    log('Requesting login OTP for:', email)
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: {
+        shouldCreateUser: false
+      }
+    })
+    if (error) throw error
+    log('Login OTP sent successfully')
+  } catch (error) {
+    throw new Error(normalizeError(error))
+  }
+}
+
+export async function verifyLoginOtp(email, token) {
+  try {
+    log('Verifying login OTP for:', email)
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: token.trim(),
+      type: 'email'
+    })
+    if (error) throw error
+    
+    const user = data.user
+    const session = data.session
+    if (!user) throw new Error('Failed to verify login OTP.')
+    
+    saveSession(user.id)
+    log('Login OTP verification successful, user logged in:', user.id)
+    return { user, session }
   } catch (error) {
     throw new Error(normalizeError(error))
   }
@@ -150,77 +195,81 @@ export async function registerUser(name, email, password, phone = '') {
 
 /* ─────────────────────────────────────────────────────────
    2. LOGIN USER
-   Returns { user, profile } so callers can check account status
-   (deactivated, deletionScheduled, etc.)
    ───────────────────────────────────────────────────────── */
 export async function loginUser(identifier, password) {
   try {
     const trimmed = identifier.trim()
     let email = trimmed
 
-    // If identifier looks like a phone number, resolve to email
     if (isPhone(trimmed)) {
       const normalized = normalizePhone(trimmed)
       log('Phone login — looking up email for:', normalized)
 
-      // ✅ FIX: Force server fetch (not cache) to avoid race condition right after signup
-      let phoneDoc
-      try {
-        phoneDoc = await getDoc(doc(db, 'phoneIndex', normalized))
-      } catch {
-        // If cache fails, try again without cache hint
-        phoneDoc = await getDoc(doc(db, 'phoneIndex', normalized))
-      }
+      const { data: phoneRow, error: phoneErr } = await supabase
+        .from('phone_index')
+        .select('email')
+        .eq('phone', normalized)
+        .maybeSingle()
 
-      if (!phoneDoc.exists()) {
-        // Give user a helpful message — they may have signed up with email
+      if (phoneErr) throw phoneErr
+      if (!phoneRow) {
         throw new Error(
           'No account found with this phone number. If you registered with your email, please log in using your email address instead.'
         )
       }
-      email = phoneDoc.data().email
+      email = phoneRow.email
       log('Resolved phone to email:', email)
     }
 
-    // Sign in with Firebase Auth
     log('Signing in...')
-    const cred = await signInWithEmailAndPassword(auth, email.toLowerCase(), password)
-    saveSession(cred.user.uid)
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase(),
+      password
+    })
 
-    // Fetch profile to return account-status flags
-    const profile = await getUserProfile(cred.user.uid)
-    log('Login complete:', cred.user.uid, '| deactivated:', profile.deactivated)
+    if (error) throw error
+    const user = data.user
+    if (!user) throw new Error('No user returned from login.')
 
-    return { user: cred.user, profile }
+    saveSession(user.id)
+
+    // Fetch profile
+    const profile = await getUserProfile(user.id)
+    log('Login complete:', user.id, '| deactivated:', profile.deactivated)
+
+    return { user, profile }
   } catch (error) {
-    // Re-throw Error instances (our custom ones) as-is; normalize Firebase errors
-    if (error instanceof Error && !error.code) throw error
+    if (error instanceof Error && !error.status) throw error
     throw new Error(normalizeError(error))
   }
 }
 
 /* ─────────────────────────────────────────────────────────
-   3. FORGOT PASSWORD — sends reset email via Firebase
+   3. FORGOT PASSWORD
    ───────────────────────────────────────────────────────── */
 export async function resetPassword(email) {
   try {
-    await sendPasswordResetEmail(auth, email.trim().toLowerCase())
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase())
+    if (error) throw error
   } catch (error) {
     throw new Error(normalizeError(error))
   }
 }
 
 /* ─────────────────────────────────────────────────────────
-   4. RE-AUTHENTICATE — required before sensitive operations
+   4. RE-AUTHENTICATE
    ───────────────────────────────────────────────────────── */
 export async function reauthenticateUser(password) {
-  const user = auth.currentUser
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user || !user.email) {
     throw new Error('Cannot verify identity. Please log in again and retry.')
   }
-  const credential = EmailAuthProvider.credential(user.email, password)
   try {
-    await reauthenticateWithCredential(user, credential)
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password
+    })
+    if (error) throw error
   } catch (error) {
     throw new Error(normalizeError(error))
   }
@@ -231,19 +280,16 @@ export async function reauthenticateUser(password) {
    ───────────────────────────────────────────────────────── */
 export async function getUserProfile(uid) {
   try {
-    const userRef = doc(db, 'users', uid, 'profile', 'info')
-    let snap
-    try {
-      // Fast cache-first retrieval for near 0ms latency
-      snap = await getDoc(userRef, { source: 'cache' })
-      // If cache miss, fall through to server
-      if (!snap.exists()) snap = await getDoc(userRef)
-    } catch {
-      snap = await getDoc(userRef)
-    }
-    return snap.exists() ? snap.data() : {}
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .maybeSingle()
+
+    if (error) throw error
+    return data ? mapProfileFromDb(data) : {}
   } catch (error) {
-    console.error('Profile read error:', error.code)
+    console.error('Profile read error:', error.message)
     return {}
   }
 }
@@ -252,18 +298,28 @@ export async function getUserProfile(uid) {
    6. USER PROFILE — Setup/Update
    ───────────────────────────────────────────────────────── */
 export async function setupUserProfile(uid, username, email = null, phone = null) {
-  const userRef = doc(db, 'users', uid, 'profile', 'info')
   try {
-    const docSnap = await getDoc(userRef)
-    await setDoc(userRef, {
+    const { data: current } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .maybeSingle()
+
+    const updates = {
       username: username || 'MoneyFlow User',
-      email: email || docSnap.data()?.email || '',
-      phone: phone || docSnap.data()?.phone || '',
-      updatedAt: serverTimestamp(),
-      ...(docSnap.exists() ? {} : { createdAt: serverTimestamp() }),
-    }, { merge: true })
+      email: email || current?.email || '',
+      phone: phone || current?.phone || '',
+      updated_at: new Date().toISOString()
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', uid)
+
+    if (error) throw error
   } catch (error) {
-    console.error('Profile write error:', error.code)
+    console.error('Profile write error:', error.message)
     throw error
   }
 }
@@ -273,9 +329,9 @@ export async function setupUserProfile(uid, username, email = null, phone = null
    ───────────────────────────────────────────────────────── */
 export async function logoutUser() {
   try {
-    await signOut(auth)
+    await supabase.auth.signOut()
   } catch (error) {
-    console.error('Logout error:', error.code)
+    console.error('Logout error:', error.message)
   } finally {
     clearSession()
   }
@@ -283,17 +339,19 @@ export async function logoutUser() {
 
 /* ─────────────────────────────────────────────────────────
    8. DEACTIVATE ACCOUNT
-   Hides account temporarily. Data stays safe in Firebase.
-   Requires password re-authentication.
    ───────────────────────────────────────────────────────── */
 export async function deactivateAccount(uid, password) {
-  // Re-authenticate before making this change
   await reauthenticateUser(password)
   try {
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
-      deactivated: true,
-      deactivatedAt: serverTimestamp(),
-    }, { merge: true })
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        deactivated: true,
+        deactivated_at: new Date().toISOString()
+      })
+      .eq('id', uid)
+
+    if (error) throw error
     await logoutUser()
   } catch (error) {
     throw new Error(normalizeError(error))
@@ -302,14 +360,18 @@ export async function deactivateAccount(uid, password) {
 
 /* ─────────────────────────────────────────────────────────
    9. REACTIVATE ACCOUNT
-   Called when a deactivated user chooses to come back.
    ───────────────────────────────────────────────────────── */
 export async function reactivateAccount(uid) {
   try {
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
-      deactivated: false,
-      deactivatedAt: null,
-    }, { merge: true })
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        deactivated: false,
+        deactivated_at: null
+      })
+      .eq('id', uid)
+
+    if (error) throw error
   } catch (error) {
     throw new Error(normalizeError(error))
   }
@@ -317,18 +379,22 @@ export async function reactivateAccount(uid) {
 
 /* ─────────────────────────────────────────────────────────
    10. SCHEDULE ACCOUNT DELETION (30-day grace period)
-   Sets a deletion timestamp 30 days from now.
-   The check happens on next login or via Cloud Function.
    ───────────────────────────────────────────────────────── */
 export async function scheduleAccountDeletion(uid, password) {
   await reauthenticateUser(password)
   try {
     const deletionDate = new Date()
     deletionDate.setDate(deletionDate.getDate() + 30)
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
-      deletionScheduled: true,
-      scheduledDeletionAt: Timestamp.fromDate(deletionDate),
-    }, { merge: true })
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        deletion_scheduled: true,
+        scheduled_deletion_at: deletionDate.toISOString()
+      })
+      .eq('id', uid)
+
+    if (error) throw error
     await logoutUser()
   } catch (error) {
     throw new Error(normalizeError(error))
@@ -340,10 +406,15 @@ export async function scheduleAccountDeletion(uid, password) {
    ───────────────────────────────────────────────────────── */
 export async function cancelAccountDeletion(uid) {
   try {
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
-      deletionScheduled: false,
-      scheduledDeletionAt: null,
-    }, { merge: true })
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        deletion_scheduled: false,
+        scheduled_deletion_at: null
+      })
+      .eq('id', uid)
+
+    if (error) throw error
   } catch (error) {
     throw new Error(normalizeError(error))
   }
@@ -351,50 +422,13 @@ export async function cancelAccountDeletion(uid) {
 
 /* ─────────────────────────────────────────────────────────
    12. PERMANENTLY DELETE ACCOUNT
-   Deletes all Firestore data + Firebase Auth account.
-   Requires password re-authentication.
    ───────────────────────────────────────────────────────── */
 export async function permanentlyDeleteAccount(uid, password) {
-  // Re-authenticate first — this is irreversible
   await reauthenticateUser(password)
-
   try {
-    const batch = writeBatch(db)
-
-    // Delete all known user data subcollections
-    const knownCollections = [
-      'transactions', 'goals', 'budgets', 'accounts',
-      'debts', 'reminders', 'recurring', 'categories',
-      'groups', 'notifications',
-    ]
-
-    for (const col of knownCollections) {
-      try {
-        const snap = await getDocs(collection(db, 'users', uid, col))
-        snap.forEach(d => batch.delete(d.ref))
-      } catch {
-        // Collection might not exist, skip
-      }
-    }
-
-    // Delete profile document
-    batch.delete(doc(db, 'users', uid, 'profile', 'info'))
-
-    await batch.commit()
-
-    // Remove phone index if exists
-    try {
-      const profile = await getDoc(doc(db, 'users', uid, 'profile', 'info'))
-      if (profile.exists() && profile.data()?.phone) {
-        await deleteDoc(doc(db, 'phoneIndex', profile.data().phone))
-      }
-    } catch { /* ignore */ }
-
-    // Delete Firebase Auth account (must be last)
-    if (auth.currentUser) {
-      await deleteUser(auth.currentUser)
-    }
-
+    // Call the security definer RPC function that deletes user from auth.users (cascades database tables)
+    const { error } = await supabase.rpc('delete_user')
+    if (error) throw error
     clearSession()
   } catch (error) {
     throw new Error(normalizeError(error))
@@ -403,7 +437,6 @@ export async function permanentlyDeleteAccount(uid, password) {
 
 /* ─────────────────────────────────────────────────────────
    SHA-256 Hash (for local PIN verification)
-   Uses Web Crypto API (hardware-accelerated) with synchronous fallback
    ───────────────────────────────────────────────────────── */
 export async function sha256Async(message) {
   try {
@@ -413,14 +446,10 @@ export async function sha256Async(message) {
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
   } catch {
-    // Fallback to sync implementation
     return sha256ForPin(message)
   }
 }
 
-/**
- * Synchronous SHA-256 (pure JS fallback for environments without SubtleCrypto)
- */
 export function sha256ForPin(ascii) {
   function rotateRight(n, x) {
     return (x >>> n) | (x << (32 - n))

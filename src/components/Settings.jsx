@@ -1010,7 +1010,7 @@ export default function Settings() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white/95">MoneyFlow</p>
-                <p className="text-[11px] text-gray-400 dark:text-white/35">React + Firebase + Gemini AI</p>
+                <p className="text-[11px] text-gray-400 dark:text-white/35">React + Supabase + Gemini AI</p>
               </div>
               <span className="text-xs font-mono text-gray-400 dark:text-white/35 bg-gray-100 dark:bg-[#222226] px-2.5 py-1 rounded-lg shrink-0">v2.2</span>
             </div>
@@ -1078,7 +1078,7 @@ export default function Settings() {
               </div>
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#34D399]/10 border border-[#34D399]/20">
                 <CheckCircle size={16} className="text-[#34D399] mt-0.5 shrink-0" />
-                <p className="text-xs text-[#34D399]">Your <strong>cloud data</strong> stays safe in Firebase</p>
+                <p className="text-xs text-[#34D399]">Your <strong>cloud data</strong> stays safe in Supabase</p>
               </div>
             </div>
 
@@ -1293,7 +1293,7 @@ function DeleteModal({ uid, onClose, onDeleted }) {
               </div>
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#FF6B6B]/10 border border-[#FF6B6B]/20">
                 <AlertTriangle size={16} className="text-[#FF6B6B] mt-0.5 shrink-0" />
-                <p className="text-xs text-[#FF6B6B]">Your <strong>Firebase Auth account</strong> will be permanently deleted</p>
+                <p className="text-xs text-[#FF6B6B]">Your <strong>Supabase Auth account</strong> will be permanently deleted</p>
               </div>
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#FBBF24]/10 border border-[#FBBF24]/20">
                 <Clock size={16} className="text-[#FBBF24] mt-0.5 shrink-0" />

@@ -5,11 +5,10 @@
 import { useState } from 'react'
 import { Wallet, Building2, Smartphone, Pencil, Check, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { auth } from '../firebase'
 import OtpGuardModal from './OtpGuardModal'
 
 export default function Accounts() {
-  const { accounts, updateAccountBalance, transactions, darkMode, balanceHidden } = useApp()
+  const { accounts, updateAccountBalance, transactions, darkMode, balanceHidden, email } = useApp()
   const [editing, setEditing] = useState(null)
   const [input, setInput]     = useState('')
   
@@ -278,7 +277,7 @@ export default function Accounts() {
       <OtpGuardModal 
         isOpen={isOtpOpen}
         onClose={() => { setIsOtpOpen(false); setPendingUpdate(null); }}
-        userEmail={auth.currentUser?.email || 'user@moneyflow.dev'}
+        userEmail={email || 'user@moneyflow.dev'}
         purpose="action_verification"
         onVerified={() => {
           if (pendingUpdate) {

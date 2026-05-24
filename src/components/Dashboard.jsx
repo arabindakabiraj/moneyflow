@@ -435,6 +435,157 @@ export function TodayWidget() {
   )
 }
 
+/* ═══════ Goals & Bills Planner Widget ═══════ */
+function GoalsAndBillsWidget() {
+  const { goals, bills, markBillPaid, setActiveTab, darkMode } = useApp()
+
+  // Up to 2 active (uncompleted) savings goals
+  const activeGoals = useMemo(() => {
+    return (goals || [])
+      .filter(g => Number(g.current || 0) < Number(g.target || 1))
+      .slice(0, 2)
+  }, [goals])
+
+  // Up to 2 unpaid upcoming bills
+  const upcomingBills = useMemo(() => {
+    return (bills || [])
+      .filter(b => !b.paid)
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+      .slice(0, 2)
+  }, [bills])
+
+  const handlePayBill = async (id) => {
+    try {
+      await markBillPaid(id)
+    } catch (err) {
+      console.error("Failed to pay bill:", err)
+    }
+  }
+
+  if (activeGoals.length === 0 && upcomingBills.length === 0) {
+    return (
+      <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 text-center py-8 animate-fade-in">
+        <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mx-auto mb-3 text-indigo-400">
+          <Target size={20} />
+        </div>
+        <h4 className="font-semibold text-xs text-gray-800 dark:text-white/80">Planning Center Empty</h4>
+        <p className="text-[10px] text-gray-400 dark:text-white/30 max-w-[280px] mx-auto mt-1 leading-relaxed">
+          Create savings goals or add bill reminders in Settings to unlock your custom visual planning cockpit.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 space-y-5 animate-fade-in">
+      <div className="flex items-center justify-between border-b border-black/[0.04] dark:border-white/[0.04] pb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-400">
+            <Target size={15} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Cockpit Planner</h3>
+            <p className="text-[10px] text-gray-400 dark:text-white/35">Your milestones & upcoming dues</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => setActiveTab('settings')}
+          className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] text-[#4F8EF7] active:scale-95 transition-all border-none cursor-pointer"
+        >
+          Manage Planner
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Left Column: Savings Goals */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-gray-400 dark:text-white/35 uppercase tracking-wide">Savings Goals</span>
+            <button onClick={() => setActiveTab('goals')} className="text-[10px] font-bold text-[#4F8EF7] hover:underline bg-transparent border-none cursor-pointer">View All</button>
+          </div>
+
+          {activeGoals.length === 0 ? (
+            <div className="text-center py-6 bg-black/[0.01] dark:bg-white/[0.01] rounded-xl border border-dashed border-black/5 dark:border-white/5 flex flex-col items-center justify-center">
+              <p className="text-[10px] text-gray-400 dark:text-white/30">No active goals</p>
+              <button onClick={() => setActiveTab('goals')} className="text-[10px] font-semibold text-[#34D399] mt-1 bg-transparent border-none cursor-pointer hover:underline">+ Create Goal</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeGoals.map(g => {
+                const current = Number(g.current || 0)
+                const target = Number(g.target || 1)
+                const pct = Math.min((current / target) * 100, 100)
+                return (
+                  <div key={g.id} className="p-3 bg-black/[0.01] dark:bg-white/[0.01] border border-black/[0.04] dark:border-white/[0.04] rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-gray-800 dark:text-white/80 truncate max-w-[120px]">{g.name}</span>
+                      <span className="text-[10px] font-mono font-bold text-emerald-400">{pct.toFixed(0)}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden bg-black/[0.05] dark:bg-white/[0.05]">
+                      <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-300" style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="flex justify-between text-[9px] text-gray-400 dark:text-white/30 font-mono">
+                      <span>₹{current.toLocaleString('en-IN')}</span>
+                      <span>Target: ₹{target.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Upcoming Bills */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-gray-400 dark:text-white/35 uppercase tracking-wide">Upcoming Bills</span>
+            <button onClick={() => setActiveTab('bills')} className="text-[10px] font-bold text-[#4F8EF7] hover:underline bg-transparent border-none cursor-pointer">View All</button>
+          </div>
+
+          {upcomingBills.length === 0 ? (
+            <div className="text-center py-6 bg-black/[0.01] dark:bg-white/[0.01] rounded-xl border border-dashed border-black/5 dark:border-white/5 flex flex-col items-center justify-center">
+              <p className="text-[10px] text-gray-400 dark:text-white/30">All bills are paid! 🎉</p>
+              <button onClick={() => setActiveTab('bills')} className="text-[10px] font-semibold text-[#34D399] mt-1 bg-transparent border-none cursor-pointer hover:underline">+ Add Reminder</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {upcomingBills.map(b => {
+                const daysDiff = Math.ceil((new Date(b.dueDate) - new Date()) / (1000 * 60 * 60 * 24))
+                const isOverdue = daysDiff < 0
+                const isDueSoon = daysDiff >= 0 && daysDiff <= 3
+                return (
+                  <div key={b.id} className="p-3 bg-black/[0.01] dark:bg-white/[0.01] border border-black/[0.04] dark:border-white/[0.04] rounded-xl flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-gray-800 dark:text-white/80 truncate">{b.description || 'Subscription/Bill'}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[9px] font-mono font-semibold" style={{ color: isOverdue ? '#FF6B6B' : isDueSoon ? '#FBBF24' : 'var(--mf-text-muted)' }}>
+                          {isOverdue ? 'Overdue' : `Due in ${daysDiff}d`}
+                        </span>
+                        <span className="text-[9px] text-gray-400 dark:text-white/20">·</span>
+                        <span className="text-[9px] text-gray-400 dark:text-white/30 font-mono">{b.dueDate}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-bold text-gray-800 dark:text-white/80 font-mono mb-1">₹{b.amount.toLocaleString('en-IN')}</p>
+                      <button 
+                        onClick={() => handlePayBill(b.id)}
+                        className="text-[9px] font-extrabold px-2 py-1 rounded-md text-white bg-[#34D399] hover:bg-[#059669] active:scale-95 transition-all border-none cursor-pointer"
+                        style={{ boxShadow: '0 2px 6px rgba(52,211,153,0.20)' }}
+                      >
+                        Paid
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ═══════ Transaction Row ═══════ */
 export function TransactionRow({ tx, compact = false, onEdit, onDelete, onToggleNeedWant }) {
   const isCredit = tx.type === 'credit'
@@ -765,40 +916,8 @@ export default function Dashboard({ onAddWithType }) {
           {/* ═══ 3. NET WORTH TIMELINE ═════════════════════════════ */}
           <NetWorthTimeline />
 
-          {/* ═══ 4. RECENT TRANSACTIONS ════════════════════════════ */}
-          <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Recent Transactions</h3>
-              <button onClick={() => setActiveTab('transactions')}
-                className="flex items-center gap-1 text-xs font-medium text-[#4F8EF7]">
-                See all <ChevronRight size={13} />
-              </button>
-            </div>
-            {loading && (
-              <div className="flex justify-center py-3">
-                <RefreshCw size={16} className="animate-spin text-[#4F8EF7]" />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              {recent.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                    style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }}>
-                    <Wallet size={22} className="text-gray-400 dark:text-white/30" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-400 dark:text-white/40">No transactions yet</p>
-                  <button onClick={() => setActiveTab('add')}
-                    className="text-xs font-semibold mt-1.5 text-[#4F8EF7]">
-                    + Add First Transaction
-                  </button>
-                </div>
-              ) : recent.map((tx, idx) => (
-                <div key={tx.id} className="stagger-item">
-                  <TransactionRow tx={tx} compact />
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* ═══ 4. COCKPIT PLANNING CENTER (Savings & Bills alignment widget) ═══ */}
+          <GoalsAndBillsWidget />
         </div>
 
         {/* Right Column: Quick Links, Analytics, AI Predictors */}
@@ -859,6 +978,41 @@ export default function Dashboard({ onAddWithType }) {
 
           {/* ═══ 8. BALANCE SHEET ══════════════════════════════════ */}
           <BalanceSheetWidget />
+ 
+          {/* ═══ 4. RECENT TRANSACTIONS (Moved below Balance Sheet) ════════════════════════════ */}
+          <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Recent Transactions</h3>
+              <button onClick={() => setActiveTab('transactions')}
+                className="flex items-center gap-1 text-xs font-medium text-[#4F8EF7]">
+                See all <ChevronRight size={13} />
+              </button>
+            </div>
+            {loading && (
+              <div className="flex justify-center py-3">
+                <RefreshCw size={16} className="animate-spin text-[#4F8EF7]" />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              {recent.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                    style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }}>
+                    <Wallet size={22} className="text-gray-400 dark:text-white/30" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-400 dark:text-white/40">No transactions yet</p>
+                  <button onClick={() => setActiveTab('add')}
+                    className="text-xs font-semibold mt-1.5 text-[#4F8EF7]">
+                    + Add First Transaction
+                  </button>
+                </div>
+              ) : recent.map((tx, idx) => (
+                <div key={tx.id} className="stagger-item">
+                  <TransactionRow tx={tx} compact />
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* ═══ 9. EXPENSE BREAKDOWN ══════════════════════════════ */}
           {Object.keys(catBreakdown).length > 0 && (

@@ -1,15 +1,10 @@
 /**
  * AppContext.jsx — Global state with budget alerts + anomaly detection + custom categories
- * + Group Expenses, Family Mode, Local Notifications
+ * + Group Expenses, Family Mode, Local Notifications (Supabase Version)
  */
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import axios from 'axios'
-import {
-  collection, query, orderBy, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, serverTimestamp,
-} from 'firebase/firestore'
-import { db, auth } from '../firebase'
-import { onAuthStateChanged, updateEmail as authUpdateEmail } from 'firebase/auth'
+import { supabase } from '../supabase'
 import { getSession, clearSession, saveSession, logoutUser, normalizePhone } from '../authUtils'
 import {
   DEFAULT_CATEGORIES,
@@ -23,6 +18,97 @@ const OR_MODEL = 'google/gemini-2.5-flash'
 // Pre-built Set lookups for O(1) cash flow classification
 const INVESTING_SET = new Set(INVESTING_CATS.map(c => c.toLowerCase()))
 const FINANCING_SET = new Set(FINANCING_CATS.map(c => c.toLowerCase()))
+
+// Helper to convert ISO Timestamp string to Firestore-like Timestamp interface for compatibility
+const parseTimestamp = (isoStr) => {
+  if (!isoStr) return null
+  const date = new Date(isoStr)
+  const ms = date.getTime()
+  return {
+    toMillis: () => ms,
+    seconds: Math.floor(ms / 1000)
+  }
+}
+
+// Db to JS Mapping Functions
+const mapTxFromDb = t => {
+  if (!t) return null
+  return {
+    id: t.id,
+    user_id: t.user_id,
+    amount: Number(t.amount),
+    category: t.category,
+    description: t.description,
+    date: t.date,
+    type: t.type,
+    account: t.account,
+    isWant: !!t.is_want,
+    createdAt: parseTimestamp(t.created_at)
+  }
+}
+
+const mapDebtFromDb = d => {
+  if (!d) return null
+  return {
+    id: d.id,
+    user_id: d.user_id,
+    name: d.name,
+    amount: Number(d.amount),
+    type: d.type,
+    repaid: !!d.repaid,
+    date: d.date,
+    createdAt: parseTimestamp(d.created_at)
+  }
+}
+
+const mapGoalFromDb = g => {
+  if (!g) return null
+  return {
+    id: g.id,
+    user_id: g.user_id,
+    name: g.name,
+    target: Number(g.target),
+    current: Number(g.current) || 0,
+    createdAt: parseTimestamp(g.created_at)
+  }
+}
+
+const mapBillFromDb = b => {
+  if (!b) return null
+  return {
+    id: b.id,
+    user_id: b.user_id,
+    dueDate: b.due_date,
+    amount: Number(b.amount),
+    paid: !!b.paid,
+    description: b.description,
+    createdAt: parseTimestamp(b.created_at)
+  }
+}
+
+const mapRecurringFromDb = r => {
+  if (!r) return null
+  return {
+    id: r.id,
+    user_id: r.user_id,
+    amount: Number(r.amount),
+    description: r.description,
+    category: r.category,
+    createdAt: parseTimestamp(r.created_at)
+  }
+}
+
+const mapGroupFromDb = gr => {
+  if (!gr) return null
+  return {
+    id: gr.id,
+    user_id: gr.user_id,
+    name: gr.name,
+    members: gr.members || [],
+    expenses: gr.expenses || [],
+    createdAt: parseTimestamp(gr.created_at)
+  }
+}
 
 // Binary search helper to find boundary index of contiguous date match in sorted array
 function findBoundary(arr, target, isStart, prefixSearch = false) {
@@ -119,17 +205,14 @@ export function AppProvider({ children }) {
   const [familySettings, setFamilySettings] = useState(null)
   const [familyTransactions, setFamilyTransactions] = useState([])
 
-
-
   // Dark mode
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
     localStorage.setItem('theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  // Session load & Firebase Auth sync
+  // Session load & Supabase Auth sync
   useEffect(() => {
-    // 1. Initial quick load from local cache
     const cachedUid = getSession()
     if (cachedUid) {
       setUid(cachedUid)
@@ -137,23 +220,32 @@ export function AppProvider({ children }) {
       setUid(null)
     }
 
-    // 2. Listen to real-time auth changes
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUid(user.uid)
-        saveSession(user.uid)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUid(session.user.id)
+        saveSession(session.user.id)
       } else {
         setUid(null)
         clearSession()
       }
     })
-    return unsubscribe
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUid(session.user.id)
+        saveSession(session.user.id)
+      } else {
+        setUid(null)
+        clearSession()
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
-  // Passwordless Email sign-in checks are removed in favor of FastAPI OTP verification.
-
-
-  // Load username + photo + email + phone from Firestore when uid changes (localStorage is primary cache)
+  // Load username + photo + email + phone from Supabase Profiles
   useEffect(() => {
     if (!uid) {
       setUsername('')
@@ -164,18 +256,23 @@ export function AppProvider({ children }) {
       localStorage.removeItem('mf_profile_photo')
       return
     }
-    getDoc(doc(db, 'users', uid, 'profile', 'info'))
-      .then(snap => {
-        if (snap.exists()) {
-          const name = snap.data().username || ''
-          const photo = snap.data().photoURL || null
-          const emailVal = snap.data().email || ''
-          const phoneVal = snap.data().phone || ''
+
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) throw error
+        if (data) {
+          const name = data.username || ''
+          const photo = data.photo_url || null
+          const emailVal = data.email || ''
+          const phoneVal = data.phone || ''
           setUsername(name)
           setProfilePhoto(photo)
           setEmailState(emailVal)
           setPhoneState(phoneVal)
-          // Cache locally for instant load next time
           if (name) localStorage.setItem('mf_username', name)
           if (photo) localStorage.setItem('mf_profile_photo', photo)
           else localStorage.removeItem('mf_profile_photo')
@@ -189,50 +286,39 @@ export function AppProvider({ children }) {
     const trimmed = newName.trim()
     setUsername(trimmed)
     localStorage.setItem('mf_username', trimmed)
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), { username: trimmed }, { merge: true })
+    await supabase
+      .from('profiles')
+      .update({ username: trimmed, updated_at: new Date().toISOString() })
+      .eq('id', uid)
   }
 
   const updateEmail = async (newEmail) => {
     if (!uid) throw new Error("No user logged in")
-    const currentUser = auth.currentUser
-    if (!currentUser) throw new Error("Authentication state is invalid")
-
     const cleanEmail = newEmail.trim().toLowerCase()
     if (!cleanEmail) {
       throw new Error("Email address cannot be empty")
     }
 
     if (cleanEmail === email) return
-
     if (cleanEmail.endsWith('@moneyflow.local')) {
       throw new Error("Invalid email domain")
     }
 
     try {
-      await authUpdateEmail(currentUser, cleanEmail)
+      const { error: authErr } = await supabase.auth.updateUser({ email: cleanEmail })
+      if (authErr) throw authErr
     } catch (authErr) {
       console.error("Auth update email failed:", authErr)
-      if (authErr.code === 'auth/requires-recent-login') {
-        throw new Error("For security, you must log out and log back in before changing your email.")
-      }
-      if (authErr.code === 'auth/email-already-in-use') {
-        throw new Error("This email is already in use by another account.")
-      }
       throw new Error(authErr.message || "Failed to update email in authentication.")
     }
 
-    if (phone) {
-      await setDoc(doc(db, 'phoneIndex', phone), {
-        uid,
+    await supabase
+      .from('profiles')
+      .update({
         email: cleanEmail,
-        createdAt: serverTimestamp()
-      }, { merge: true })
-    }
-
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
-      email: cleanEmail,
-      updatedAt: serverTimestamp()
-    }, { merge: true })
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', uid)
 
     setEmailState(cleanEmail)
   }
@@ -243,8 +329,13 @@ export function AppProvider({ children }) {
     if (cleanPhone === phone) return
 
     if (cleanPhone) {
-      const phoneSnap = await getDoc(doc(db, 'phoneIndex', cleanPhone))
-      if (phoneSnap.exists() && phoneSnap.data().uid !== uid) {
+      const { data: phoneSnap } = await supabase
+        .from('phone_index')
+        .select('*')
+        .eq('phone', cleanPhone)
+        .maybeSingle()
+
+      if (phoneSnap && phoneSnap.uid !== uid) {
         throw new Error("This phone number is already registered to another account.")
       }
     }
@@ -265,41 +356,23 @@ export function AppProvider({ children }) {
     }
 
     if (authEmailChanged) {
-      const currentUser = auth.currentUser
-      if (!currentUser) throw new Error("Authentication state is invalid")
       try {
-        await authUpdateEmail(currentUser, targetEmail)
+        const { error: authErr } = await supabase.auth.updateUser({ email: targetEmail })
+        if (authErr) throw authErr
       } catch (authErr) {
         console.error("Auth update email failed for synthetic email update:", authErr)
-        if (authErr.code === 'auth/requires-recent-login') {
-          throw new Error("For security, you must log out and log back in before changing your phone number.")
-        }
         throw new Error(authErr.message || "Failed to update internal email reference.")
       }
     }
 
-    const oldPhone = phone
-    if (oldPhone) {
-      try {
-        await deleteDoc(doc(db, 'phoneIndex', oldPhone))
-      } catch (e) {
-        console.warn("Failed to delete old phone index:", e)
-      }
-    }
-
-    if (cleanPhone) {
-      await setDoc(doc(db, 'phoneIndex', cleanPhone), {
-        uid,
+    await supabase
+      .from('profiles')
+      .update({
+        phone: cleanPhone,
         email: targetEmail,
-        createdAt: serverTimestamp()
+        updated_at: new Date().toISOString()
       })
-    }
-
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
-      phone: cleanPhone,
-      email: targetEmail,
-      updatedAt: serverTimestamp()
-    }, { merge: true })
+      .eq('id', uid)
 
     setPhoneState(cleanPhone)
     if (authEmailChanged) {
@@ -309,8 +382,6 @@ export function AppProvider({ children }) {
 
   const updateProfileDetails = async (newName, newEmail, newPhone) => {
     if (!uid) throw new Error("No user logged in")
-    const currentUser = auth.currentUser
-    if (!currentUser) throw new Error("Authentication state is invalid")
 
     const cleanName = newName.trim()
     const cleanEmail = newEmail.trim().toLowerCase()
@@ -318,7 +389,6 @@ export function AppProvider({ children }) {
 
     if (!cleanName) throw new Error("Name cannot be empty")
 
-    // Determine the email to set
     let targetEmail = cleanEmail
     if (!targetEmail) {
       if (email && email.endsWith('@moneyflow.local')) {
@@ -341,42 +411,24 @@ export function AppProvider({ children }) {
     const phoneChanged = cleanPhone !== oldPhone
 
     if (phoneChanged && cleanPhone) {
-      const phoneSnap = await getDoc(doc(db, 'phoneIndex', cleanPhone))
-      if (phoneSnap.exists() && phoneSnap.data().uid !== uid) {
+      const { data: phoneSnap } = await supabase
+        .from('phone_index')
+        .select('*')
+        .eq('phone', cleanPhone)
+        .maybeSingle()
+
+      if (phoneSnap && phoneSnap.uid !== uid) {
         throw new Error("This phone number is already registered to another account.")
       }
     }
 
     if (emailChanged) {
       try {
-        await authUpdateEmail(currentUser, targetEmail)
+        const { error: authErr } = await supabase.auth.updateUser({ email: targetEmail })
+        if (authErr) throw authErr
       } catch (authErr) {
         console.error("Auth update email failed:", authErr)
-        if (authErr.code === 'auth/requires-recent-login') {
-          throw new Error("For security, you must log out and log back in before changing your email.")
-        }
-        if (authErr.code === 'auth/email-already-in-use') {
-          throw new Error("This email is already in use by another account.")
-        }
         throw new Error(authErr.message || "Failed to update email in authentication.")
-      }
-    }
-
-    if (phoneChanged || emailChanged) {
-      if (oldPhone) {
-        try {
-          await deleteDoc(doc(db, 'phoneIndex', oldPhone))
-        } catch (e) {
-          console.warn("Failed to delete old phone index:", e)
-        }
-      }
-
-      if (cleanPhone) {
-        await setDoc(doc(db, 'phoneIndex', cleanPhone), {
-          uid,
-          email: targetEmail,
-          createdAt: serverTimestamp()
-        })
       }
     }
 
@@ -384,9 +436,9 @@ export function AppProvider({ children }) {
       username: cleanName,
       email: targetEmail,
       phone: cleanPhone,
-      updatedAt: serverTimestamp()
+      updated_at: new Date().toISOString()
     }
-    await setDoc(doc(db, 'users', uid, 'profile', 'info'), updatedProfile, { merge: true })
+    await supabase.from('profiles').update(updatedProfile).eq('id', uid)
 
     setUsername(cleanName)
     localStorage.setItem('mf_username', cleanName)
@@ -394,18 +446,18 @@ export function AppProvider({ children }) {
     setPhoneState(cleanPhone)
   }
 
-
-  // Update profile photo — stores compressed base64 in Firestore + localStorage cache
+  // Update profile photo — stores compressed base64 in database
   const updateProfilePhoto = async (base64) => {
     if (!uid || !base64) return
-    // Immediately show in UI + cache locally
     setProfilePhoto(base64)
     localStorage.setItem('mf_profile_photo', base64)
     try {
-      await setDoc(doc(db, 'users', uid, 'profile', 'info'), { photoURL: base64 }, { merge: true })
+      await supabase
+        .from('profiles')
+        .update({ photo_url: base64, updated_at: new Date().toISOString() })
+        .eq('id', uid)
     } catch (err) {
       console.error('Photo save error:', err)
-      // localStorage still has it, so it persists locally even if Firestore fails
     }
   }
 
@@ -435,184 +487,441 @@ export function AppProvider({ children }) {
     if (!customCategories.includes(cat)) setCustomCats(p => [...p, cat])
   }
 
-  // Firestore — transactions real-time
+  // Supabase — transactions real-time
   useEffect(() => {
     if (!uid) { setTx([]); return }
     setLoading(true)
-    const q = query(collection(db, 'users', uid, 'transactions'), orderBy('date', 'desc'))
-    const unsub = onSnapshot(q,
-      snap => { setTx(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); setError(null) },
-      err => { console.error(err); setError('Data load error.'); setLoading(false) }
-    )
-    return unsub
+
+    const fetchTx = () => {
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', uid)
+        .order('date', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error(error)
+            setError('Data load error.')
+          } else {
+            setTx((data || []).map(mapTxFromDb))
+            setError(null)
+          }
+          setLoading(false)
+        })
+    }
+
+    fetchTx()
+
+    const channel = supabase
+      .channel('public:transactions')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'transactions',
+        filter: `user_id=eq.${uid}`
+      }, () => {
+        fetchTx()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [uid])
 
-  // Firestore — budgets real-time
+  // Supabase — Settings load and real-time subscription (budgets, accounts, finance, family)
   useEffect(() => {
-    if (!uid) { setBudgets({}); return }
-    const unsub = onSnapshot(doc(db, 'users', uid, 'settings', 'budgets'),
-      snap => { if (snap.exists()) setBudgets(snap.data()) },
-      err => console.error('Budget load err:', err)
-    )
-    return unsub
-  }, [uid])
+    if (!uid) {
+      setBudgets({})
+      setAccounts({ cash: 0, bank: 0, upi: 0 })
+      setOpeningBalanceState(0)
+      setOpeningDateState('')
+      setGstSettingsState({ gstRate: 18, registered: false })
+      setOnboardingDoneState(null)
+      setFamilySettings(null)
+      return
+    }
 
-  // Firestore — accounts real-time (Cash / Bank / UPI)
-  useEffect(() => {
-    if (!uid) { setAccounts({ cash: 0, bank: 0, upi: 0 }); return }
-    const unsub = onSnapshot(doc(db, 'users', uid, 'settings', 'accounts'),
-      snap => { if (snap.exists()) setAccounts({ cash: 0, bank: 0, upi: 0, ...snap.data() }) },
-      err => console.error('Accounts err:', err)
-    )
-    return unsub
+    const fetchSettings = () => {
+      supabase
+        .from('settings')
+        .select('*')
+        .eq('user_id', uid)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Settings load err:', error)
+          } else if (data) {
+            setBudgets(data.budgets || {})
+            setAccounts(data.accounts || { cash: 0, bank: 0, upi: 0 })
+            
+            const fin = data.finance || {}
+            setOpeningBalanceState(Number(fin.openingBalance) || 0)
+            setOpeningDateState(fin.openingDate || '')
+            setGstSettingsState({ gstRate: Number(fin.gstRate) || 18, registered: !!fin.registered })
+            setOnboardingDoneState(!!fin.onboardingDone)
+            
+            setFamilySettings(data.family || null)
+          }
+        })
+    }
+
+    fetchSettings()
+
+    const channel = supabase
+      .channel('public:settings')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'settings',
+        filter: `user_id=eq.${uid}`
+      }, () => {
+        fetchSettings()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [uid])
 
   const updateAccountBalance = async (key, amount) => {
     if (!uid) return
     const updated = { ...accounts, [key]: amount }
     setAccounts(updated)
-    await setDoc(doc(db, 'users', uid, 'settings', 'accounts'), updated)
+    await supabase
+      .from('settings')
+      .update({ accounts: updated })
+      .eq('user_id', uid)
   }
 
-  // Firestore — debts real-time
+  // Supabase — debts real-time
   useEffect(() => {
     if (!uid) { setDebts([]); return }
-    const unsub = onSnapshot(
-      query(collection(db, 'users', uid, 'debts'), orderBy('date', 'desc')),
-      snap => setDebts(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Debts err:', err)
-    )
-    return unsub
+    const fetchDebts = () => {
+      supabase
+        .from('debts')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => setDebts((data || []).map(mapDebtFromDb)))
+    }
+    fetchDebts()
+
+    const channel = supabase
+      .channel('public:debts')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'debts',
+        filter: `user_id=eq.${uid}`
+      }, () => {
+        fetchDebts()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [uid])
 
-  const addDebt = async (d) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'debts'), { ...d, repaid: false, createdAt: serverTimestamp() }) }
-  const markDebtRepaid = async (id) => { if (!uid) return; await updateDoc(doc(db, 'users', uid, 'debts', id), { repaid: true }) }
-  const deleteDebt = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'debts', id)) }
+  const addDebt = async (d) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('debts')
+      .insert({
+        user_id: uid,
+        name: d.name,
+        amount: Number(d.amount),
+        type: d.type,
+        repaid: false,
+        date: d.date
+      })
+    if (error) console.error(error)
+  }
 
-  // Firestore — Goals real-time
+  const markDebtRepaid = async (id) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('debts')
+      .update({ repaid: true })
+      .eq('id', id)
+    if (error) console.error(error)
+  }
+
+  const deleteDebt = async (id) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('debts')
+      .delete()
+      .eq('id', id)
+    if (error) console.error(error)
+  }
+
+  // Supabase — Goals real-time
   useEffect(() => {
     if (!uid) { setGoals([]); return }
-    const unsub = onSnapshot(
-      query(collection(db, 'users', uid, 'goals'), orderBy('createdAt', 'desc')),
-      snap => setGoals(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Goals err:', err)
-    )
-    return unsub
+    const fetchGoals = () => {
+      supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => setGoals((data || []).map(mapGoalFromDb)))
+    }
+    fetchGoals()
+
+    const channel = supabase
+      .channel('public:goals')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'goals',
+        filter: `user_id=eq.${uid}`
+      }, () => {
+        fetchGoals()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [uid])
 
-  const addGoal = async (g) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'goals'), { ...g, createdAt: serverTimestamp() }) }
-  const deleteGoal = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'goals', id)) }
+  const addGoal = async (g) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('goals')
+      .insert({
+        user_id: uid,
+        name: g.name,
+        target: Number(g.target),
+        current: Number(g.current) || 0
+      })
+    if (error) console.error(error)
+  }
 
-  // Firestore — Bills real-time
+  const deleteGoal = async (id) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('goals')
+      .delete()
+      .eq('id', id)
+    if (error) console.error(error)
+  }
+
+  // Supabase — Bills real-time
   useEffect(() => {
     if (!uid) { setBills([]); return }
-    const unsub = onSnapshot(
-      query(collection(db, 'users', uid, 'bills'), orderBy('dueDate', 'asc')),
-      snap => setBills(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Bills err:', err)
-    )
-    return unsub
+    const fetchBills = () => {
+      supabase
+        .from('bills')
+        .select('*')
+        .eq('user_id', uid)
+        .order('due_date', { ascending: true })
+        .then(({ data }) => setBills((data || []).map(mapBillFromDb)))
+    }
+    fetchBills()
+
+    const channel = supabase
+      .channel('public:bills')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'bills',
+        filter: `user_id=eq.${uid}`
+      }, () => {
+        fetchBills()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [uid])
 
-  const addBill = async (b) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'bills'), { ...b, createdAt: serverTimestamp() }) }
-  const deleteBill = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'bills', id)) }
-  const markBillPaid = async (id) => { if (!uid) return; await updateDoc(doc(db, 'users', uid, 'bills', id), { paid: true }) }
+  const addBill = async (b) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('bills')
+      .insert({
+        user_id: uid,
+        due_date: b.dueDate,
+        amount: Number(b.amount),
+        paid: false,
+        description: b.description
+      })
+    if (error) console.error(error)
+  }
 
-  // Firestore — Recurring Transactions real-time
+  const deleteBill = async (id) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('bills')
+      .delete()
+      .eq('id', id)
+    if (error) console.error(error)
+  }
+
+  const markBillPaid = async (id) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('bills')
+      .update({ paid: true })
+      .eq('id', id)
+    if (error) console.error(error)
+  }
+
+  // Supabase — Recurring Transactions real-time
   useEffect(() => {
     if (!uid) { setRecurringTx([]); return }
-    const unsub = onSnapshot(
-      collection(db, 'users', uid, 'recurring'),
-      snap => setRecurringTx(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Recurring err:', err)
-    )
-    return unsub
-  }, [uid])
-
-  const addRecurring = async (r) => { if (!uid) return; await addDoc(collection(db, 'users', uid, 'recurring'), { ...r, createdAt: serverTimestamp() }) }
-  const deleteRecurring = async (id) => { if (!uid) return; await deleteDoc(doc(db, 'users', uid, 'recurring', id)) }
-
-  // Firestore — Opening Balance + GST settings real-time
-  useEffect(() => {
-    if (!uid) {
-      setOpeningBalanceState(0)
-      setOpeningDateState('')
-      setGstSettingsState({ gstRate: 18, registered: false })
-      setOnboardingDoneState(null)
-      return
+    const fetchRecurring = () => {
+      supabase
+        .from('recurring')
+        .select('*')
+        .eq('user_id', uid)
+        .then(({ data }) => setRecurringTx((data || []).map(mapRecurringFromDb)))
     }
-    const unsub = onSnapshot(
-      doc(db, 'users', uid, 'settings', 'finance'),
-      snap => {
-        if (snap.exists()) {
-          const d = snap.data()
-          setOpeningBalanceState(Number(d.openingBalance) || 0)
-          setOpeningDateState(d.openingDate || '')
-          setGstSettingsState({ gstRate: Number(d.gstRate) || 18, registered: !!d.registered })
-          setOnboardingDoneState(!!d.onboardingDone)
-        } else {
-          setOnboardingDoneState(false)
-        }
-      },
-      err => console.error('Finance settings err:', err)
-    )
-    return unsub
+    fetchRecurring()
+
+    const channel = supabase
+      .channel('public:recurring')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'recurring',
+        filter: `user_id=eq.${uid}`
+      }, () => {
+        fetchRecurring()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [uid])
+
+  const addRecurring = async (r) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('recurring')
+      .insert({
+        user_id: uid,
+        amount: Number(r.amount),
+        description: r.description,
+        category: r.category
+      })
+    if (error) console.error(error)
+  }
+
+  const deleteRecurring = async (id) => {
+    if (!uid) return
+    const { error } = await supabase
+      .from('recurring')
+      .delete()
+      .eq('id', id)
+    if (error) console.error(error)
+  }
 
   const setOpeningBalance = async (amount, date) => {
     if (!uid) return
     const val = { openingBalance: Number(amount) || 0, openingDate: date || new Date().toISOString().split('T')[0] }
     setOpeningBalanceState(val.openingBalance)
     setOpeningDateState(val.openingDate)
-    await setDoc(doc(db, 'users', uid, 'settings', 'finance'), val, { merge: true })
+
+    const { data: current } = await supabase.from('settings').select('finance').eq('user_id', uid).maybeSingle()
+    const updatedFinance = { ...(current?.finance || {}), ...val }
+    await supabase.from('settings').update({ finance: updatedFinance }).eq('user_id', uid)
   }
 
   const completeOnboarding = async () => {
     setOnboardingDoneState(true)
     if (!uid) return
-    await setDoc(doc(db, 'users', uid, 'settings', 'finance'), { onboardingDone: true }, { merge: true })
+    const { data: current } = await supabase.from('settings').select('finance').eq('user_id', uid).maybeSingle()
+    const updatedFinance = { ...(current?.finance || {}), onboardingDone: true }
+    await supabase.from('settings').update({ finance: updatedFinance }).eq('user_id', uid)
   }
 
   const updateGstSettings = async (settings) => {
     if (!uid) return
     const updated = { ...gstSettings, ...settings }
     setGstSettingsState(updated)
-    await setDoc(doc(db, 'users', uid, 'settings', 'finance'), { gstRate: updated.gstRate, registered: updated.registered }, { merge: true })
+    const { data: current } = await supabase.from('settings').select('finance').eq('user_id', uid).maybeSingle()
+    const updatedFinance = { ...(current?.finance || {}), gstRate: updated.gstRate, registered: updated.registered }
+    await supabase.from('settings').update({ finance: updatedFinance }).eq('user_id', uid)
   }
 
-  // Firestore — Groups real-time
+  // Supabase — Groups real-time
   useEffect(() => {
     if (!uid) { setGroups([]); return }
-    const unsub = onSnapshot(
-      collection(db, 'users', uid, 'groups'),
-      snap => setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Groups err:', err)
-    )
-    return unsub
+    const fetchGroups = () => {
+      supabase
+        .from('groups')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => setGroups((data || []).map(mapGroupFromDb)))
+    }
+    fetchGroups()
+
+    const channel = supabase
+      .channel('public:groups')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'groups',
+        filter: `user_id=eq.${uid}`
+      }, () => {
+        fetchGroups()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [uid])
 
   const addGroup = async (g) => {
     if (!uid) return
-    await addDoc(collection(db, 'users', uid, 'groups'), { ...g, expenses: [], createdAt: serverTimestamp() })
+    const { error } = await supabase
+      .from('groups')
+      .insert({
+        user_id: uid,
+        name: g.name,
+        members: g.members || [],
+        expenses: []
+      })
+    if (error) console.error(error)
   }
 
   const deleteGroup = async (id) => {
     if (!uid) return
-    await deleteDoc(doc(db, 'users', uid, 'groups', id))
+    const { error } = await supabase
+      .from('groups')
+      .delete()
+      .eq('id', id)
+    if (error) console.error(error)
   }
 
   const updateGroup = async (id, data) => {
     if (!uid) return
-    await updateDoc(doc(db, 'users', uid, 'groups', id), data)
+    const { error } = await supabase
+      .from('groups')
+      .update(data)
+      .eq('id', id)
+    if (error) console.error(error)
   }
 
   const addGroupExpense = async (groupId, expense) => {
     if (!uid) return
-    const groupDoc = doc(db, 'users', uid, 'groups', groupId)
     const group = groups.find(g => g.id === groupId)
     if (!group) return
     const expenses = [...(group.expenses || []), expense]
-    await updateDoc(groupDoc, { expenses })
+    const { error } = await supabase
+      .from('groups')
+      .update({ expenses })
+      .eq('id', groupId)
+    if (error) console.error(error)
   }
 
   const deleteGroupExpense = async (groupId, expenseIndex) => {
@@ -620,7 +929,11 @@ export function AppProvider({ children }) {
     const group = groups.find(g => g.id === groupId)
     if (!group) return
     const expenses = group.expenses.filter((_, i) => i !== expenseIndex)
-    await updateDoc(doc(db, 'users', uid, 'groups', groupId), { expenses })
+    const { error } = await supabase
+      .from('groups')
+      .update({ expenses })
+      .eq('id', groupId)
+    if (error) console.error(error)
   }
 
   // Calculate minimum transfers for settlement (greedy algorithm)
@@ -633,15 +946,12 @@ export function AppProvider({ children }) {
     group.members.forEach(m => { balances[m] = 0 })
 
     group.expenses.forEach(exp => {
-      // Person who paid gets credited
       balances[exp.paidBy] = (balances[exp.paidBy] || 0) + Number(exp.amount)
-      // Each person owes their split
       Object.entries(exp.splits || {}).forEach(([person, amt]) => {
         balances[person] = (balances[person] || 0) - Number(amt)
       })
     })
 
-    // Separate into creditors and debtors
     const creditors = []
     const debtors = []
     Object.entries(balances).forEach(([person, balance]) => {
@@ -649,11 +959,9 @@ export function AppProvider({ children }) {
       else if (balance < -0.01) debtors.push({ person, amount: -balance })
     })
 
-    // Sort by amount
     creditors.sort((a, b) => b.amount - a.amount)
     debtors.sort((a, b) => b.amount - a.amount)
 
-    // Greedy matching
     const settlements = []
     let i = 0, j = 0
     while (i < debtors.length && j < creditors.length) {
@@ -679,52 +987,58 @@ export function AppProvider({ children }) {
     return settlements
   }
 
-  // Firestore — Family Settings real-time
-  useEffect(() => {
-    if (!uid) { setFamilySettings(null); setFamilyTransactions([]); return }
-    const unsub = onSnapshot(
-      doc(db, 'users', uid, 'settings', 'family'),
-      snap => {
-        if (snap.exists()) {
-          setFamilySettings(snap.data())
-        } else {
-          setFamilySettings(null)
-        }
-      },
-      err => console.error('Family settings err:', err)
-    )
-    return unsub
-  }, [uid])
-
   // Real-time handshake for invite code generator
   useEffect(() => {
     if (!uid || !familySettings?.inviteCode || familySettings?.linkedUid) return
 
-    const unsub = onSnapshot(
-      doc(db, 'familyLinks', familySettings.inviteCode),
-      async snap => {
-        if (snap.exists()) {
-          const data = snap.data()
-          if (data.linkedUid) {
+    const checkInviteCode = () => {
+      supabase
+        .from('family_links')
+        .select('*')
+        .eq('code', familySettings.inviteCode)
+        .maybeSingle()
+        .then(async ({ data, error }) => {
+          if (error) {
+            console.error('Invite code query err:', error)
+          } else if (data && data.linked_uid) {
             console.log('[Family] Partner entered invite code. Completing link...')
-            // Link partner in our own settings
-            await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
-              linkedUid: data.linkedUid,
-              linkedName: data.linkedName || 'Partner'
-            }, { merge: true })
+            const updatedFamily = {
+              ...familySettings,
+              linkedUid: data.linked_uid,
+              linkedName: data.linked_name || 'Partner',
+              inviteCode: '' // Clear code
+            }
+            await supabase
+              .from('settings')
+              .update({ family: updatedFamily })
+              .eq('user_id', uid)
 
-            // Clean up the invite code document so it can't be reused
             try {
-              await deleteDoc(doc(db, 'familyLinks', familySettings.inviteCode))
+              await supabase.from('family_links').delete().eq('code', familySettings.inviteCode)
             } catch (e) {
-              console.warn('[Family] Failed to delete invite code doc (not critical):', e)
+              console.warn('[Family] Failed to delete invite code doc:', e)
             }
           }
-        }
-      },
-      err => console.error('Invite code listener err:', err)
-    )
-    return unsub
+        })
+    }
+
+    checkInviteCode()
+
+    const channel = supabase
+      .channel('public:family_links')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'family_links',
+        filter: `code=eq.${familySettings.inviteCode}`
+      }, () => {
+        checkInviteCode()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [uid, familySettings?.inviteCode, familySettings?.linkedUid])
 
   // Listen to partner's transactions when linked
@@ -733,38 +1047,71 @@ export function AppProvider({ children }) {
       setFamilyTransactions([])
       return
     }
-    const unsub = onSnapshot(
-      query(collection(db, 'users', familySettings.linkedUid, 'transactions'), orderBy('date', 'desc')),
-      snap => setFamilyTransactions(snap.docs.map(d => ({ id: d.id, ...d.data(), isPartner: true }))),
-      err => {
-        console.error('Family transactions err:', err)
-        // If we get permission denied, it means partner unlinked us! Let's clear our link too.
-        if (err.code === 'permission-denied') {
-          console.log('[Family] Partner unlinked us. Cleaning up local link...')
-          unlinkPartner()
-        }
-      }
-    )
-    return unsub
+
+    const fetchPartnerTx = () => {
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', familySettings.linkedUid)
+        .order('date', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Family transactions err:', error)
+            if (error.message.includes('permission') || error.code === '42501') {
+              console.log('[Family] Partner unlinked us or permission denied. Cleaning up local link...')
+              unlinkPartner()
+            }
+          } else {
+            setFamilyTransactions((data || []).map(t => ({ ...mapTxFromDb(t), isPartner: true })))
+          }
+        })
+    }
+
+    fetchPartnerTx()
+
+    const channel = supabase
+      .channel('public:partner_transactions')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'transactions',
+        filter: `user_id=eq.${familySettings.linkedUid}`
+      }, () => {
+        fetchPartnerTx()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [familySettings?.linkedUid])
 
   const generateInviteCode = async () => {
     if (!uid) return null
     const code = Math.random().toString(36).substring(2, 8).toUpperCase()
 
-    // Store in global familyLinks collection (readable by any authenticated user)
-    await setDoc(doc(db, 'familyLinks', code), {
-      uid,
-      name: username || 'Partner',
-      createdAt: serverTimestamp()
-    })
+    const { error: linkErr } = await supabase
+      .from('family_links')
+      .insert({
+        code,
+        uid,
+        name: username || 'Partner'
+      })
+    if (linkErr) {
+      console.error('Invite code link insert err:', linkErr)
+      return null
+    }
 
-    // Store in own family settings
-    await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
+    const updatedFamily = {
+      ...(familySettings || {}),
       inviteCode: code,
       linkedUid: null,
       linkedName: null
-    }, { merge: true })
+    }
+    await supabase
+      .from('settings')
+      .update({ family: updatedFamily })
+      .eq('user_id', uid)
 
     return code
   }
@@ -773,28 +1120,41 @@ export function AppProvider({ children }) {
     if (!uid || !code) return { success: false, error: 'Invalid code' }
 
     try {
-      const linkDoc = await getDoc(doc(db, 'familyLinks', code.toUpperCase()))
-      if (!linkDoc.exists()) {
+      const { data: linkData, error: linkErr } = await supabase
+        .from('family_links')
+        .select('*')
+        .eq('code', code.toUpperCase())
+        .maybeSingle()
+
+      if (linkErr) throw linkErr
+      if (!linkData) {
         return { success: false, error: 'Invalid invite code' }
       }
 
-      const partnerData = linkDoc.data()
-      if (partnerData.uid === uid) {
+      if (linkData.uid === uid) {
         return { success: false, error: 'Cannot link to yourself' }
       }
 
-      // Update the invite code document to tell the partner we linked
-      await updateDoc(doc(db, 'familyLinks', code.toUpperCase()), {
-        linkedUid: uid,
-        linkedName: username || 'Partner'
-      })
+      const { error: updateLinkErr } = await supabase
+        .from('family_links')
+        .update({
+          linked_uid: uid,
+          linked_name: username || 'Partner'
+        })
+        .eq('code', code.toUpperCase())
 
-      // Update own family settings
-      await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
-        linkedUid: partnerData.uid,
-        linkedName: partnerData.name,
-        inviteCode: '' // Clear code since link is established
-      }, { merge: true })
+      if (updateLinkErr) throw updateLinkErr
+
+      const updatedFamily = {
+        ...(familySettings || {}),
+        linkedUid: linkData.uid,
+        linkedName: linkData.name,
+        inviteCode: '' 
+      }
+      await supabase
+        .from('settings')
+        .update({ family: updatedFamily })
+        .eq('user_id', uid)
 
       return { success: true }
     } catch (err) {
@@ -805,13 +1165,16 @@ export function AppProvider({ children }) {
 
   const unlinkPartner = async () => {
     if (!uid) return
-
-    // Remove link from own settings only (partner will see change via their listener)
-    await setDoc(doc(db, 'users', uid, 'settings', 'family'), {
+    const updatedFamily = {
+      ...(familySettings || {}),
       linkedUid: null,
       linkedName: null,
       inviteCode: ''
-    }, { merge: true })
+    }
+    await supabase
+      .from('settings')
+      .update({ family: updatedFamily })
+      .eq('user_id', uid)
   }
 
   // Single-pass O(n) family summary instead of 8 separate filter+reduce passes
@@ -840,24 +1203,61 @@ export function AppProvider({ children }) {
     }
   }, [transactions, familyTransactions])
 
-  const col = () => collection(db, 'users', uid, 'transactions')
-
   const addTransaction = async (tx) => {
     if (!uid) return
-    try { await addDoc(col(), { ...tx, amount: Number(tx.amount), createdAt: serverTimestamp() }) }
-    catch (e) { console.error(e); setError('Save error.') }
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: uid,
+          amount: Number(tx.amount),
+          category: tx.category,
+          description: tx.description || '',
+          date: tx.date,
+          type: tx.type,
+          account: tx.account || 'Cash',
+          is_want: !!tx.isWant
+        })
+      if (error) throw error
+    } catch (e) {
+      console.error(e)
+      setError('Save error.')
+    }
   }
 
   const updateTransaction = async (id, updated) => {
     if (!uid) return
-    try { await updateDoc(doc(db, 'users', uid, 'transactions', id), updated) }
-    catch (e) { console.error(e) }
+    try {
+      const dbUpdates = {}
+      if (updated.amount !== undefined) dbUpdates.amount = Number(updated.amount)
+      if (updated.category !== undefined) dbUpdates.category = updated.category
+      if (updated.description !== undefined) dbUpdates.description = updated.description
+      if (updated.date !== undefined) dbUpdates.date = updated.date
+      if (updated.type !== undefined) dbUpdates.type = updated.type
+      if (updated.account !== undefined) dbUpdates.account = updated.account
+      if (updated.isWant !== undefined) dbUpdates.is_want = !!updated.isWant
+
+      const { error } = await supabase
+        .from('transactions')
+        .update(dbUpdates)
+        .eq('id', id)
+      if (error) throw error
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const deleteTransaction = async (id) => {
     if (!uid) return
-    try { await deleteDoc(doc(db, 'users', uid, 'transactions', id)) }
-    catch (e) { console.error(e) }
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const toggleNeedWant = (id) => {
@@ -870,7 +1270,10 @@ export function AppProvider({ children }) {
     if (!uid) return
     const newBudgets = { ...budgets, [category]: Number(limit) }
     setBudgets(newBudgets)
-    await setDoc(doc(db, 'users', uid, 'settings', 'budgets'), newBudgets, { merge: true })
+    await supabase
+      .from('settings')
+      .update({ budgets: newBudgets })
+      .eq('user_id', uid)
   }
 
   const removeBudget = async (category) => {
@@ -878,7 +1281,10 @@ export function AppProvider({ children }) {
     const nb = { ...budgets }
     delete nb[category]
     setBudgets(nb)
-    await setDoc(doc(db, 'users', uid, 'settings', 'budgets'), nb)
+    await supabase
+      .from('settings')
+      .update({ budgets: nb })
+      .eq('user_id', uid)
   }
 
   // Budget alerts — categories over limit this month (memoized)
@@ -938,11 +1344,9 @@ export function AppProvider({ children }) {
 
   // ── Net Worth History — month-by-month cumulative balance (memoized) ──
   const netWorthHistoryCache = useMemo(() => {
-    // Sort all transactions by date ascending
     const sorted = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date))
     if (!sorted.length) return []
 
-    // Group by month, track running balance starting from openingBalance
     const monthMap = {}
     sorted.forEach(t => {
       const month = t.date?.slice(0, 7)
@@ -962,7 +1366,6 @@ export function AppProvider({ children }) {
   const getNetWorthHistory = useCallback(() => netWorthHistoryCache, [netWorthHistoryCache])
 
   // ── Cash Flow Statement — Operating / Investing / Financing ──
-  // Uses pre-built Set lookups for O(1) category classification (defined at module top)
   const getCashFlowData = useCallback((month = '') => {
     const filtered = month ? transactions.filter(t => t.date?.startsWith(month)) : transactions
     const result = {
@@ -973,7 +1376,6 @@ export function AppProvider({ children }) {
     for (const t of filtered) {
       const amt = Number(t.amount)
       const catLower = (t.category || 'Others').toLowerCase()
-      // O(1) Set lookup instead of O(k) .some() loop
       const section = INVESTING_SET.has(catLower) ? 'investing'
         : FINANCING_SET.has(catLower) ? 'financing'
         : 'operating'
@@ -992,7 +1394,7 @@ export function AppProvider({ children }) {
     return result
   }, [transactions])
 
-  // ── P&L Statement — monthly income vs expense breakdown ──
+  // ── P&L Statement ──
   const getPLStatement = useCallback((month = '') => {
     const target = month || new Date().toISOString().slice(0, 7)
     const filtered = transactions.filter(t => t.date?.startsWith(target))
@@ -1020,7 +1422,7 @@ export function AppProvider({ children }) {
     return { month: target, income, expense, grossSavings, savingsRate, catBreakdown, incomeBreakdown }
   }, [transactions])
 
-  // ── Double-Entry Ledger — every transaction as Debit/Credit row with running balance ──
+  // ── Double-Entry Ledger ──
   const getLedgerEntries = useCallback(() => {
     const sorted = [...transactions].sort((a, b) => {
       const dateDiff = new Date(a.date) - new Date(b.date)
@@ -1031,7 +1433,6 @@ export function AppProvider({ children }) {
     })
     let balance = openingBalance
     const entries = []
-    // First row = Opening Balance entry
     if (openingBalance > 0 && openingDate) {
       entries.push({
         id: 'opening',
@@ -1057,7 +1458,7 @@ export function AppProvider({ children }) {
     return entries
   }, [transactions, openingBalance, openingDate])
 
-  // ── ML Spending Prediction — weighted avg of last 3 months per category (memoized) ──
+  // ── ML Spending Prediction ──
   const mlPredictionsCache = useMemo(() => {
     const monthsData = {}
     transactions.filter(t => t.type === 'debit').forEach(t => {
@@ -1071,7 +1472,6 @@ export function AppProvider({ children }) {
 
     const allCats = [...new Set(sortedMonths.flatMap(m => Object.keys(monthsData[m])))]
     return allCats.map(cat => {
-      // Weighted average: most recent month weight=3, middle=2, oldest=1
       const weights = [1, 2, 3]
       let weightedSum = 0, totalWeight = 0
       sortedMonths.forEach((m, i) => {
@@ -1104,7 +1504,6 @@ export function AppProvider({ children }) {
       }
     }
 
-    // Sort the small sliced subset by createdAt descending (extremely fast for small k)
     return sliced.sort((a, b) => {
       const aT = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ?? 0) * 1000
       const bT = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ?? 0) * 1000
@@ -1120,7 +1519,6 @@ export function AppProvider({ children }) {
       .filter(t => t.type === 'debit')
       .reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + Number(t.amount); return acc }, {})
 
-    // ── Enhanced: monthly trend data for smart chat ──
     const monthlyData = {}
     transactions.forEach(t => {
       const m = t.date?.slice(0, 7)
@@ -1132,7 +1530,6 @@ export function AppProvider({ children }) {
     const sortedMonths = Object.keys(monthlyData).sort().slice(-6)
     const monthlyTrend = sortedMonths.map(m => `${m}: Income ₹${monthlyData[m].income}, Expense ₹${monthlyData[m].expense}`).join(' | ')
 
-    // ── Enhanced: per-category monthly data for comparisons ──
     const catMonthly = {}
     transactions.filter(t => t.type === 'debit').forEach(t => {
       const m = t.date?.slice(0, 7)
@@ -1141,15 +1538,12 @@ export function AppProvider({ children }) {
       catMonthly[m][t.category] = (catMonthly[m][t.category] || 0) + Number(t.amount)
     })
 
-    // ── Enhanced: recent transactions for context ──
     const recentTx = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20)
       .map(t => `${t.date} ${t.type === 'credit' ? '+' : '-'}₹${t.amount} ${t.description} [${t.category}]`)
       .join('\n')
 
-    // ── Enhanced: account balances ──
     const accountInfo = `Cash: ₹${accounts.cash || 0}, Bank: ₹${accounts.bank || 0}, UPI: ₹${accounts.upi || 0}`
 
-    // ── Enhanced: debt info ──
     const activeDebts = debts.filter(d => !d.repaid)
     const debtInfo = activeDebts.length > 0
       ? activeDebts.map(d => `${d.name || d.person || 'Someone'}: ₹${d.amount} (${d.type})`).join(', ')
@@ -1196,7 +1590,6 @@ ${recentTx}
           model: OR_MODEL,
           messages: [
             { role: 'system', content: systemInstruction },
-            // Include last 6 chat messages for context continuity
             ...chatMessages.slice(-6),
             { role: 'user', content: userMessage },
           ],
@@ -1220,9 +1613,6 @@ ${recentTx}
     }
   }
 
-  /**
-   * askGeminiRaw — Direct prompt → response (no chat history, for internal use)
-   */
   const askGeminiRaw = async (prompt) => {
     if (!OR_API_KEY) return null
     try {
@@ -1250,10 +1640,6 @@ ${recentTx}
     }
   }
 
-  /**
-   * parseNLPTransaction — Parse natural language in ANY language into transaction fields
-   * E.g. "yesterday spent 200 on bus" → { type: 'debit', amount: 200, description: 'Bus fare', ... }
-   */
   const parseNLPTransaction = async (text) => {
     if (!OR_API_KEY || !text.trim()) return null
 
@@ -1294,11 +1680,9 @@ RESPOND WITH ONLY valid JSON, no markdown, no explanation:
         }
       )
       const raw = res.data?.choices?.[0]?.message?.content || ''
-      // Extract JSON from response (handle possible markdown wrapping)
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0])
-        // Validate required fields
         if (parsed.amount && parsed.description) {
           return {
             type: parsed.type === 'credit' ? 'credit' : 'debit',
@@ -1347,7 +1731,6 @@ RESPOND WITH ONLY valid JSON, no markdown, no explanation:
     addTransaction, updateTransaction, deleteTransaction, toggleNeedWant,
     getSummary, getFilteredTransactions,
     askGemini, askGeminiRaw, parseNLPTransaction,
-    // ── Commerce & AI Features ──
     openingBalance, openingDate, setOpeningBalance,
     gstSettings, updateGstSettings,
     onboardingDone, completeOnboarding,

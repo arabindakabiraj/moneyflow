@@ -3,7 +3,7 @@
  * Tabs: login | register | forgot
  * Post-login screens: deactivated | deletion-scheduled
  */
-import { useState, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   RefreshCw, UserPlus, LogIn, User, Eye, EyeOff,
   CheckCircle2, AlertCircle, Sparkles, Mail, Lock, Phone,
@@ -13,6 +13,8 @@ import {
   registerUser, loginUser, resetPassword,
   isEmail, isPhone,
   reactivateAccount, cancelAccountDeletion,
+  verifySignupOtp, resendSignupOtp,
+  sendLoginOtp, verifyLoginOtp,
 } from '../authUtils'
 
 /* ═══════ Floating Label Input ═══════ */
@@ -436,11 +438,237 @@ function ForgotPasswordPanel({ onBack }) {
   )
 }
 
+/* ═══════ OTP Verification Panel ═══════ */
+function OtpVerificationPanel({ email, username, type = 'signup', onVerified, onBack }) {
+  const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  const [cooldown, setCooldown] = useState(60)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+  const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)]
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = setInterval(() => {
+      setCooldown(c => c - 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [cooldown])
+
+  // Handle OTP digit entry
+  const handleChange = (val, idx) => {
+    const digit = val.replace(/\D/g, '').slice(-1)
+    const nextOtp = [...otp]
+    nextOtp[idx] = digit
+    setOtp(nextOtp)
+    setError('')
+
+    // Auto-advance to next box
+    if (digit !== '' && idx < 5) {
+      inputRefs[idx + 1].current?.focus()
+    }
+  }
+
+  // Handle keypresses (e.g. Backspace to delete and go back)
+  const handleKeyDown = (e, idx) => {
+    if (e.key === 'Backspace') {
+      if (otp[idx] === '' && idx > 0) {
+        const nextOtp = [...otp]
+        nextOtp[idx - 1] = ''
+        setOtp(nextOtp)
+        inputRefs[idx - 1].current?.focus()
+      } else {
+        const nextOtp = [...otp]
+        nextOtp[idx] = ''
+        setOtp(nextOtp)
+      }
+      setError('')
+    }
+  }
+
+  // Handle paste events (e.g., cmd+v a 6-digit OTP code)
+  const handlePaste = (e) => {
+    e.preventDefault()
+    const pastedData = e.clipboardData.getData('text').trim().replace(/\D/g, '').slice(0, 6)
+    if (pastedData.length === 6) {
+      const nextOtp = pastedData.split('')
+      setOtp(nextOtp)
+      inputRefs[5].current?.focus()
+    }
+  }
+
+  const handleVerify = async () => {
+    const code = otp.join('')
+    if (code.length < 6) {
+      setError('Please enter all 6 digits of the OTP.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      if (type === 'signup') {
+        const { user } = await verifySignupOtp(email, code)
+        setSuccess(true)
+        setTimeout(() => onVerified(user.id), 1200)
+      } else {
+        const { user } = await verifyLoginOtp(email, code)
+        setSuccess(true)
+        setTimeout(() => onVerified(user.id), 1200)
+      }
+    } catch (err) {
+      setError(err.message || 'Verification failed. Please check the code.')
+      // Reset inputs on error to allow user to retry cleanly
+      setOtp(['', '', '', '', '', ''])
+      inputRefs[0].current?.focus()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Auto-submit when all 6 digits are filled
+  useEffect(() => {
+    if (otp.join('').length === 6 && !loading && !success) {
+      handleVerify()
+    }
+  }, [otp])
+
+  const handleResend = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      if (type === 'signup') {
+        await resendSignupOtp(email)
+      } else {
+        await sendLoginOtp(email)
+      }
+      setCooldown(60)
+      setOtp(['', '', '', '', '', ''])
+      inputRefs[0].current?.focus()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Autofocus first input on mount
+  useEffect(() => {
+    setTimeout(() => inputRefs[0].current?.focus(), 150)
+  }, [])
+
+  if (success) {
+    return (
+      <div className="p-8 text-center flex flex-col items-center justify-center min-h-[320px] animate-fade-in">
+        <div className="relative w-20 h-20 mb-6 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full border-2 border-[#34D399]/25 animate-ping" />
+          <div className="absolute inset-2 rounded-full border border-[#34D399]/40" />
+          <div className="w-16 h-16 rounded-full bg-[#34D399]/15 flex items-center justify-center border border-[#34D399]/30">
+            <CheckCircle2 size={28} className="text-[#34D399]" />
+          </div>
+        </div>
+        <h3 className="text-xl font-bold text-white mb-1.5">Verification Successful</h3>
+        <p className="text-xs text-white/40">Securely loading your cockpit...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-5 pt-3 flex-1 flex flex-col animate-fade-in">
+      <div className="text-center mb-6">
+        <div className="w-12 h-12 bg-[#14B8A6]/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#14B8A6]/20 shadow-lg shadow-[#14B8A6]/5">
+          <Clock className="text-[#14B8A6]" size={22} />
+        </div>
+        <h3 className="text-lg font-bold text-white mb-1">Verify Your Email</h3>
+        <p className="text-xs text-white/50 px-2 leading-relaxed">
+          We've sent a 6-digit OTP code to:
+          <span className="block font-semibold text-emerald-400 mt-0.5 break-all">{email}</span>
+        </p>
+      </div>
+
+      {/* Grid of 6 digit inputs */}
+      <div className="flex gap-2 justify-center my-6" onPaste={handlePaste}>
+        {otp.map((digit, idx) => (
+          <input
+            key={idx}
+            ref={inputRefs[idx]}
+            type="tel"
+            inputMode="numeric"
+            maxLength={1}
+            value={digit}
+            onChange={(e) => handleChange(e.target.value, idx)}
+            onKeyDown={(e) => handleKeyDown(e, idx)}
+            className="w-11 h-14 rounded-2xl flex items-center justify-center text-center text-xl font-bold font-mono transition-all duration-300 select-none bg-white/[0.03] outline-none"
+            style={{
+              border: otp[idx] !== ''
+                ? '2px solid #14B8A6'
+                : error
+                  ? '2px solid var(--mf-error)'
+                  : '1.5px solid var(--mf-border)',
+              boxShadow: otp[idx] !== '' ? '0 0 16px rgba(20,184,166,0.15)' : 'none',
+              color: 'var(--mf-text-primary)'
+            }}
+          />
+        ))}
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-1.5 justify-center text-xs font-semibold py-2.5 px-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[#FF6B6B] mb-4 animate-fade-in">
+          <AlertCircle size={13} className="shrink-0" />
+          <span className="text-left">{error}</span>
+        </div>
+      )}
+
+      <div className="space-y-4 text-center mt-2">
+        <button
+          onClick={handleVerify}
+          disabled={loading || otp.join('').length < 6}
+          className="w-full py-4 rounded-2xl font-bold text-base text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none cursor-pointer border-none"
+          style={{
+            background: 'linear-gradient(135deg, #14B8A6 0%, #0D9488 50%, #0F766E 100%)',
+            boxShadow: '0 8px 28px rgba(20,184,166,0.30)',
+          }}
+        >
+          {loading ? <RefreshCw size={18} className="animate-spin" /> : 'Confirm Verification'}
+        </button>
+
+        <div className="flex flex-col gap-2 items-center justify-center pt-2">
+          {cooldown > 0 ? (
+            <span className="text-[11px] text-white/30 font-medium">
+              Resend code in <strong className="font-mono text-white/40">{cooldown}s</strong>
+            </span>
+          ) : (
+            <button
+              onClick={handleResend}
+              disabled={loading}
+              className="text-xs font-semibold text-[#14B8A6] hover:underline active:scale-95 transition-all bg-transparent border-none cursor-pointer"
+            >
+              Resend verification code
+            </button>
+          )}
+
+          <button
+            onClick={onBack}
+            className="text-xs font-semibold text-white/40 hover:text-white/60 active:scale-95 transition-all bg-transparent border-none cursor-pointer mt-2"
+          >
+            ← Change email address / Go back
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ═══════════════════════════════════════════════════
    MAIN AUTH SCREEN — V.2.1
    ═══════════════════════════════════════════════════ */
 export default function AuthScreen({ onAuth }) {
-  const [tab, setTab] = useState('login') // 'login' | 'register' | 'forgot'
+  const [tab, setTab] = useState('login') // 'login' | 'register' | 'forgot' | 'otp-verify'
+  const [loginMode, setLoginMode] = useState('password') // 'password' | 'otp'
+  const [otpEmail, setOtpEmail] = useState('')
+  const [otpType, setOtpType] = useState('signup') // 'signup' | 'login'
+
 
   // Post-login state: when user is deactivated or scheduled for deletion
   const [deactivatedState, setDeactivatedState] = useState(null) // { uid, username }
@@ -493,7 +721,10 @@ export default function AuthScreen({ onAuth }) {
   const validatePhone = (val) => !val || /^\+?[1-9]\d{6,14}$/.test(val)
 
   const isValidMobile = (phone) => {
-    const digits = phone.replace(/\D/g, '')
+    let digits = phone.replace(/\D/g, '')
+    if (digits.startsWith('91') && digits.length === 12) {
+      digits = digits.slice(2)
+    }
     if (digits.length !== 10) return false
     if (!/^[6-9]/.test(digits)) return false
     if (/^(\d)\1{9}$/.test(digits)) return false
@@ -522,6 +753,29 @@ export default function AuthScreen({ onAuth }) {
       setFieldErrors({ identifier: 'Enter your email or phone number' })
       return
     }
+
+    if (loginMode === 'otp') {
+      if (!isEmail(trimmed)) {
+        setFieldErrors({ identifier: 'Enter a valid email address' })
+        return
+      }
+
+      submittingRef.current = true
+      setLoading(true)
+      try {
+        await sendLoginOtp(trimmed)
+        setOtpEmail(trimmed)
+        setOtpType('login')
+        setTab('otp-verify')
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+        submittingRef.current = false
+      }
+      return
+    }
+
     const looksLikePhone = /^\d+$/.test(trimmed) || (trimmed.startsWith('+') && /^\d+$/.test(trimmed.slice(1)))
     if (looksLikePhone) {
       if (!isValidMobile(trimmed)) {
@@ -547,19 +801,19 @@ export default function AuthScreen({ onAuth }) {
 
       // Check if account is deactivated → show reactivation screen
       if (profile.deactivated) {
-        setDeactivatedState({ uid: user.uid, username: profile.username })
+        setDeactivatedState({ uid: user.id, username: profile.username })
         return
       }
 
       // Check if account is scheduled for deletion → show cancellation screen
       if (profile.deletionScheduled) {
-        setDeletionState({ uid: user.uid, scheduledDeletionAt: profile.scheduledDeletionAt })
+        setDeletionState({ uid: user.id, scheduledDeletionAt: profile.scheduledDeletionAt })
         return
       }
 
       // Normal login success
       setShowSuccess(true)
-      setTimeout(() => onAuth(user.uid), 1000)
+      setTimeout(() => onAuth(user.id), 1000)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -582,11 +836,11 @@ export default function AuthScreen({ onAuth }) {
       setFieldErrors({ name: 'Enter your full name (min 2 characters)' })
       return
     }
-    if (!emailVal && !phoneVal) {
-      setFieldErrors({ email: 'Email address or phone number is required' })
+    if (!emailVal) {
+      setFieldErrors({ email: 'Email address is required' })
       return
     }
-    if (emailVal && !validateEmail(emailVal)) {
+    if (!validateEmail(emailVal)) {
       setFieldErrors({ email: 'Enter a valid email address' })
       return
     }
@@ -605,9 +859,18 @@ export default function AuthScreen({ onAuth }) {
     submittingRef.current = true
     setLoading(true)
     try {
-      const user = await registerUser(nameVal, emailVal, passwordVal, phoneVal)
-      setShowSuccess(true)
-      setTimeout(() => onAuth(user.uid), 1000)
+      const { user, session } = await registerUser(nameVal, emailVal, passwordVal, phoneVal)
+      
+      if (!session) {
+        // If email confirmation is enabled, redirect to OTP verification screen
+        setOtpEmail(emailVal)
+        setOtpType('signup')
+        setTab('otp-verify')
+      } else {
+        // Direct login if email confirmation is disabled
+        setShowSuccess(true)
+        setTimeout(() => onAuth(user.id), 1000)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -807,19 +1070,27 @@ export default function AuthScreen({ onAuth }) {
               <span className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-tr from-[#14B8A6] to-[#2DD4BF] relative z-10 select-none">₹</span>
             </div>
             <p className="text-base font-bold mb-0.5" style={{ color: 'var(--mf-text-primary)' }}>
-              {tab === 'login' ? 'Welcome back 👋' : tab === 'register' ? 'Create your account 🚀' : 'Reset your password 🔑'}
+              {tab === 'login'
+                ? 'Welcome back 👋'
+                : tab === 'register'
+                  ? 'Create your account 🚀'
+                  : tab === 'otp-verify'
+                    ? 'Verify your email ✉️'
+                    : 'Reset your password 🔑'}
             </p>
             <p className="text-xs px-2" style={{ color: 'var(--mf-text-muted)' }}>
               {tab === 'login'
                 ? 'Sign in with your email or phone number'
                 : tab === 'register'
                   ? 'Start tracking your money securely'
-                  : 'Enter your email to receive a reset link'}
+                  : tab === 'otp-verify'
+                    ? 'Enter the 6-digit verification code'
+                    : 'Enter your email to receive a reset link'}
             </p>
           </div>
 
-          {/* Tab Switcher — only for login/register, not forgot */}
-          {tab !== 'forgot' && (
+          {/* Tab Switcher — only for login/register, not forgot/otp */}
+          {tab !== 'forgot' && tab !== 'otp-verify' && (
             <div className="px-5 py-2">
               <div className="relative flex p-1 rounded-2xl" style={{ background: 'var(--mf-surface-2)' }}>
                 <div
@@ -853,8 +1124,27 @@ export default function AuthScreen({ onAuth }) {
             <ForgotPasswordPanel onBack={() => switchTab('login')} />
           )}
 
+          {/* ── OTP VERIFICATION PANEL ── */}
+          {tab === 'otp-verify' && (
+            <OtpVerificationPanel
+              email={otpEmail}
+              type={otpType}
+              onVerified={(newUid) => {
+                setShowSuccess(true)
+                setTimeout(() => onAuth(newUid), 1000)
+              }}
+              onBack={() => {
+                if (otpType === 'signup') {
+                  switchTab('register')
+                } else {
+                  switchTab('login')
+                }
+              }}
+            />
+          )}
+
           {/* ── LOGIN / REGISTER FORM ── */}
-          {tab !== 'forgot' && (
+          {tab !== 'forgot' && tab !== 'otp-verify' && (
             <form
               className="p-5 pt-3 flex-1 flex flex-col"
               onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
@@ -876,7 +1166,7 @@ export default function AuthScreen({ onAuth }) {
                     <FloatingInput
                       icon={Mail}
                       type="email"
-                      label="Email address (optional)"
+                      label="Email address"
                       value={regEmail}
                       onChange={e => setRegEmail(e.target.value)}
                       error={fieldErrors.email}
@@ -940,40 +1230,61 @@ export default function AuthScreen({ onAuth }) {
                       autoFocus
                       delay={50}
                     />
-                    <div>
-                      <FloatingInput
-                        icon={Lock}
-                        type={showPassword ? 'text' : 'password'}
-                        label="Password"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        error={fieldErrors.password}
-                        autoComplete="current-password"
-                        delay={100}
-                        right={
+                    {loginMode === 'password' ? (
+                      <div>
+                        <FloatingInput
+                          icon={Lock}
+                          type={showPassword ? 'text' : 'password'}
+                          label="Password"
+                          value={password}
+                          onChange={e => setPassword(e.target.value)}
+                          error={fieldErrors.password}
+                          autoComplete="current-password"
+                          delay={100}
+                          right={
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(p => !p)}
+                              className="p-1 text-white/30 hover:text-white/60 transition-colors"
+                              tabIndex={-1}
+                              aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            >
+                              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          }
+                        />
+                        {/* ✨ Forgot Password / Sign in with OTP links */}
+                        <div className="flex justify-between mt-2.5 px-1">
                           <button
                             type="button"
-                            onClick={() => setShowPassword(p => !p)}
-                            className="p-1 text-white/30 hover:text-white/60 transition-colors"
-                            tabIndex={-1}
-                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            onClick={() => setLoginMode('otp')}
+                            className="text-xs font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer hover:underline"
+                            style={{ color: '#14B8A6' }}
                           >
-                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            Sign in with OTP
                           </button>
-                        }
-                      />
-                      {/* ✨ Forgot Password link */}
-                      <div className="flex justify-end mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => switchTab('forgot')}
+                            className="text-xs font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer hover:underline"
+                            style={{ color: '#14B8A6' }}
+                          >
+                            Forgot Password?
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end mt-1 px-1">
                         <button
                           type="button"
-                          onClick={() => switchTab('forgot')}
-                          className="text-xs font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer"
+                          onClick={() => setLoginMode('password')}
+                          className="text-xs font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer hover:underline"
                           style={{ color: '#14B8A6' }}
                         >
-                          Forgot Password?
+                          Sign in with Password
                         </button>
                       </div>
-                    </div>
+                    )}
                   </>
                 )}
 
@@ -997,7 +1308,11 @@ export default function AuthScreen({ onAuth }) {
                   {loading ? (
                     <RefreshCw size={18} className="animate-spin" />
                   ) : tab === 'login' ? (
-                    <><LogIn size={17} /> Log In</>
+                    loginMode === 'otp' ? (
+                      <><KeyRound size={17} /> Request OTP</>
+                    ) : (
+                      <><LogIn size={17} /> Log In</>
+                    )
                   ) : (
                     <><UserPlus size={17} /> Create Account</>
                   )}
