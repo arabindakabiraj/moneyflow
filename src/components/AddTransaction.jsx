@@ -50,66 +50,100 @@ const GlassInput = ({ className = '', ...props }) => (
   />
 )
 
-/* ── Success bottom sheet ── */
+/* ── Success floating toast ── */
 function SuccessToast({ data, onClose, onGoHome }) {
-  const [visible,  setVisible]  = useState(false)
-  const [exiting,  setExiting]  = useState(false)
+  const [visible, setVisible] = useState(false)
+  const [exiting, setExiting] = useState(false)
   const isCredit = data.type === 'credit'
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true))
-    const t = setTimeout(() => dismiss(), 5000)
+    const t = setTimeout(() => dismiss(), 4000)
     return () => clearTimeout(t)
   }, [])
 
-  const dismiss = () => { setExiting(true); setTimeout(() => onClose(), 400) }
+  const dismiss = () => {
+    setExiting(true)
+    setTimeout(() => onClose(), 400)
+  }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-4">
-      <div className={`fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${visible && !exiting ? 'opacity-100' : 'opacity-0'}`}
-        onClick={dismiss} />
-      <div className={`relative w-full max-w-md transition-all duration-500 ease-out ${visible && !exiting ? 'translate-y-0 lg:scale-100 lg:opacity-100' : 'translate-y-full lg:scale-95 lg:opacity-0 opacity-0'}`}>
-        {/* Glass bottom sheet / desktop dialog */}
-        <div className="rounded-t-3xl lg:rounded-3xl p-6 pb-10 lg:pb-6"
+    <div className="fixed top-4 left-4 right-4 md:left-auto md:right-6 md:top-6 z-[100] max-w-sm w-auto">
+      <style>{`
+        @keyframes toastProgress {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+        .toast-progress-bar {
+          animation: toastProgress 4s linear forwards;
+        }
+      `}</style>
+
+      <div 
+        className={`relative overflow-hidden rounded-2xl p-4 flex gap-3.5 backdrop-blur-xl shadow-2xl transition-all duration-300 border ${
+          visible && !exiting 
+            ? 'translate-y-0 opacity-100 scale-100' 
+            : 'translate-y-[-20px] opacity-0 scale-95'
+        }`}
+        style={{
+          background: 'rgba(26, 26, 29, 0.88)',
+          borderColor: isCredit ? 'rgba(52, 211, 153, 0.25)' : 'rgba(239, 68, 68, 0.25)',
+          boxShadow: isCredit 
+            ? '0 12px 40px rgba(52, 211, 153, 0.15), 0 0 0 1px rgba(255,255,255,0.05)'
+            : '0 12px 40px rgba(239, 68, 68, 0.15), 0 0 0 1px rgba(255,255,255,0.05)'
+        }}
+      >
+        <div 
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border"
           style={{
-            background: isCredit
-              ? 'linear-gradient(145deg, rgba(34,197,94,0.75) 0%, rgba(16,185,129,0.70) 100%)'
-              : 'linear-gradient(145deg, rgba(244,63,94,0.75) 0%, rgba(239,68,68,0.70) 100%)',
-            backdropFilter: 'blur(40px)',
-            WebkitBackdropFilter: 'blur(40px)',
-            border: '1px solid rgba(255,255,255,0.20)',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.40)',
-          }}>
-          <div className="w-10 h-1 bg-white/30 rounded-full mx-auto mb-5 lg:hidden" />
-          <button onClick={dismiss}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(255,255,255,0.15)' }}>
-            <X size={16} className="text-white" />
-          </button>
-          <div className="flex flex-col items-center text-center">
-            <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center mb-4"
-              style={{ background: 'rgba(255,255,255,0.20)' }}>
-              <CheckCircle size={36} className="text-white" />
-            </div>
-            <h3 className="text-white font-display font-bold text-xl mb-1">
-              {isCredit ? '💰 Income Added!' : '💸 Expense Added!'}
-            </h3>
-            <p className="text-white/75 text-sm mb-5">Saved successfully ✅</p>
-            <div className="w-full px-4 py-4 rounded-2xl mb-5 text-center"
-              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.20)' }}>
-              <p className="text-white font-display font-bold text-3xl">
-                {isCredit ? '+' : '-'}₹{Number(data.amount).toLocaleString('en-IN')}
-              </p>
-              <p className="text-white/65 text-xs mt-1.5 truncate">
-                {data.description} · {data.category}
-              </p>
-            </div>
-            <button onClick={() => { dismiss(); setTimeout(() => onGoHome?.(), 300) }}
-              className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 text-white transition-all active:scale-95"
-              style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)' }}>
+            background: isCredit ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            borderColor: isCredit ? 'rgba(52, 211, 153, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+            color: isCredit ? '#34D399' : '#FF6B6B'
+          }}
+        >
+          <CheckCircle size={20} />
+        </div>
+
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-baseline justify-between gap-2">
+            <h4 className="text-white text-[13px] font-bold tracking-wide">
+              {isCredit ? 'Income Saved' : 'Expense Saved'}
+            </h4>
+            <span 
+              className="text-xs font-mono font-bold shrink-0"
+              style={{ color: isCredit ? '#34D399' : '#FF6B6B' }}
+            >
+              {isCredit ? '+' : '-'}₹{Number(data.amount).toLocaleString('en-IN')}
+            </span>
+          </div>
+          <p className="text-[11px] text-white/50 truncate mt-0.5">
+            {data.description} · <span className="font-semibold text-white/70">{data.category}</span>
+          </p>
+          
+          <div className="flex items-center gap-3 mt-2.5 pt-2 border-t border-white/[0.06]">
+            <button 
+              onClick={() => { dismiss(); setTimeout(() => onGoHome?.(), 300) }}
+              className="text-[10px] font-extrabold text-[#4F8EF7] hover:text-[#76a7f9] flex items-center gap-1 active:scale-95 transition-all bg-transparent border-none cursor-pointer"
+            >
               🏠 Go to Home
             </button>
+            <span className="text-white/20 text-[10px]">|</span>
+            <button 
+              onClick={dismiss}
+              className="text-[10px] font-bold text-white/40 hover:text-white/60 active:scale-95 transition-all bg-transparent border-none cursor-pointer"
+            >
+              Dismiss
+            </button>
           </div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-white/10">
+          <div 
+            className="h-full toast-progress-bar"
+            style={{
+              background: isCredit ? 'linear-gradient(90deg, #34D399, #10B981)' : 'linear-gradient(90deg, #FF6B6B, #EF4444)'
+            }}
+          />
         </div>
       </div>
     </div>

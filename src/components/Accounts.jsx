@@ -93,7 +93,7 @@ export default function Accounts() {
             filter:'blur(24px)',
           }} />
         </div>
-        <p className="text-xs mb-1 relative z-10 text-black/50 dark:text-white/50">Total Balance</p>
+        <p className="text-xs mb-1 relative z-10 text-gray-500 dark:text-white/50">Total Balance</p>
         <p className="font-display font-bold text-4xl relative z-10 text-gray-900 dark:text-white/97" style={{
           textShadow:'0 2px 20px rgba(74,222,128,0.25)',
         }}>
@@ -174,7 +174,7 @@ export default function Accounts() {
                 }}>
                 <ArrowDownLeft size={12} style={{ color: 'var(--mf-success)', flexShrink: 0 }} />
                 <div>
-                  <p className="text-[10px] text-black/40 dark:text-white/38">Income</p>
+                  <p className="text-[10px] text-gray-500 dark:text-white/40">Income</p>
                   <p className="text-xs font-mono font-bold" style={{ color: 'var(--mf-success)' }}>₹{totals.credit.toLocaleString('en-IN')}</p>
                 </div>
               </div>
@@ -185,7 +185,7 @@ export default function Accounts() {
                 }}>
                 <ArrowUpRight size={12} style={{ color: 'var(--mf-error)', flexShrink: 0 }} />
                 <div>
-                  <p className="text-[10px] text-black/40 dark:text-white/38">Expense</p>
+                  <p className="text-[10px] text-gray-500 dark:text-white/40">Expense</p>
                   <p className="text-xs font-mono font-bold" style={{ color: 'var(--mf-error)' }}>₹{totals.debit.toLocaleString('en-IN')}</p>
                 </div>
               </div>
@@ -194,9 +194,9 @@ export default function Accounts() {
             {/* Last transaction */}
             {lastTransaction && (
               <div className="relative z-10 pt-2 border-t border-black/[0.06] dark:border-white/[0.08]">
-                <p className="text-[10px] mb-1 text-black/35 dark:text-white/35">Last transaction</p>
+                <p className="text-[10px] mb-1 text-gray-500 dark:text-white/40">Last transaction</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs truncate max-w-[60%] text-gray-600 dark:text-white/65">
+                  <span className="text-xs truncate max-w-[60%] text-gray-500 dark:text-white/60">
                     {lastTransaction.description || lastTransaction.category}
                   </span>
                   <span className="text-xs font-mono font-bold" style={{ color: lastTransaction.type === 'credit' ? 'var(--mf-success)' : 'var(--mf-error)' }}>

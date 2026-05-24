@@ -4,7 +4,7 @@
  * All business logic preserved from original
  */
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, Plus, ArrowDownLeft, ArrowUpRight, CreditCard, Zap, ArrowDown, ArrowUp, Brain, X, Lightbulb, Flame, Scale, Target, BarChart3, MessageCircle, BookOpen, Activity, Eye, EyeOff } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, Plus, ArrowDownLeft, ArrowUpRight, CreditCard, Zap, ArrowDown, ArrowUp, Brain, X, Lightbulb, Flame, Scale, Target, BarChart3, MessageCircle, BookOpen, Activity, Eye, EyeOff, Check } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { predictSpending, getDailyBudgetInfo } from '../utils/spendingPredictor'
@@ -229,8 +229,18 @@ function BalanceSheetWidget() {
 /* ═══════ Net Worth Timeline ═══════ */
 function NetWorthTimeline() {
   const { getNetWorthHistory, darkMode } = useApp()
-  const data = getNetWorthHistory()
-  if (data.length < 2) return null
+  const rawData = getNetWorthHistory()
+  const isMock = rawData.length < 2
+  
+  const data = isMock ? [
+    { month: '2026-01', netWorth: 12000 },
+    { month: '2026-02', netWorth: 18000 },
+    { month: '2026-03', netWorth: 15500 },
+    { month: '2026-04', netWorth: 24000 },
+    { month: '2026-05', netWorth: 29000 },
+    { month: '2026-06', netWorth: 35000 },
+  ] : rawData
+
   const latest  = data[data.length - 1]?.netWorth || 0
   const first   = data[0]?.netWorth || 0
   const growth  = latest - first
@@ -244,12 +254,16 @@ function NetWorthTimeline() {
           style={{ background: 'rgba(79,142,247,0.15)' }}>
           <TrendingUp size={14} className="text-[#4F8EF7]" />
         </div>
-        <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Net Worth Timeline</h3>
+        <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">
+          Net Worth Timeline {isMock && <span className="ml-1 text-[8px] font-mono tracking-widest uppercase bg-indigo-500/20 text-[#4F8EF7] px-1.5 py-0.5 rounded-md">Preview</span>}
+        </h3>
         <span className="ml-auto text-xs font-bold" style={{ color: growing ? '#34D399' : '#FF6B6B' }}>
           {growing ? '+' : '-'}₹{Math.abs(growth).toLocaleString('en-IN')}
         </span>
       </div>
-      <p className="text-[10px] mb-3 text-gray-400 dark:text-white/30">Wealth growth over time</p>
+      <p className="text-[10px] mb-3 text-gray-400 dark:text-white/30">
+        {isMock ? '✨ Accumulate transaction history over 2 months to unlock actual growth chart' : 'Wealth growth over time'}
+      </p>
 
       {/* Chart */}
       <ResponsiveContainer width="100%" height={110}>
@@ -277,6 +291,65 @@ function NetWorthTimeline() {
   )
 }
 
+/* ── Smart Financial Tip Widget ── */
+export function TipWidget() {
+  const [tipIdx, setTipIdx] = useState(0)
+  const tips = [
+    {
+      title: "The 50/30/20 Rule",
+      desc: "Allocate 50% of your income to Needs, 30% to Wants, and 20% to Savings or paying off debt."
+    },
+    {
+      title: "24-Hour Purchase Rule",
+      desc: "Wait 24 hours before buying non-essential items to see if you still want them. Eliminates impulse spend."
+    },
+    {
+      title: "Audit Subscriptions",
+      desc: "Look over your recurring card bills monthly. Cancel services you haven't opened in 30 days."
+    },
+    {
+      title: "Wealth Preservation",
+      desc: "Standard savings accounts lose value to inflation. Invest your idle capital to grow your true net worth."
+    },
+    {
+      title: "Streak for Discipline",
+      desc: "Open MoneyFlow daily to review expenses. Developing a financial habit is key to passive accumulation."
+    }
+  ]
+
+  const nextTip = () => setTipIdx(i => (i + 1) % tips.length)
+  const tip = tips[tipIdx]
+
+  return (
+    <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 animate-fade-in relative overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div style={{
+          position: 'absolute', top: '-35%', right: '-15%',
+          width: '120px', height: '120px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(251,191,36,0.08) 0%, transparent 70%)',
+          filter: 'blur(20px)',
+        }} />
+      </div>
+
+      <div className="flex items-center gap-2.5 mb-3 relative z-10">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-amber-400/10 text-amber-400">
+          <Lightbulb size={14} />
+        </div>
+        <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Smart Financial Tip</h3>
+        <button onClick={nextTip}
+          className="ml-auto text-[10px] font-bold px-2.5 py-1 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.10] text-[#4F8EF7] flex items-center gap-0.5 active:scale-95 transition-all">
+          Next Tip <ChevronRight size={10} />
+        </button>
+      </div>
+
+      <div className="relative z-10 min-h-[50px] flex flex-col justify-center">
+        <p className="text-xs font-bold text-gray-900 dark:text-white/90 mb-1">{tip.title}</p>
+        <p className="text-[11px] leading-relaxed text-gray-500 dark:text-white/50">{tip.desc}</p>
+      </div>
+    </div>
+  )
+}
+
 /* ═══════ Today's Snapshot Widget ═══════ */
 export function TodayWidget() {
   const { transactions, budgets, darkMode } = useApp()
@@ -289,7 +362,7 @@ export function TodayWidget() {
   const monthlySpent = transactions.filter(t => t.type === 'debit' && t.date?.startsWith(month)).reduce((s,t) => s + Number(t.amount), 0)
   const totalBudget  = Object.values(budgets).reduce((s, v) => s + Number(v), 0)
 
-  if (todayTx.length === 0 && totalBudget === 0) return null
+  if (todayTx.length === 0 && totalBudget === 0) return <TipWidget />
 
   const budgetPct = totalBudget > 0 ? Math.min((monthlySpent / totalBudget) * 100, 100) : 0
   const budgetColor = budgetPct > 90 ? '#FF6B6B' : budgetPct > 70 ? '#FBBF24' : '#34D399'
@@ -475,7 +548,7 @@ export function TransactionRow({ tx, compact = false, onEdit, onDelete, onToggle
 
 /* ═══════════════ MAIN DASHBOARD ═══════════════ */
 export default function Dashboard({ onAddWithType }) {
-  const { getSummary, transactions, savingsGoal, setActiveTab, loading, goals, darkMode } = useApp()
+  const { getSummary, transactions, accounts = {}, budgets = {}, savingsGoal, setActiveTab, loading, goals, darkMode, username } = useApp()
   const summary = getSummary()
   const animatedBalance = useCountUp(summary.balance)
   const streak = useStreak()
@@ -521,6 +594,23 @@ export default function Dashboard({ onAddWithType }) {
   ]
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Welcome Greeting Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-black/[0.05] dark:border-white/[0.05]">
+        <div>
+          <h2 className="font-display font-bold text-2xl text-gray-900 dark:text-white/95">
+            Hello, {username || 'User'}! 👋
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-white/45 mt-0.5">
+            Here's your financial status overview at a glance.
+          </p>
+        </div>
+        {streak >= 2 && (
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-xs font-semibold shrink-0">
+            <span>🔥 {streak}-Day Streak</span>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Account Summary, Timeline, Recent Ledger */}
         <div className="lg:col-span-7 space-y-6">
@@ -537,30 +627,31 @@ export default function Dashboard({ onAddWithType }) {
             </div>
 
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-white/45">
                   Current Balance
                 </span>
                 <div className="px-2.5 py-1 rounded-lg bg-black/[0.04] dark:bg-white/[0.06]">
-                  <span className="text-[10px] font-semibold text-black/50 dark:text-white/50">
+                  <span className="text-[10px] font-semibold text-gray-500 dark:text-white/50">
                     {new Date().toLocaleString('en', { month: 'short' })} {new Date().getFullYear()}
                   </span>
                 </div>
               </div>
 
-              {/* Balance hide/show */}
-              <button onClick={toggleBalance}
-                className="flex items-center gap-1.5 mb-3 transition-all active:scale-95 text-black/30 dark:text-white/30">
-                {balanceHidden ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
-                <span className="text-[10px] font-semibold tracking-wide">
-                  {balanceHidden ? 'Show balance' : 'Hide balance'}
-                </span>
-              </button>
-
-              {/* Big balance number */}
-              <p className="font-display font-bold text-[44px] leading-none mb-6 tracking-tight text-gray-900 dark:text-white/95">
-                {balanceHidden ? '₹ ●●●●●●' : `₹${animatedBalance.toLocaleString('en-IN')}`}
-              </p>
+              <div className="flex items-center justify-between gap-3 mb-6">
+                {/* Big balance number */}
+                <p className="font-display font-bold text-[40px] md:text-[44px] leading-none tracking-tight text-gray-900 dark:text-white/95">
+                  {balanceHidden ? '₹ ●●●●●●' : `₹${animatedBalance.toLocaleString('en-IN')}`}
+                </p>
+                {/* Balance hide/show - aligned opposite to the amount */}
+                <button onClick={toggleBalance}
+                  className="flex items-center gap-1.5 transition-all active:scale-95 text-gray-500 dark:text-white/45 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.06] dark:hover:bg-white/[0.10] border border-black/[0.04] dark:border-white/[0.06] px-2.5 py-1.5 rounded-xl shrink-0">
+                  {balanceHidden ? <Eye size={13} className="shrink-0" /> : <EyeOff size={13} className="shrink-0" />}
+                  <span className="text-[10px] font-bold tracking-wide">
+                    {balanceHidden ? 'Show balance' : 'Hide balance'}
+                  </span>
+                </button>
+              </div>
 
               {/* Income & Expense mini-cards */}
               <div className="grid grid-cols-2 gap-3">
@@ -575,7 +666,7 @@ export default function Dashboard({ onAddWithType }) {
                       <Icon size={13} style={{ color }} />
                     </div>
                     <div>
-                      <p className="text-[9px] uppercase font-semibold text-black/35 dark:text-white/35">{label}</p>
+                      <p className="text-[9px] uppercase font-semibold text-gray-500 dark:text-white/40">{label}</p>
                       <p className="font-bold text-sm font-mono" style={{ color }}>
                         {balanceHidden ? '₹ ●●●●' : `₹${value.toLocaleString('en-IN')}`}
                       </p>
@@ -585,6 +676,53 @@ export default function Dashboard({ onAddWithType }) {
               </div>
             </div>
           </div>
+
+          {/* ═══ Setup Checklist (shown only if new user) ═══ */}
+          {transactions.length === 0 && (
+            <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 stagger-item">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base">🚀</span>
+                <h4 className="font-semibold text-sm text-gray-800 dark:text-white/90">Quick Start Checklist</h4>
+              </div>
+              <div className="space-y-3">
+                {[
+                  {
+                    label: 'Add your first transaction',
+                    done: transactions.length > 0,
+                    action: () => setActiveTab('add'),
+                    desc: 'Log an income or expense to activate charts.'
+                  },
+                  {
+                    label: 'Adjust your base accounts balance',
+                    done: Object.values(accounts || {}).some(v => v !== 0),
+                    action: () => setActiveTab('accounts'),
+                    desc: 'Set cash, bank, or UPI base values in Wallet.'
+                  },
+                  {
+                    label: 'Set a monthly spending budget',
+                    done: Object.values(budgets || {}).some(v => v !== 0),
+                    action: () => setActiveTab('settings'),
+                    desc: 'Control category expenditures in Settings.'
+                  }
+                ].map(({ label, done, action, desc }) => (
+                  <div key={label} onClick={action} className="group flex gap-3 p-3 rounded-xl hover:bg-black/[0.02] dark:hover:bg-white/[0.02] border border-transparent hover:border-black/[0.04] dark:hover:border-white/[0.04] cursor-pointer transition-all duration-150">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${
+                      done 
+                        ? 'bg-[#34D399] border-[#34D399] text-white' 
+                        : 'border-black/20 dark:border-white/20'
+                    }`}>
+                      {done && <Check size={11} strokeWidth={3} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-semibold ${done ? 'text-gray-400 dark:text-white/40 line-through' : 'text-gray-700 dark:text-white/80'}`}>{label}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-white/30 mt-0.5">{desc}</p>
+                    </div>
+                    <ChevronRight size={14} className="text-gray-400 dark:text-white/20 group-hover:translate-x-0.5 transition-transform shrink-0 self-center" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ═══ 2. TODAY'S SNAPSHOT ════════════════════════════════ */}
           <TodayWidget />
