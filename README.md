@@ -1,80 +1,127 @@
-# 💰 MoneyFlow V.2 — Premium AI-Powered Financial Tracker
+# 💰 MoneyFlow V.2 — Premium AI-Powered Financial Tracking Ecosystem
 
 <div align="center">
 
-  [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
-  [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-  [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-  [![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=white)](https://firebase.google.com/)
-  [![Gemini AI](https://img.shields.io/badge/Gemini_AI-9E5CF2?style=for-the-badge&logo=google-gemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
-  [![Capacitor Mobile](https://img.shields.io/badge/Capacitor-119EFF?style=for-the-badge&logo=capacitor&logoColor=white)](https://capacitorjs.com/)
-  [![GSAP](https://img.shields.io/badge/GSAP-88CE02?style=for-the-badge&logo=greensock&logoColor=white)](https://greensock.com/gsap/)
+  [![React](https://img.shields.io/badge/React-18.2-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
+  [![Vite](https://img.shields.io/badge/Vite-7.3-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+  [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.3-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+  [![Firebase](https://img.shields.io/badge/Firebase-12.9-FFCA28?style=for-the-badge&logo=firebase&logoColor=white)](https://firebase.google.com/)
+  [![Gemini AI](https://img.shields.io/badge/Gemini_AI-1.5_Flash-9E5CF2?style=for-the-badge&logo=google-gemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
+  [![Capacitor Mobile](https://img.shields.io/badge/Capacitor-8.1-119EFF?style=for-the-badge&logo=capacitor&logoColor=white)](https://capacitorjs.com/)
+  [![GSAP](https://img.shields.io/badge/GSAP-3.14-88CE02?style=for-the-badge&logo=greensock&logoColor=white)](https://greensock.com/gsap/)
+  [![Recharts](https://img.shields.io/badge/Recharts-3.7-22c55e?style=for-the-badge&logo=recharts&logoColor=white)](https://recharts.org/)
 
   <p align="center">
-    A premium, state-of-the-art mobile-first personal finance tracking ecosystem. Built for modern users and students, combining beautiful fluid visuals, intelligent AI insights, offline-first reliability, and full-spectrum financial analytics.
+    <strong>A high-fidelity, mobile-first personal finance cockpit.</strong><br />
+    Designed for students and modern users, combining premium liquid glass visuals, intelligent AI diagnostics, offline-first reliability, collaborative ledger linking, and corporate-grade reporting.
   </p>
 
   <h4>
-    <a href="#-core-capabilities">Key Features</a> •
-    <a href="#-architecture">Architecture</a> •
+    <a href="#-premium-ux--design-philosophy">UX Design</a> •
+    <a href="#-architectural-features">Core Features</a> •
+    <a href="#-security--encryption">Security Specs</a> •
+    <a href="#-project-architecture">Architecture</a> •
     <a href="#%EF%B8%8F-tech-stack">Tech Stack</a> •
     <a href="#-getting-started">Installation</a> •
-    <a href="#-capacitor-native-mobile-setup">Mobile Build</a> •
-    <a href="#-security-design">Security</a>
+    <a href="#-fastapi-otp-service-setup">OTP Backend</a> •
+    <a href="#-capacitor-native-mobile-setup">Mobile Build</a>
   </h4>
 </div>
 
 ---
 
-## 💎 Premium Design Philosophy & UX
+## 💎 Premium UX & Design Philosophy
 
-MoneyFlow V.2 is crafted from the ground up to feel **premium, organic, and ultra-modern**. It rejects standard, boring spreadsheets in favor of a responsive interface that feels alive:
-*   **GSAP-Powered Motion Design**: A professional entry experience featuring a smooth, physics-informed splash screen with bouncy transitions.
-*   **Curated HSL Color System & Dark Aesthetics**: Elegant deep backgrounds matched with harmoniously balanced gradient highlight colors.
-*   **Diamond Action HUD**: A distinctive center-docked, rotated diamond dynamic action button (`+`) for lightning-fast expense logging.
-*   **Interactive Micro-Animations**: Buttons, inputs, tab transitions, and cards react organically using custom spring-like hover and active transitions.
-*   **Responsive Fluid Layouts**: Native look-and-feel whether viewed on a desktop browser, a PWA install, or wrapped inside a native iOS/Android shell.
+MoneyFlow V.2 moves away from standard spreadsheet interfaces, delivering an organic, interactive dashboard inspired by modern financial apps:
 
----
-
-## 🚀 Core Capabilities
-
-### 🤖 AI Financial Intelligence & Advisor
-*   **Interactive AI Chat Companion**: An integrated chat interface powered by **Gemini (via OpenRouter or native Gemini API)** to provide contextual financial wisdom, custom savings strategies, and spending analysis.
-*   **Smart SMS Import**: Scan and parse transaction SMS alerts seamlessly with our built-in pattern matching parser, translating text messages into structured records.
-*   **Natural Language Entry (Smart Add)**: Input expenses by typing human sentences (e.g., *"Spent 150 on coffee with Raj today"*) — parsed dynamically to extract value, description, and automatically categorize using automated dictionary clustering.
-*   **Anomaly & Spending Predictors**: AI monitors spending history to identify deviations, warn when you approach 80% of category limits, and predict end-of-month cash flow using behavioral tracking algorithms.
-
-### 📶 Offline-First Smart Sync
-*   **Built-in Offline Engine**: Persistent cached local database using Firebase Firestore's local cache (IndexedDB) for zero-lag performance even on poor networks.
-*   **Automatic Conflict Resolution**: Queue offline modifications instantly. Records sync cleanly to the cloud database as soon as network state switches back.
-*   **Real-time Network Tracking**: A custom reactive hook (`useNetwork.js`) tracks online/offline states to display elegant micro-toasts and persistent banners.
-
-### 📊 Professional Analytics & Heatmaps
-*   **Interactive Recharts Dashboard**: Visualize categories, cash inflows, and monthly spending profiles with custom animated charts, circular savings progress rings, and interactive legends.
-*   **Expense Density Heatmap**: Identify calendar days of high-volume transactions via an interactive visual calendar-style density map.
-*   **Budget vs. Actual Trackers**: Set rigid financial boundaries per category and visual indicator bars showing real-time utilization.
-
-### 💼 Comprehensive Ledger & Split Tools
-*   **Multi-Account Ledger**: Manage Cash, Bank accounts, credit lines, and UPI accounts independently with total unified net-worth calculations.
-*   **Split Bill Engine & Groups**: Complete group management to track complex shared expenses, calculate optimized debt structures (who owes whom), and send reminder indicators.
-*   **Structured Debts Tracker**: Separate record logs for money borrowed or lent with automated calculation of net balances.
-*   **Savings Goals & Progress Rings**: Set long-term target pools, associate transactions with them, and track savings streaks.
-*   **EMI & Bill Reminder Dashboards**: Track recurring debts, calculate loan payments, and set future payment reminders.
+*   **Liquid Glassmorphism**: High-depth visual containers featuring custom backdrop filters, translucent surface overlays, and color-coded shadows that adjust dynamically to light and dark configurations.
+*   **GSAP-Powered Motion Choreography**: Smooth startup animation sequences and physics-informed splash screen transitions that provide fluid entry into the application dashboard.
+*   **Diamond Quick Action HUD**: A distinctive, center-docked, 45-degree rotated diamond action trigger (`+`) enabling quick manually logged transactions on mobile screen orientations.
+*   **Active Micro-Animations**: Spring-like UI feedback on inputs, tags, account selections, and navigation tabs.
+*   **HSL Multi-Theme Customizer**: Real-time manipulation of CSS variables at the root element level, supporting 6 distinct theme configurations:
+    1.  🌿 **Default Green**: Clean organic highlights with deep forest gradients.
+    2.  🌙 **Midnight Blue**: Calm indigo backgrounds matching dark dashboard mockups.
+    3.  🌹 **Rose Gold**: Premium copper-rose accent tones.
+    4.  🌊 **Ocean Teal**: Vibrant maritime blue-green styling.
+    5.  💜 **Purple Night**: Rich neon violet micro-accents.
+    6.  🖤 **AMOLED Black**: True-black layouts optimized for OLED phone screens.
 
 ---
 
-## 🛠️ Tech Stack
+## 🚀 Core Architectural Features
 
-MoneyFlow V.2 features a lightweight yet incredibly robust modern runtime environment:
+### 🤖 AI Financial Intelligence (Gemini AI + OpenRouter)
+*   **Context-Injected AI Advisor**: A chat interface (`AIChat.jsx`) leveraging `google/gemini-2.5-flash` to act as an active assistant. The LLM receives contextual snapshots, including:
+    *   Unified balance & individual account distributions.
+    *   Category breakdown metrics.
+    *   Budget alarms (threshold utilization $\ge$ 80%).
+    *   Detected transaction anomalies.
+    *   Last 6 months of historical income/expense trends.
+    *   Last 20 transaction records and active debt ledgers.
+*   **Multilingual Processing**: The assistant automatically detects and matches user language preferences (English, Bengali, Hindi, or mixed code-switching) to deliver actionable savings advice.
+*   **Smart Add (Natural Language Parser)**: An inline entry panel (`SmartAdd.jsx`) allowing users to speak or type transactions in natural phrases (e.g., *"yesterday spent 150 on pizza via UPI"*). The AI extracts:
+    *   Transaction Type (`credit` vs. `debit`).
+    *   Numerical value.
+    *   Normalized description (translated to English).
+    *   ISO Date formatting.
+    *   Matched category selection.
+    *   Account destination (`Cash`, `Bank`, or `UPI`).
+*   **Word-Frequency Auto-Categorization**: An automatic tag classification engine (`autoCategory.js`) that analyzes new transaction descriptions. It maps keywords based on user transaction histories or defaults to dictionary keyword arrays.
 
-*   **Runtime & Framework**: [React 18](https://react.dev/) + [Vite 7](https://vitejs.dev/) (lightning-fast HMR and optimized builds)
-*   **Styling & Icons**: [Tailwind CSS 3](https://tailwindcss.com/) with native variables, glassmorphism, and [Lucide Icons](https://lucide.dev/)
-*   **Animations**: [GreenSock Animation Platform (GSAP)](https://greensock.com/gsap/) for smooth splash screens
-*   **Database & Core Engine**: [Firebase 12 (Firestore)](https://firebase.google.com/) configured with offline persistent caching
-*   **Interactive Visualization**: [Recharts 3](https://recharts.org/) for vector-perfect, responsive canvas charts
-*   **Mobile Wrapper**: [Capacitor 8](https://capacitorjs.com/) enabling cross-platform iOS & Android deployments
-*   **PDF Generation**: [jsPDF 4](https://github.com/parallax/jsPDF) + [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable) for pixel-perfect PDF financial statements
+### 📶 Offline-First Synchronization (IndexedDB Cache)
+*   **Zero-Network Latency**: Uses Firestore's `persistentLocalCache` and `persistentMultipleTabManager` to store all data in local IndexedDB directories. Reads/writes resolve immediately without network roundtrips.
+*   **Auto-Conflict Resolution**: Queued operations apply locally and sync to the cloud database automatically when connection states toggle.
+*   **Connectivity Hooks**: Tracks internet availability through a custom hook (`useNetwork.js`), showing system-wide connection toasts.
+
+### 📊 Cash Flow, Heatmaps & Predictive Analytics
+*   **GitHub-Style Expense Heatmap**: A visual calendar matrix (`ExpenseHeatmap.jsx`) plotting daily spending volume. Levels are HSL color-graded relative to maximum daily expenditure:
+    *   ⬜ *Gray*: No spending.
+    *   🟢 *Light Green*: Low spending ($<15\%$).
+    *   🟢 *Medium Green*: Moderate spending ($<35\%$).
+    *   🟡 *Amber*: High spending ($<55\%$).
+    *   🟠 *Orange*: Very high spending ($<75\%$).
+    *   🔴 *Rose/Red*: Maximum spending ($ge 75\%$).
+*   **Recharts Analytics Dashboard**: Includes vector-based data visualizations:
+    *   Weekly/Monthly bar comparisons of inflows and outflows.
+    *   Cash Flow area charts mapping wealth accumulation over time.
+    *   Day-of-Week bar charts showing spending patterns across the week.
+    *   Category pie charts and vertical forecast summaries.
+*   **Weighted Spending Forecasts**: A forecasting tool (`spendingPredictor.js`) using weighted moving averages of the last 6 months (weighting recent months more heavily) to predict future spending.
+*   **Daily Budget Allowance**: Computes real-time allowances based on current calendar days remaining and available budgets.
+
+### 👥 Collaborative Bookkeeping
+*   **Family Mode (Shared Finances)**: Links two user accounts via secure 6-character alphanumeric invite codes (`familyLinks` collection). Links are verified in real time, unlocking:
+    *   A shared family dashboard.
+    *   Live queries of partner transactions.
+    *   Single-pass $O(N)$ combined income/expense summaries.
+    *   Self-healing link termination if a partner unlinks.
+*   **Split Bill Engine & Greedy Settlement Optimizer**: A bill-splitting module (`GroupExpenses.jsx`) for managing group transactions. It calculates optimal payments using a greedy debt minimization algorithm:
+    1.  Computes net debt or credit positions for each group member.
+    2.  Sorts members into debtors and creditors.
+    3.  Iteratively settles largest outstanding debts, minimizing transactions.
+
+### 💼 Ledger & Statement Generation
+*   **Double-Entry Ledger Grid**: Displays a running balance history initialized from an Opening Balance and As-Of date setup configuration.
+*   **Indian SMS Ingestion Parser**: Automatically extracts transactions from pasted bank notification strings (supports SBI, HDFC, ICICI, Axis, Kotak, GPay, Paytm, and PhonePe).
+*   **Corporate-Grade PDF Statements**: Uses `jsPDF` and `jspdf-autotable` to compile records into PDF statements containing:
+    *   Elegantly designed layout headers and metadata.
+    *   Colored transaction type highlights.
+    *   Summary cards for total inflows, outflows, and net balances.
+
+---
+
+## 🔒 Security & Cryptographic Design
+
+*   **Zero-Trust Authentication**: Leverages custom client hashing (`authUtils.js`) powered by PBKDF2/SHA-256 to hash password strings before Firebase authentication, ensuring plain passwords never transit the database.
+*   **Security Lock Screen & Lockout**: A PIN entry system (`AppLock.jsx`) storing SHA-256 hashes locally. Features include:
+    *   Lockout timer: 30-second keypad lockout after 5 failed attempts.
+    *   Idle auto-lock: Custom inactive timeouts monitored via mouse and scroll listeners.
+*   **WebAuthn Biometrics**: Integrates Face ID / Touch ID using platform authenticator challenges, offering secure biometrics.
+*   **MFA OtpGuard Verification**: Protects sensitive actions (e.g., base account adjustments, account deactivations, deletions) behind a secondary validation step (`OtpGuardModal.jsx`) powered by a FastAPI OTP engine.
+*   **Account Life-Cycle Controls**: Supports:
+    *   *Account Deactivation*: Hides personal profiles without deleting transactions.
+    *   *Scheduled Deletion*: Configures a 30-day grace period, allowing users to cancel deletion on subsequent logins.
+    *   *Permanent Purge*: Deletes authentication records, index mapping, and Firestore collections.
 
 ---
 
@@ -82,84 +129,115 @@ MoneyFlow V.2 features a lightweight yet incredibly robust modern runtime enviro
 
 ```
 MoneyFlow V.2/
-├── public/                 # Static assets & manifest files
+├── public/                     # Static assets, SVG/PNG icons, webapp manifest
+├── firestore.rules             # Granular user collection verification rules
+├── firebase.json               # Firebase SDK deployment configuration
+├── tailwind.config.js          # Custom glassmorphic color presets
+├── vite.config.js              # React bundle compilation pipeline configuration
+├── package.json                # Project dependencies and script runner commands
 ├── src/
-│   ├── App.jsx             # Root layout, router, global PIN locks, and tab layout coordinator
-│   ├── main.jsx            # React root DOM initialization
-│   ├── authUtils.js        # PBKDF2/SHA-256 custom cryptographic hashing library
-│   ├── firebase.js         # Firebase initialization & Offline Firestore config
-│   ├── constants.js        # Global static financial options and styles
-│   ├── components/         # Premium reusable functional views
-│   │   ├── ui/             # Core UI atoms & glass wrappers
-│   │   ├── AIChat.jsx      # Gemini interactive chatbot interface
-│   │   ├── Accounts.jsx    # Bank, UPI, and Cash balance coordinator
-│   │   ├── AddTransaction. # Dynamic debit/credit forms with interactive modifiers
-│   │   ├── AppLock.jsx     # Safe PIN Lock & auto-timeout lock UI
-│   │   ├── AuthScreen.jsx  # Elegant phone-password hybrid signup/signin
-│   │   ├── Charts.jsx      # Interactive Recharts analytics dashboard
-│   │   ├── DebtTracker.jsx # Borrowed & lent record keeper
-│   │   ├── ExpenseHeatmap. # Multi-scale visual transaction calendar density map
-│   │   ├── GroupExpenses.jsx # Advanced bill-split engine & balance optimizer
-│   │   ├── Settings.jsx    # Security presets, profile configs, export utilities
-│   │   └── ... (additional feature components)
+│   ├── main.jsx                # Application mounting point
+│   ├── App.jsx                 # Routing logic, active app-locks, and layout structure
+│   ├── firebase.js             # Firestore initialization & offline persistence setup
+│   ├── authUtils.js            # Authentication logic and SHA-256 PIN hashing helpers
+│   ├── constants.js            # Standard category listings and system configurations
+│   │
 │   ├── context/
-│   │   ├── AppContext.jsx  # Main state engine, CRUD modifiers, and Firebase queries
-│   │   └── ThemeContext.js # Multi-theme switching coordinator (Glass, Dark, HSL presets)
+│   │   ├── AppContext.jsx      # Core state provider (CRUD utilities, AI prompts, and hooks)
+│   │   └── ThemeContext.jsx    # Real-time multi-theme customizer
+│   │
 │   ├── hooks/
-│   │   ├── useNetwork.js   # Live online/offline browser state listener
+│   │   ├── useNetwork.js       # Live online/offline browser state listener
 │   │   ├── useNotifications.js # App-wide local notification manager
-│   │   └── useInstallPrompt.js # PWA browser install handler
-│   └── utils/
-│       ├── autoCategory.js # Keywords mapping & auto-classifier algorithm
-│       ├── smsParser.js    # Decodes regular transactional SMS syntax patterns
-│       └── pdfExport.js    # Formats statements into clean, structured tables
+│   │   └── useInstallPrompt.js # PWA browser install prompt handler
+│   │
+│   ├── utils/
+│   │   ├── smsParser.js        # Decodes bank transaction SMS copy-paste blocks
+│   │   ├── autoCategory.js     # Transaction description auto-categorizer
+│   │   ├── spendingPredictor.js# Calculates future spending forecasts and daily allowances
+│   │   ├── pdfExport.js        # Generates structured PDF financial statements
+│   │   └── csvExport.js        # Formats transactions into downloadable CSV strings
+│   │
+│   └── components/
+│       ├── Header.jsx          # Top-bar showing user profile actions
+│       ├── BottomNav.jsx       # Mobile tab selector layout
+│       ├── DesktopSidebar.jsx  # Desktop sidebar navigation
+│       ├── SplashScreen.jsx    # GSAP physics-informed intro animation panel
+│       ├── AuthScreen.jsx      # Login, registration, and account recovery panel
+│       ├── AppLock.jsx         # PIN pad interface with biometrics support
+│       ├── OnboardingModal.jsx # New user wizard and product spotlight tour
+│       ├── OtpGuardModal.jsx   # FastAPI MFA OTP entry overlay
+│       ├── Dashboard.jsx       # Overview panel with charts and snapshot statistics
+│       ├── Accounts.jsx        # Wallet balance manager
+│       ├── AddTransaction.jsx  # Transaction editor with automated suggestions
+│       ├── SmartAdd.jsx        # Natural language input panel with voice dictation
+│       ├── Ledger.jsx          # Double-entry ledger list view
+│       ├── Charts.jsx          # Full Recharts reporting dashboard
+│       ├── ExpenseHeatmap.jsx  # GitHub-style grid and Day-of-Week breakdown
+│       ├── GroupExpenses.jsx   # Greedy bill-splitting split calculator
+│       ├── DebtTracker.jsx     # Borrowed and lent log
+│       ├── SavingsGoals.jsx    # Long-term goals tracking
+│       ├── BillReminders.jsx   # Upcoming bill reminders
+│       ├── RecurringTransactions.jsx # Automatically generated transactions configuration
+│       ├── SMSImport.jsx       # Interface for bulk SMS parsing
+│       ├── FamilyMode.jsx      # Multi-account linking panel
+│       ├── Settings.jsx        # App configuration, profiles, and security locks
+│       └── ui/
+│           ├── ActionButton.jsx # Rotated diamond HUD selector button
+│           ├── Card.jsx         # Core layout component
+│           ├── InsightCard.jsx  # Custom stat container
+│           └── SkeletonLoader.jsx# Dashboard skeleton loader
 ```
 
 ---
 
-## 🔒 Security Design
+## 🛠️ Tech Stack
 
-*   **Zero-Trust Authentication**: By using custom cryptographic hashing (`authUtils.js`) powered by PBKDF2/SHA-256 on password strings before database submissions, plain passwords never reach the database.
-*   **Contextual Auto-AppLock**: A local security overlay prompts for a 4-digit PIN stored securely in the local context.
-*   **Activity Auto-Lock Timer**: Tracks mouse moves, scrolls, and visibility toggles to automatically lock the workspace after standard idle durations.
+### Frontend Core
+*   **Runtime Library**: React 18.2 (Functional component architecture + React Hooks)
+*   **Build Pipeline**: Vite 7.3 (Hot Module Replacement with rollup asset tree optimization)
+*   **Styling Engine**: Tailwind CSS 3.3 + PostCSS (Modular system utilizing custom HSL properties)
+*   **Animations**: GreenSock Animation Platform (GSAP 3.14) for splash animations
+
+### Core Infrastructure
+*   **Database & Auth**: Firebase 12.9 (Cloud Firestore with IndexedDB cache + Firebase Client Authentication)
+*   **AI Gateway**: OpenRouter Endpoint integration targeting `google/gemini-2.5-flash`
+*   **Visualizations**: Recharts 3.7 (Dynamic responsive charts)
+*   **Native Wrapper**: Capacitor 8.1 (Platform compilation bridge for iOS/Android distribution)
+*   **Document Generation**: jsPDF 4.2 + jsPDF-AutoTable 5.0 (Pixel-precise PDF reporting)
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Prerequisite Installations
-Ensure you have [Node.js (v18 or higher)](https://nodejs.org/) installed on your local computer.
+### 1. Prerequisites
+Verify that [Node.js (v18 or higher)](https://nodejs.org/) is installed on your local development machine.
 
-### 2. Project Download & Dependencies
-Clone the repository and install npm dependencies:
+### 2. Installation
+Clone the repository and install the project dependencies:
 ```bash
 # Clone the repository
 git clone https://github.com/arabindakabiraj/moneyflow-xyz.vercel.app.git
 
-# Move into the folder
+# Navigate into the project folder
 cd "MoneyFlow V.2"
 
-# Install node dependencies
+# Install node modules
 npm install
 ```
 
-### 3. Environment Setup
-Create a `.env` file in the root directory. You can copy `.env.example` as a starting template:
+### 3. Environment Configuration
+Create a `.env` file in the root directory using the `.env.example` template:
 ```bash
 cp .env.example .env
 ```
-Populate the file with your keys:
+
+Populate the `.env` file with your credentials:
 ```env
-# Google Apps Script Web App Integration (Optional backup)
-VITE_GAS_URL=your_gas_web_app_url_here
-
-# Native Gemini API Integration (Optional)
-VITE_GEMINI_API_KEY=your_gemini_api_key_here
-
-# OpenRouter Integration Key
+# OpenRouter API Integration Configuration
 VITE_OPENROUTER_API_KEY=your_openrouter_api_key_here
 
-# Firebase Web Config
+# Firebase Web Application Client Configurations
 VITE_FIREBASE_API_KEY=your_firebase_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
 VITE_FIREBASE_PROJECT_ID=your_firebase_project_id
@@ -168,61 +246,76 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
 VITE_FIREBASE_APP_ID=your_firebase_app_id
 ```
 
-### 4. Development Server
-Run the local dev engine:
+### 4. Running the Development Server
+Start the local development server:
 ```bash
 npm run dev
 ```
-Open [http://localhost:5173](http://localhost:5173) in your web browser.
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ### 5. Production Compilation
-Create an optimized production bundle:
+Compile optimized production assets:
 ```bash
 npm run build
 ```
 
 ---
 
-## 📱 PWA & Capacitor Native Mobile Setup
+## 🔒 FastAPI OTP Service Setup
 
-MoneyFlow V.2 is pre-configured with **CapacitorJS**, making it extremely simple to deploy onto mobile operating systems:
+MoneyFlow V.2 features a Multi-Factor Authentication (MFA) shield. To run this feature locally, you must run the OTP verification backend:
 
-### Initializing Mobile Frameworks
+### 1. Prerequisites
+Ensure you have Python 3.10+ installed.
+
+### 2. Start the FastAPI OTP Backend
+Configure a local backend running at `http://localhost:8001/api/v1` that exposes the following endpoints:
+*   `POST /api/v1/auth/register`: Auto-registers a user in the database.
+*   `POST /api/v1/otp/send`: Generates and sends a 6-digit verification code.
+*   `POST /api/v1/otp/verify`: Verifies the entered OTP code.
+*   `GET /api/v1/otp/dev-latest?identifier={email}`: Returns the last generated code for local testing and autofill validation.
+
+*Note: The frontend automatically detects development hostnames and enables an **Autofill Code** notification toast to streamline local testing.*
+
+---
+
+## 📱 Capacitor Native Mobile Setup
+
+To build and compile native Android or iOS application wrappers:
+
+### 1. Add Platform Containers
+Initialize Capacitor mobile packages in your project:
 ```bash
-# Initialize Android platform wrapper
-npx cap add android
+# Install Capacitor packages
+npm install @capacitor/core @capacitor/cli
 
-# Initialize iOS platform wrapper
+# Add native project folders
+npx cap add android
 npx cap add ios
 ```
 
-### Compiling and Synchronizing
-Whenever you build your frontend bundle, sync the assets to the native shells:
+### 2. Synchronize Assets
+Sync compiled web assets to native container folders after each build:
 ```bash
-# Build the production react bundles
+# Build Vite production bundles
 npm run build
 
-# Synchronize resources with Capacitor
+# Sync assets to Capacitor platform directories
 npx cap sync
 ```
 
-### Opening IDE Native Projects
-Open the native container directly inside Xcode or Android Studio:
+### 3. Open Native IDE Containers
+Open the projects in Android Studio or Xcode to compile and deploy to devices:
 ```bash
-# Launch Android Studio
+# Open project in Android Studio
 npx cap open android
 
-# Launch Xcode
+# Open project in Xcode
 npx cap open ios
 ```
 
 ---
 
-## 📸 Interface Captures
-*(Place your dynamic app walkthrough GIFs or PNG mockups here to display the gorgeous visual glassmorphism UI!)*
-
----
-
 <div align="center">
-  <sub>Designed with ❤️ by <b>Arabinda Kabiraj</b></sub>
+  <sub>Designed and developed with ❤️ by <b>Arabinda Kabiraj</b></sub>
 </div>
