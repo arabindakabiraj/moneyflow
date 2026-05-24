@@ -14,6 +14,7 @@ import {
 const AppContext = createContext(null)
 const OR_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || ''
 const OR_MODEL = 'google/gemini-2.5-flash'
+const askGeminiCache = new Map()
 
 // Pre-built Set lookups for O(1) cash flow classification
 const INVESTING_SET = new Set(INVESTING_CATS.map(c => c.toLowerCase()))
@@ -280,6 +281,21 @@ export function AppProvider({ children }) {
       })
       .catch(console.error)
   }, [uid])
+
+  // Reset chat messages when logging out
+  useEffect(() => {
+    if (!uid) {
+      setChatMessages([
+        { role: 'assistant', content: '👋 I am your AI Financial Advisor! Ask me anything!' }
+      ])
+    }
+  }, [uid])
+
+  const clearChatHistory = async () => {
+    setChatMessages([
+      { role: 'assistant', content: '👋 I am your AI Financial Advisor! Ask me anything!' }
+    ])
+  }
 
   const updateUsername = async (newName) => {
     if (!uid || !newName.trim()) return
@@ -1549,6 +1565,78 @@ export function AppProvider({ children }) {
       ? activeDebts.map(d => `${d.name || d.person || 'Someone'}: ₹${d.amount} (${d.type})`).join(', ')
       : 'No active debts'
 
+    // ── Cache Lookup (0ms latency for repeating messages under the same financial state) ──
+    const stateKey = `${uid || 'guest'}_${userMessage.trim().toLowerCase()}_${summary.balance}_${transactions.length}_${debts.length}`
+    if (askGeminiCache.has(stateKey)) {
+      const cachedReply = askGeminiCache.get(stateKey)
+      setChatMessages(prev => [...prev, { role: 'assistant', content: cachedReply }])
+      return cachedReply
+    }
+
+    // ── Local Rule-Based Fast Response Engine (0ms latency for basic state queries) ──
+    const lowerMsg = userMessage.toLowerCase().trim()
+
+    // 1. Balance Queries
+    if (
+      /balance|bal|taka|paisa|koto acche|rem|account|hisab|amount|rupee/i.test(lowerMsg) &&
+      !/spend|add|buy|goal|debt|loan/i.test(lowerMsg)
+    ) {
+      const balReply = `💵 *Your Current Balance Summary*:\n\n• **Total Balance**: ₹${summary.balance}\n• **Cash Wallet**: ₹${accounts.cash || 0}\n• **Bank Account**: ₹${accounts.bank || 0}\n• **UPI Wallet**: ₹${accounts.upi || 0}\n\nHope this helps! Let me know if you need saving advice.`
+      setChatMessages(prev => [...prev, { role: 'assistant', content: balReply }])
+      return balReply
+    }
+
+    // 2. Goal Creation Queries (e.g. "add goal Bike with target 80000", "create goal laptop 50000")
+    const goalRegex = /(?:add|create|new|set)\s+goal\s+([a-zA-Z0-9\s]+?)(?:\s+(?:with|of|target|price)\s+(\d+))?/i
+    const goalMatchLocal = lowerMsg.match(goalRegex) || lowerMsg.match(/([a-zA-Z0-9\s]+?)\s+goal\s+(?:create|add)(?:\s+(?:with|of|target|price)\s+(\d+))?/i)
+    if (goalMatchLocal) {
+      const name = (goalMatchLocal[1] || 'Savings Goal').trim().replace(/^(for|a|an)\s+/i, '')
+      const targetVal = Number(goalMatchLocal[2] || 50000)
+      if (name && targetVal > 0) {
+        await addGoal({ name, target: targetVal, current: 0 })
+        window.dispatchEvent(new CustomEvent('ai-goal-created', { detail: { name, target: targetVal } }))
+        
+        const goalReply = `🎯 **Savings Goal Created Automatically!**\n\nI have successfully added a new savings goal for you:\n• **Goal**: "${name}"\n• **Target Amount**: ₹${targetVal.toLocaleString()}\n\nYou can track this goal directly on your dashboard. Good luck with your savings!`
+        setChatMessages(prev => [...prev, { role: 'assistant', content: goalReply }])
+        return goalReply
+      }
+    }
+
+    // 3. Debt Summary Query
+    if (/debt|borrow|lent|loan|dhar|baki|dena|lena/i.test(lowerMsg) && !/add|create|repay|pay/i.test(lowerMsg)) {
+      let debtReply = `💸 *Your Debt Summary*:\n\n`
+      if (activeDebts.length === 0) {
+        debtReply += `• You have no active debts! All set.`
+      } else {
+        const borrowed = activeDebts.filter(d => d.type === 'borrowed').reduce((acc, d) => acc + d.amount, 0)
+        const lent = activeDebts.filter(d => d.type === 'lent').reduce((acc, d) => acc + d.amount, 0)
+        debtReply += `• **Total You Owe (Borrowed)**: ₹${borrowed}\n• **Total Owed to You (Lent)**: ₹${lent}\n\n*Details*:\n`
+        activeDebts.forEach(d => {
+          debtReply += `• ${d.name}: ₹${d.amount} (${d.type === 'borrowed' ? 'You owe them' : 'They owe you'})\n`
+        })
+      }
+      setChatMessages(prev => [...prev, { role: 'assistant', content: debtReply }])
+      return debtReply
+    }
+
+    // 4. Budget Queries
+    if (/budget|limit|alert/i.test(lowerMsg) && !/set|change|add|update/i.test(lowerMsg)) {
+      let budgetReply = `🎯 *Your Active Budgets*:\n\n`
+      const categories = Object.keys(budgets)
+      if (categories.length === 0) {
+        budgetReply += `• No budgets configured yet. You can set them in Settings!`
+      } else {
+        categories.forEach(cat => {
+          const limit = budgets[cat]
+          const spent = catBreakdown[cat] || 0
+          const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0
+          budgetReply += `• **${cat}**: ₹${spent} / ₹${limit} (${pct}% used)\n`
+        })
+      }
+      setChatMessages(prev => [...prev, { role: 'assistant', content: budgetReply }])
+      return budgetReply
+    }
+
     const systemInstruction = `You are MoneyFlow's AI Financial Advisor. You are talking to a student user.
 
 ══ Financial Data ══
@@ -1567,20 +1655,25 @@ ${monthlyTrend}
 ${recentTx}
 
 ══ Instructions ══
+- CRITICAL: Keep your response extremely brief, short, and to-the-point (under 60 words / 2-3 sentences max). Never write long paragraphs or explanations. Be highly direct and immediate.
 - Respond in the SAME LANGUAGE as the user's message. If they write in English, reply in English. If Bengali, reply in Bengali. If mixed, reply mixed.
-- Be concise, friendly, and actionable
-- Use emojis for visual clarity
-- When asked to compare months, use the monthly trend data above
-- When asked about specific categories, use category-wise and monthly data
-- For budget advice, consider actual spending vs budget limits
-- Give specific numbers, not vague advice
-- If user asks to show data as a table/chart, format with clear structure`
+- Be concise, friendly, and actionable.
+- Use emojis for visual clarity.
+- When asked to compare months, use the monthly trend data above.
+- When asked about specific categories, use category-wise and monthly data.
+- For budget advice, consider actual spending vs budget limits.
+- Give specific numbers, not vague advice.
+- If user asks to show data as a table/chart, format with clear structure.
+- CRITICAL: If the user talks about a new savings goal or purchase plan (e.g. buying a bike, laptop, car, mobile, trip, etc.), formulate a savings plan. Tell the user you can set up this goal automatically (e.g. "I can add this to your Savings Goals for you!") and you MUST append a command block EXACTLY like this at the end of your response:
+  [AUTO_GOAL:{"name":"Bike Savings","target":80000}]
+  (The JSON payload must be single-line, minified, and contain valid "name" and "target". Ensure the target matches what the user specified or is a reasonable estimate based on the product.)`
 
     setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
 
     if (!OR_API_KEY) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ OpenRouter API Key is not set. Add VITE_OPENROUTER_API_KEY to your .env file.' }])
-      return
+      const errText = '⚠️ OpenRouter API Key is not set. Add VITE_OPENROUTER_API_KEY to your .env file.'
+      setChatMessages(prev => [...prev, { role: 'assistant', content: errText }])
+      return errText
     }
 
     try {
@@ -1590,11 +1683,11 @@ ${recentTx}
           model: OR_MODEL,
           messages: [
             { role: 'system', content: systemInstruction },
-            ...chatMessages.slice(-6),
+            ...chatMessages.slice(-4),
             { role: 'user', content: userMessage },
           ],
           temperature: 0.7,
-          max_tokens: 1500,
+          max_tokens: 300,
         },
         {
           headers: {
@@ -1606,10 +1699,39 @@ ${recentTx}
         }
       )
       const reply = res.data?.choices?.[0]?.message?.content || 'Sorry, no response received.'
-      setChatMessages(prev => [...prev, { role: 'assistant', content: reply }])
+
+      // Auto-create goal if command tag is found
+      const goalMatch = reply.match(/\[AUTO_GOAL:\s*(\{[\s\S]*?\})\s*\]/)
+      if (goalMatch) {
+        try {
+          const goalData = JSON.parse(goalMatch[1])
+          if (goalData.name && goalData.target) {
+            await addGoal({
+              name: goalData.name,
+              target: Number(goalData.target),
+              current: 0
+            })
+            window.dispatchEvent(new CustomEvent('ai-goal-created', { detail: goalData }))
+          }
+        } catch (e) {
+          console.error('Failed to auto-create goal:', e)
+        }
+      }
+
+      // Clean the reply from command tags
+      const cleanReply = reply.replace(/\[AUTO_GOAL:[\s\S]*?\]/g, '').trim()
+
+      // Save to cache map
+      askGeminiCache.set(stateKey, cleanReply)
+
+      setChatMessages(prev => [...prev, { role: 'assistant', content: cleanReply }])
+
+      return cleanReply
     } catch (err) {
       const msg = err.response?.data?.error?.message || err.message
-      setChatMessages(prev => [...prev, { role: 'assistant', content: `❌ AI error: ${msg}` }])
+      const errReply = `❌ AI error: ${msg}`
+      setChatMessages(prev => [...prev, { role: 'assistant', content: errReply }])
+      return errReply
     }
   }
 
@@ -1731,6 +1853,7 @@ RESPOND WITH ONLY valid JSON, no markdown, no explanation:
     addTransaction, updateTransaction, deleteTransaction, toggleNeedWant,
     getSummary, getFilteredTransactions,
     askGemini, askGeminiRaw, parseNLPTransaction,
+    clearChatHistory,
     openingBalance, openingDate, setOpeningBalance,
     gstSettings, updateGstSettings,
     onboardingDone, completeOnboarding,
