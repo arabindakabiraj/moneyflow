@@ -3,7 +3,7 @@
  * iOS 18 glass inputs, dark backdrop, premium form
  */
 import { useState, useEffect, useRef } from 'react'
-import { PlusCircle, CheckCircle, X, Sparkles, Wand2, Mic, MicOff, Loader2, Hash, StickyNote } from 'lucide-react'
+import { PlusCircle, CheckCircle, X, Sparkles, Wand2, Mic, MicOff, Loader2, Hash, StickyNote, ChevronDown } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { suggestCategory } from '../utils/autoCategory'
 
@@ -310,6 +310,19 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
   const [nlpListening, setNlpListening] = useState(false)
   const nlpRecogRef = useRef(null)
 
+  const [catDropdownOpen, setCatDropdownOpen] = useState(false)
+  const catDropdownRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (catDropdownRef.current && !catDropdownRef.current.contains(event.target)) {
+        setCatDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   useEffect(() => {
     if (editData) setForm({ ...defaultForm, ...editData })
     else setForm(defaultForm)
@@ -457,19 +470,49 @@ export default function AddTransaction({ editData, onEditDone, defaultType, onTy
             </div>
 
             {/* Category selection */}
-            <div>
+            <div className="relative" ref={catDropdownRef}>
               <GlassLabel>Category</GlassLabel>
-              <div className="flex flex-wrap gap-2">
-                {customCategories.map(cat => (
-                  <button key={cat} onClick={() => handleChange('category', cat)}
-                    className="px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95"
-                    style={form.category === cat
-                      ? { background:'linear-gradient(135deg,rgba(34,197,94,0.85),rgba(16,185,129,0.80))', color:'white', boxShadow:'0 4px 12px rgba(34,197,94,0.40)', border:'1px solid rgba(34,197,94,0.50)' }
-                      : { background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.55)', border:'1px solid rgba(255,255,255,0.12)' }}>
-                    {cat}
-                  </button>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setCatDropdownOpen(p => !p)}
+                className="w-full px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 flex items-center justify-between active:scale-[0.99]"
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1.5px solid rgba(255,255,255,0.16)',
+                  color: 'rgba(255,255,255,0.92)',
+                }}
+              >
+                <span>{form.category}</span>
+                <ChevronDown size={15} className={`transition-transform duration-200 ${catDropdownOpen ? 'rotate-180' : ''}`} style={{ color: 'rgba(255,255,255,0.40)' }} />
+              </button>
+
+              {catDropdownOpen && (
+                <div className="absolute left-0 right-0 mt-2 p-2 rounded-2xl backdrop-blur-xl border border-white/[0.08] shadow-2xl z-[100] max-h-60 overflow-y-auto"
+                  style={{
+                    background: 'rgba(26, 26, 29, 0.96)',
+                  }}
+                >
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {customCategories.map(cat => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          handleChange('category', cat);
+                          setCatDropdownOpen(false);
+                        }}
+                        className="px-3 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 text-left flex items-center justify-between hover:bg-white/[0.06] active:scale-95"
+                        style={form.category === cat
+                          ? { background: 'linear-gradient(135deg,rgba(34,197,94,0.18),rgba(16,185,129,0.15))', color: '#4ade80', border: '1px solid rgba(34,197,94,0.30)' }
+                          : { background: 'transparent', color: 'rgba(255,255,255,0.60)', border: '1px solid transparent' }}
+                      >
+                        <span className="truncate">{cat}</span>
+                        {form.category === cat && <span className="text-[8px] text-[#4ade80]">●</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Tags */}

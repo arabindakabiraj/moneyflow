@@ -247,7 +247,7 @@ function NetWorthTimeline() {
   const growing = growth >= 0
 
   return (
-    <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5">
+    <div className="hidden lg:block bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5">
       {/* Header */}
       <div className="flex items-center gap-2.5 mb-2">
         <div className="w-8 h-8 rounded-xl flex items-center justify-center"
@@ -338,7 +338,7 @@ export function TipWidget() {
   const tip = tips[tipIdx]
 
   return (
-    <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 animate-fade-in relative overflow-hidden">
+    <div className="hidden lg:block bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 animate-fade-in relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div style={{
           position: 'absolute', top: '-35%', right: '-15%',
@@ -464,7 +464,7 @@ function GoalsAndBillsWidget() {
 
   if (activeGoals.length === 0 && upcomingBills.length === 0) {
     return (
-      <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 text-center py-8 animate-fade-in">
+      <div className="hidden lg:block bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 text-center py-8 animate-fade-in">
         <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mx-auto mb-3 text-indigo-400">
           <Target size={20} />
         </div>
@@ -477,7 +477,7 @@ function GoalsAndBillsWidget() {
   }
 
   return (
-    <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 space-y-5 animate-fade-in">
+    <div className="hidden lg:block bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 space-y-5 animate-fade-in">
       <div className="flex items-center justify-between border-b border-black/[0.04] dark:border-white/[0.04] pb-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-400">
@@ -714,6 +714,45 @@ export function TransactionRow({ tx, compact = false, onEdit, onDelete, onToggle
   )
 }
 
+/* ═══════════════ RECENT TRANSACTIONS WIDGET ═══════════════ */
+function RecentTransactionsWidget({ recent, loading, darkMode, setActiveTab }) {
+  return (
+    <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-[20px] p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3.5">
+        <h3 className="font-semibold text-xs uppercase tracking-wider text-gray-400 dark:text-white/35">Recent Transactions</h3>
+        <button onClick={() => setActiveTab('transactions')}
+          className="flex items-center gap-1 text-[11px] font-bold text-[#4F8EF7] border-none bg-transparent cursor-pointer active:scale-95 transition-all">
+          See all <ChevronRight size={12} />
+        </button>
+      </div>
+      {loading && (
+        <div className="flex justify-center py-3">
+          <RefreshCw size={16} className="animate-spin text-[#4F8EF7]" />
+        </div>
+      )}
+      <div className="space-y-2">
+        {recent.length === 0 ? (
+          <div className="text-center py-6">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+              style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }}>
+              <Wallet size={20} className="text-gray-400 dark:text-white/30" />
+            </div>
+            <p className="text-xs font-medium text-gray-400 dark:text-white/40">No transactions logged yet</p>
+            <button onClick={() => setActiveTab('add')}
+              className="text-xs font-semibold mt-1.5 text-[#4F8EF7] border-none bg-transparent cursor-pointer hover:underline">
+              + Add First Transaction
+            </button>
+          </div>
+        ) : recent.map((tx) => (
+          <div key={tx.id} className="stagger-item">
+            <TransactionRow tx={tx} compact />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /* ═══════════════ MAIN DASHBOARD ═══════════════ */
 export default function Dashboard({ onAddWithType }) {
   const { getSummary, transactions, accounts = {}, budgets = {}, savingsGoal, setActiveTab, loading, goals, darkMode, username, balanceHidden, setBalanceHidden, getTrueBalance } = useApp()
@@ -759,9 +798,9 @@ export default function Dashboard({ onAddWithType }) {
     { label: 'Analytics', icon: BarChart3,    color: '#FBBF24', bg: 'rgba(251,191,36,0.10)', action: () => setActiveTab('charts') },
   ]
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Welcome Greeting Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-black/[0.05] dark:border-white/[0.05]">
+    <div className="space-y-4 lg:space-y-6 animate-fade-in">
+      {/* Welcome Greeting Header (hidden on mobile, shown on desktop to prevent duplicate username labels) */}
+      <div className="hidden md:flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-black/[0.05] dark:border-white/[0.05]">
         <div>
           <h2 className="font-display font-bold text-2xl text-gray-900 dark:text-white/95 flex items-center gap-2">
             <span>Hello, {username || 'User'}!</span>
@@ -778,9 +817,9 @@ export default function Dashboard({ onAddWithType }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
         {/* Left Column: Account Summary, Timeline, Recent Ledger */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 flex flex-col gap-4 lg:gap-6">
           {/* ═══ 1. BALANCE HERO CARD ═══════════════════ */}
           <div className="rounded-[20px] p-6 relative tour-balance-card" style={{ background: 'linear-gradient(145deg, var(--mf-hero-from) 0%, var(--mf-hero-to) 100%)', border: '1px solid var(--mf-border)', boxShadow: 'var(--mf-shadow-lg)' }}>
             {/* Subtle accent glow */}
@@ -863,9 +902,44 @@ export default function Dashboard({ onAddWithType }) {
             </div>
           </div>
 
+          {/* ═══ MOBILE QUICK ACTIONS GRID (exclusively shown on mobile, hidden on desktop) ═══ */}
+          <div className="lg:hidden bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-[20px] p-4 shadow-sm space-y-3.5 tour-quick-actions">
+            <h4 className="text-[10px] uppercase font-bold tracking-wider text-gray-400 dark:text-white/30 flex items-center gap-1.5">
+              <Zap size={11} className="text-[#14B8A6]" /> Cockpit Tools & Actions
+            </h4>
+            <div className="grid grid-cols-3 gap-2.5">
+              {[
+                { label: 'Income',    icon: ArrowDownLeft,  color: '#34D399', bg: 'rgba(52,211,153,0.08)', action: () => onAddWithType?.('credit') },
+                { label: 'Expense',   icon: ArrowUpRight,   color: '#FF6B6B', bg: 'rgba(255,107,107,0.08)', action: () => onAddWithType?.('debit') },
+                { label: 'Smart Add',  icon: Zap,            color: '#14B8A6', bg: 'rgba(20,184,166,0.08)',  action: () => setActiveTab('smartadd') },
+                { label: 'Accounts',   icon: CreditCard,     color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  action: () => setActiveTab('accounts') },
+                { label: 'AI Chat',    icon: Brain,          color: '#a855f7', bg: 'rgba(168,85,247,0.08)',  action: () => setActiveTab('ai') },
+                { label: 'Analytics',  icon: BarChart3,      color: '#f59e0b', bg: 'rgba(245,158,11,0.08)',  action: () => setActiveTab('charts') },
+              ].map(({ label, icon: QIcon, color, bg, action }) => (
+                <button key={label} onClick={action}
+                  className={`flex flex-col items-center justify-center gap-1.5 py-2.5 px-1 rounded-2xl active:scale-[0.96] transition-all duration-150 bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04] hover:border-white/[0.08] ${label === 'AI Chat' ? 'tour-ai-btn' : ''}`}
+                  style={{ touchAction: 'manipulation' }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-inner"
+                    style={{ background: bg }}>
+                    <QIcon size={15} style={{ color }} />
+                  </div>
+                  <span className="text-[10px] font-bold tracking-tight text-center leading-none text-gray-700 dark:text-white/70">
+                    {label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ═══ MOBILE RECENT TRANSACTIONS (shown only on mobile, placed directly below quick actions) ═══ */}
+          <div className="lg:hidden">
+            <RecentTransactionsWidget recent={recent} loading={loading} darkMode={darkMode} setActiveTab={setActiveTab} />
+          </div>
+
+
           {/* ═══ Setup Checklist (shown only if new user) ═══ */}
           {transactions.length === 0 && (
-            <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 stagger-item">
+            <div className="hidden lg:block bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5 stagger-item">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-base">🚀</span>
                 <h4 className="font-semibold text-sm text-gray-800 dark:text-white/90">Quick Start Checklist</h4>
@@ -921,9 +995,9 @@ export default function Dashboard({ onAddWithType }) {
         </div>
 
         {/* Right Column: Quick Links, Analytics, AI Predictors */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* ═══ 5. QUICK ACTIONS ═════════════════════════════════════ */}
-          <div className="space-y-2.5 tour-quick-actions">
+        <div className="lg:col-span-5 flex flex-col gap-4 lg:gap-6">
+          {/* ═══ 5. QUICK ACTIONS (hidden on mobile, shown on desktop) ═════════════════════════════════════ */}
+          <div className="hidden lg:block space-y-2.5 tour-quick-actions">
             {[primaryActions, secondaryActions].map((row, ri) => (
               <div key={ri} className="grid grid-cols-3 gap-2.5">
                 {row.map(({ label, icon: QIcon, color, bg, action }) => (
@@ -943,8 +1017,8 @@ export default function Dashboard({ onAddWithType }) {
             ))}
           </div>
 
-          {/* ═══ 6. STREAK + SAVINGS GOAL ══════════════════════════ */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* ═══ 6. STREAK + SAVINGS GOAL (hidden on mobile, shown on desktop) ══════════════════════════ */}
+          <div className="hidden lg:grid grid-cols-2 gap-3">
             {/* Streak */}
             <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl p-5 flex flex-col items-center justify-center"
               style={{ opacity: streak < 2 ? 0.5 : 1 }}>
@@ -979,39 +1053,9 @@ export default function Dashboard({ onAddWithType }) {
           {/* ═══ 8. BALANCE SHEET ══════════════════════════════════ */}
           <BalanceSheetWidget />
  
-          {/* ═══ 4. RECENT TRANSACTIONS (Moved below Balance Sheet) ════════════════════════════ */}
-          <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">Recent Transactions</h3>
-              <button onClick={() => setActiveTab('transactions')}
-                className="flex items-center gap-1 text-xs font-medium text-[#4F8EF7]">
-                See all <ChevronRight size={13} />
-              </button>
-            </div>
-            {loading && (
-              <div className="flex justify-center py-3">
-                <RefreshCw size={16} className="animate-spin text-[#4F8EF7]" />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              {recent.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                    style={{ background: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }}>
-                    <Wallet size={22} className="text-gray-400 dark:text-white/30" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-400 dark:text-white/40">No transactions yet</p>
-                  <button onClick={() => setActiveTab('add')}
-                    className="text-xs font-semibold mt-1.5 text-[#4F8EF7]">
-                    + Add First Transaction
-                  </button>
-                </div>
-              ) : recent.map((tx, idx) => (
-                <div key={tx.id} className="stagger-item">
-                  <TransactionRow tx={tx} compact />
-                </div>
-              ))}
-            </div>
+          {/* ═══ 4. RECENT TRANSACTIONS (Moved below Balance Sheet, hidden on mobile) ════════════════════════════ */}
+          <div className="hidden lg:block">
+            <RecentTransactionsWidget recent={recent} loading={loading} darkMode={darkMode} setActiveTab={setActiveTab} />
           </div>
 
           {/* ═══ 9. EXPENSE BREAKDOWN ══════════════════════════════ */}

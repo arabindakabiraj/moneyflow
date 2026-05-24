@@ -104,7 +104,10 @@ export async function registerUser(name, email, password, phone = '') {
 
     if (error) throw error
     const user = data.user
-    if (!user) throw new Error('Failed to register user.')
+    if (!user) {
+      // Supabase returns an empty success response if the email already exists to prevent email enumeration
+      throw new Error('This email is already registered. Please try logging in instead.')
+    }
 
     if (data.session) {
       saveSession(user.id)

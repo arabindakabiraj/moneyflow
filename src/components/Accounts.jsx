@@ -93,7 +93,7 @@ export default function Accounts() {
           }} />
         </div>
         <p className="text-xs mb-1 relative z-10 text-gray-500 dark:text-white/50">Total Balance</p>
-        <p className="font-display font-bold text-4xl relative z-10 text-gray-900 dark:text-white/97 flex items-center justify-center h-12" style={{
+        <p className="font-display font-bold text-4xl relative z-10 text-gray-900 dark:text-white flex items-center justify-center h-12" style={{
           textShadow:'0 2px 20px rgba(74,222,128,0.25)',
         }}>
           {balanceHidden ? (
