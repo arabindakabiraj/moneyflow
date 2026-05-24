@@ -18,6 +18,7 @@ import OnboardingModal from './components/OnboardingModal'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useNetwork } from './hooks/useNetwork'
 import DesktopSidebar from './components/DesktopSidebar'
+import { isSupabaseConfigured } from './supabase'
 
 // ── Lazy-loaded tabs (code-split → faster initial load) ──
 const AIChat = lazy(() => import('./components/AIChat'))
@@ -131,6 +132,46 @@ function AppContent() {
   }, [setActiveTab])
 
   if (!splashDone) return <SplashScreen onFinish={onSplashFinish} />
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--mf-bg)' }}>
+        <div className="w-full max-w-md p-8 rounded-3xl text-center space-y-6" style={{
+          background: 'var(--mf-surface)',
+          border: '1.5px solid rgba(255,107,107,0.25)',
+          boxShadow: 'var(--mf-shadow-lg)'
+        }}>
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto shadow-lg shadow-red-500/5">
+            <span className="text-3xl text-red-500 font-bold">⚠️</span>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-white">Supabase Credentials Missing</h2>
+            <p className="text-sm text-white/60 leading-relaxed font-body">
+              Your application database keys are not configured in your deployment settings.
+            </p>
+          </div>
+          <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.05] text-left text-xs font-mono space-y-3 text-white/70">
+            <p className="font-bold text-emerald-400">Please add these Environment Variables on Vercel:</p>
+            <div>
+              <span className="block text-[10px] text-white/40 uppercase tracking-wider font-bold mb-1">Key Name</span>
+              <div className="p-2 rounded bg-black/40 select-all font-semibold break-all text-white/90 border border-white/[0.03]">
+                VITE_SUPABASE_URL
+              </div>
+            </div>
+            <div>
+              <span className="block text-[10px] text-white/40 uppercase tracking-wider font-bold mb-1">Anon Key</span>
+              <div className="p-2 rounded bg-black/40 select-all font-semibold break-all text-white/90 border border-white/[0.03]">
+                VITE_SUPABASE_ANON_KEY
+              </div>
+            </div>
+          </div>
+          <div className="text-xs text-white/40 leading-relaxed font-body">
+            After configuring the keys in the Vercel Dashboard under <strong>Settings ➔ Environment Variables</strong>, trigger a new deployment to apply the changes.
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (uid === undefined) {
     return (
