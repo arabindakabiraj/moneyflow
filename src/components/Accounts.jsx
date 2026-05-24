@@ -9,7 +9,7 @@ import { auth } from '../firebase'
 import OtpGuardModal from './OtpGuardModal'
 
 export default function Accounts() {
-  const { accounts, updateAccountBalance, transactions, darkMode } = useApp()
+  const { accounts, updateAccountBalance, transactions, darkMode, balanceHidden } = useApp()
   const [editing, setEditing] = useState(null)
   const [input, setInput]     = useState('')
   
@@ -64,13 +64,13 @@ export default function Accounts() {
   const calcBalance = (key) => {
     const base   = accounts[key] ?? 0
     const totals = acctTotals[key] || { credit: 0, debit: 0 }
-    return base + totals.credit - totals.debit
+    return Math.max(0, base + totals.credit - totals.debit)
   }
 
   const cashBal = calcBalance('cash')
   const bankBal = calcBalance('bank')
   const  upiBal = calcBalance('upi')
-  const totalBalance = cashBal + bankBal + upiBal
+  const totalBalance = Math.max(0, cashBal + bankBal + upiBal)
 
   const lastTx = (key) => transactions.filter(tx => (tx.account?.toLowerCase() || 'cash') === key)[0]
   const getBal  = (key) => key === 'cash' ? cashBal : key === 'bank' ? bankBal : upiBal
@@ -94,16 +94,36 @@ export default function Accounts() {
           }} />
         </div>
         <p className="text-xs mb-1 relative z-10 text-gray-500 dark:text-white/50">Total Balance</p>
-        <p className="font-display font-bold text-4xl relative z-10 text-gray-900 dark:text-white/97" style={{
+        <p className="font-display font-bold text-4xl relative z-10 text-gray-900 dark:text-white/97 flex items-center justify-center h-12" style={{
           textShadow:'0 2px 20px rgba(74,222,128,0.25)',
         }}>
-          ₹{totalBalance.toLocaleString('en-IN')}
+          {balanceHidden ? (
+            <span className="inline-flex items-center gap-1.5 h-10 select-none pointer-events-none">
+              <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+              <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+              <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+              <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+              <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+            </span>
+          ) : (
+            `₹${totalBalance.toLocaleString('en-IN')}`
+          )}
         </p>
         <div className="flex items-center justify-center gap-2 mt-3 relative z-10 flex-wrap">
           {Object.entries(accountMeta).map(([key, { emoji, accent, bg }]) => (
-            <span key={key} className="text-xs px-2.5 py-1 rounded-xl font-mono font-semibold"
+            <span key={key} className="text-xs px-2.5 py-1 rounded-xl font-mono font-semibold flex items-center gap-1"
               style={{ background: bg, color: accent, border: `1px solid ${accent}55` }}>
-              {emoji} ₹{getBal(key).toLocaleString('en-IN')}
+              <span>{emoji}</span>
+              {balanceHidden ? (
+                <span className="inline-flex items-center gap-1 h-3 select-none pointer-events-none mx-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                </span>
+              ) : (
+                `₹${getBal(key).toLocaleString('en-IN')}`
+              )}
             </span>
           ))}
         </div>
@@ -154,8 +174,18 @@ export default function Accounts() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="font-display font-bold text-xl font-mono" style={{ color: accent }}>
-                    ₹{bal.toLocaleString('en-IN')}
+                  <span className="font-display font-bold text-xl font-mono flex items-center h-7" style={{ color: accent }}>
+                    {balanceHidden ? (
+                      <span className="inline-flex items-center gap-1.5 h-6 select-none pointer-events-none mx-1">
+                        <span className="w-2 h-2 rounded-full bg-current opacity-40"></span>
+                        <span className="w-2 h-2 rounded-full bg-current opacity-45"></span>
+                        <span className="w-2 h-2 rounded-full bg-current opacity-45"></span>
+                        <span className="w-2 h-2 rounded-full bg-current opacity-45"></span>
+                        <span className="w-2 h-2 rounded-full bg-current opacity-45"></span>
+                      </span>
+                    ) : (
+                      `₹${bal.toLocaleString('en-IN')}`
+                    )}
                   </span>
                   <button onClick={() => { setEditing(key); setInput(String(baseBal)) }}
                     className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors bg-black/[0.04] dark:bg-white/[0.08] text-gray-500 dark:text-white/45 hover:bg-black/[0.08] dark:hover:bg-white/20">
@@ -175,7 +205,18 @@ export default function Accounts() {
                 <ArrowDownLeft size={12} style={{ color: 'var(--mf-success)', flexShrink: 0 }} />
                 <div>
                   <p className="text-[10px] text-gray-500 dark:text-white/40">Income</p>
-                  <p className="text-xs font-mono font-bold" style={{ color: 'var(--mf-success)' }}>₹{totals.credit.toLocaleString('en-IN')}</p>
+                  <p className="text-xs font-mono font-bold" style={{ color: 'var(--mf-success)' }}>
+                    {balanceHidden ? (
+                      <span className="inline-flex items-center gap-1 h-3 select-none pointer-events-none">
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                      </span>
+                    ) : (
+                      `₹${totals.credit.toLocaleString('en-IN')}`
+                    )}
+                  </p>
                 </div>
               </div>
               <div className="flex-1 flex items-center gap-1.5 rounded-xl px-2.5 py-1.5"
@@ -186,7 +227,18 @@ export default function Accounts() {
                 <ArrowUpRight size={12} style={{ color: 'var(--mf-error)', flexShrink: 0 }} />
                 <div>
                   <p className="text-[10px] text-gray-500 dark:text-white/40">Expense</p>
-                  <p className="text-xs font-mono font-bold" style={{ color: 'var(--mf-error)' }}>₹{totals.debit.toLocaleString('en-IN')}</p>
+                  <p className="text-xs font-mono font-bold" style={{ color: 'var(--mf-error)' }}>
+                    {balanceHidden ? (
+                      <span className="inline-flex items-center gap-1 h-3 select-none pointer-events-none">
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                      </span>
+                    ) : (
+                      `₹${totals.debit.toLocaleString('en-IN')}`
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
@@ -199,8 +251,17 @@ export default function Accounts() {
                   <span className="text-xs truncate max-w-[60%] text-gray-500 dark:text-white/60">
                     {lastTransaction.description || lastTransaction.category}
                   </span>
-                  <span className="text-xs font-mono font-bold" style={{ color: lastTransaction.type === 'credit' ? 'var(--mf-success)' : 'var(--mf-error)' }}>
-                    {lastTransaction.type === 'credit' ? '+' : '-'}₹{Number(lastTransaction.amount).toLocaleString('en-IN')}
+                  <span className="text-xs font-mono font-bold flex items-center h-4" style={{ color: lastTransaction.type === 'credit' ? 'var(--mf-success)' : 'var(--mf-error)' }}>
+                    {balanceHidden ? (
+                      <span className="inline-flex items-center gap-1 h-3 select-none pointer-events-none mx-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                      </span>
+                    ) : (
+                      `${lastTransaction.type === 'credit' ? '+' : '-'}₹${Number(lastTransaction.amount).toLocaleString('en-IN')}`
+                    )}
                   </span>
                 </div>
               </div>

@@ -4,7 +4,7 @@
  * All business logic preserved from original
  */
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, Plus, ArrowDownLeft, ArrowUpRight, CreditCard, Zap, ArrowDown, ArrowUp, Brain, X, Lightbulb, Flame, Scale, Target, BarChart3, MessageCircle, BookOpen, Activity, Eye, EyeOff, Check } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ChevronRight, RefreshCw, Plus, ArrowDownLeft, ArrowUpRight, CreditCard, Zap, ArrowDown, ArrowUp, Brain, X, Lightbulb, Flame, Scale, Target, BarChart3, MessageCircle, BookOpen, Activity, Eye, EyeOff, Check, Sparkles } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { useApp } from '../context/AppContext'
 import { predictSpending, getDailyBudgetInfo } from '../utils/spendingPredictor'
@@ -249,44 +249,61 @@ function NetWorthTimeline() {
   return (
     <div className="bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] rounded-2xl p-5">
       {/* Header */}
-      <div className="flex items-center gap-2.5 mb-1">
+      <div className="flex items-center gap-2.5 mb-2">
         <div className="w-8 h-8 rounded-xl flex items-center justify-center"
           style={{ background: 'rgba(79,142,247,0.15)' }}>
           <TrendingUp size={14} className="text-[#4F8EF7]" />
         </div>
         <h3 className="font-semibold text-sm text-gray-800 dark:text-white/90">
-          Net Worth Timeline {isMock && <span className="ml-1 text-[8px] font-mono tracking-widest uppercase bg-indigo-500/20 text-[#4F8EF7] px-1.5 py-0.5 rounded-md">Preview</span>}
+          Net Worth Timeline
         </h3>
-        <span className="ml-auto text-xs font-bold" style={{ color: growing ? '#34D399' : '#FF6B6B' }}>
-          {growing ? '+' : '-'}₹{Math.abs(growth).toLocaleString('en-IN')}
-        </span>
+        {!isMock && (
+          <span className="ml-auto text-xs font-bold" style={{ color: growing ? '#34D399' : '#FF6B6B' }}>
+            {growing ? '+' : '-'}₹{Math.abs(growth).toLocaleString('en-IN')}
+          </span>
+        )}
       </div>
-      <p className="text-[10px] mb-3 text-gray-400 dark:text-white/30">
-        {isMock ? '✨ Accumulate transaction history over 2 months to unlock actual growth chart' : 'Wealth growth over time'}
-      </p>
 
-      {/* Chart */}
-      <ResponsiveContainer width="100%" height={110}>
-        <LineChart data={data} margin={{ top:4, right:4, left:-28, bottom:0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)"} />
-          <XAxis dataKey="month" tick={{ fontSize: 9, fill: darkMode ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.45)' }} tickFormatter={m => m?.slice(5)} />
-          <YAxis tick={{ fontSize: 9, fill: darkMode ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.45)' }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
-          <Tooltip
-            contentStyle={{
-              background: darkMode ? 'var(--mf-surface-2)' : '#ffffff',
-              border: `1px solid ${darkMode ? 'var(--mf-border)' : 'rgba(0,0,0,0.08)'}`,
-              borderRadius: 12,
-              fontSize: 11,
-              color: darkMode ? 'rgba(255,255,255,0.90)' : 'rgba(0,0,0,0.90)',
-              boxShadow: darkMode ? 'none' : '0 4px 12px rgba(0,0,0,0.05)'
-            }}
-            formatter={v => [`₹${v.toLocaleString('en-IN')}`, 'Net Worth']}
-          />
-          <Line type="monotone" dataKey="netWorth" stroke={growing ? '#34D399' : '#FF6B6B'}
-            strokeWidth={2} dot={{ r: 3, fill: growing ? '#34D399' : '#FF6B6B', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: growing ? '#34D399' : '#FF6B6B' }} />
-        </LineChart>
-      </ResponsiveContainer>
+      {isMock ? (
+        <div className="flex flex-col items-center justify-center text-center py-6 px-4 bg-black/[0.02] dark:bg-white/[0.02] rounded-xl border border-dashed border-black/10 dark:border-white/10 mt-1 animate-fade-in">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-[#4F8EF7] flex items-center justify-center mb-2">
+            <BarChart3 size={18} />
+          </div>
+          <p className="text-xs font-semibold text-gray-800 dark:text-white/80">No timeline history yet</p>
+          <p className="text-[10px] text-gray-400 dark:text-white/35 max-w-[240px] mt-1 leading-relaxed">
+            Your cumulative net worth growth chart will unlock automatically once you accumulate transactions over 2 or more months.
+          </p>
+        </div>
+      ) : (
+        <>
+          <p className="text-[10px] mb-3 text-gray-400 dark:text-white/30">
+            Wealth growth over time
+          </p>
+
+          {/* Chart */}
+          <ResponsiveContainer width="100%" height={110}>
+            <LineChart data={data} margin={{ top:4, right:4, left:-28, bottom:0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)"} />
+              <XAxis dataKey="month" tick={{ fontSize: 9, fill: darkMode ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.45)' }} tickFormatter={m => m?.slice(5)} />
+              <YAxis tick={{ fontSize: 9, fill: darkMode ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.45)' }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{
+                  background: darkMode ? 'var(--mf-surface-2)' : '#ffffff',
+                  border: `1px solid ${darkMode ? 'var(--mf-border)' : 'rgba(0,0,0,0.08)'}`,
+                  borderRadius: 12,
+                  fontSize: 11,
+                  color: darkMode ? 'rgba(255,255,255,0.90)' : 'rgba(0,0,0,0.90)',
+                  boxShadow: darkMode ? 'none' : '0 4px 12px rgba(0,0,0,0.05)'
+                }}
+                formatter={v => [`₹${v.toLocaleString('en-IN')}`, 'Net Worth']}
+              />
+              <Line type="monotone" dataKey="netWorth" stroke={growing ? '#34D399' : '#FF6B6B'}
+                strokeWidth={2} dot={{ r: 3, fill: growing ? '#34D399' : '#FF6B6B', strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: growing ? '#34D399' : '#FF6B6B' }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </>
+      )}
     </div>
   )
 }
@@ -548,16 +565,14 @@ export function TransactionRow({ tx, compact = false, onEdit, onDelete, onToggle
 
 /* ═══════════════ MAIN DASHBOARD ═══════════════ */
 export default function Dashboard({ onAddWithType }) {
-  const { getSummary, transactions, accounts = {}, budgets = {}, savingsGoal, setActiveTab, loading, goals, darkMode, username } = useApp()
+  const { getSummary, transactions, accounts = {}, budgets = {}, savingsGoal, setActiveTab, loading, goals, darkMode, username, balanceHidden, setBalanceHidden, getTrueBalance } = useApp()
   const summary = getSummary()
-  const animatedBalance = useCountUp(summary.balance)
+  const trueBalance = getTrueBalance()
+  const animatedBalance = useCountUp(Math.max(0, trueBalance))
   const streak = useStreak()
 
-  const [balanceHidden, setBalanceHidden] = useState(
-    () => localStorage.getItem('mf_balance_hidden') === 'true'
-  )
   const toggleBalance = () => {
-    setBalanceHidden(h => { localStorage.setItem('mf_balance_hidden', String(!h)); return !h })
+    setBalanceHidden(h => !h)
   }
 
   const recent = useMemo(() => transactions.slice(0, 5), [transactions])
@@ -579,7 +594,7 @@ export default function Dashboard({ onAddWithType }) {
       }, goals[0])
     : null
   const topGoalPct  = topGoal ? Math.min((Number(topGoal.saved||0)/Number(topGoal.target||1))*100,100) : 0
-  const savingsPct  = Math.min((summary.balance / savingsGoal) * 100, 100)
+  const savingsPct  = Math.min((Math.max(0, trueBalance) / savingsGoal) * 100, 100)
 
   /* Quick action config */
   const primaryActions = [
@@ -597,8 +612,9 @@ export default function Dashboard({ onAddWithType }) {
       {/* Welcome Greeting Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-black/[0.05] dark:border-white/[0.05]">
         <div>
-          <h2 className="font-display font-bold text-2xl text-gray-900 dark:text-white/95">
-            Hello, {username || 'User'}! 👋
+          <h2 className="font-display font-bold text-2xl text-gray-900 dark:text-white/95 flex items-center gap-2">
+            <span>Hello, {username || 'User'}!</span>
+            <Sparkles size={20} className="text-amber-400 animate-pulse shrink-0" style={{ filter: 'drop-shadow(0 0 4px rgba(251, 191, 36, 0.4))' }} />
           </h2>
           <p className="text-xs text-gray-500 dark:text-white/45 mt-0.5">
             Here's your financial status overview at a glance.
@@ -640,8 +656,18 @@ export default function Dashboard({ onAddWithType }) {
 
               <div className="flex items-center justify-between gap-3 mb-6">
                 {/* Big balance number */}
-                <p className="font-display font-bold text-[40px] md:text-[44px] leading-none tracking-tight text-gray-900 dark:text-white/95">
-                  {balanceHidden ? '₹ ●●●●●●' : `₹${animatedBalance.toLocaleString('en-IN')}`}
+                <p className="font-display font-bold text-[40px] md:text-[44px] leading-none tracking-tight text-gray-900 dark:text-white/95 flex items-center h-12">
+                  {balanceHidden ? (
+                    <span className="inline-flex items-center gap-1.5 h-10 select-none pointer-events-none">
+                      <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+                      <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+                      <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+                      <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+                      <span className="w-3.5 h-3.5 rounded-full bg-gray-500/30 dark:bg-white/20"></span>
+                    </span>
+                  ) : (
+                    `₹${animatedBalance.toLocaleString('en-IN')}`
+                  )}
                 </p>
                 {/* Balance hide/show - aligned opposite to the amount */}
                 <button onClick={toggleBalance}
@@ -667,8 +693,17 @@ export default function Dashboard({ onAddWithType }) {
                     </div>
                     <div>
                       <p className="text-[9px] uppercase font-semibold text-gray-500 dark:text-white/40">{label}</p>
-                      <p className="font-bold text-sm font-mono" style={{ color }}>
-                        {balanceHidden ? '₹ ●●●●' : `₹${value.toLocaleString('en-IN')}`}
+                      <p className="font-bold text-sm font-mono flex items-center h-5" style={{ color }}>
+                        {balanceHidden ? (
+                          <span className="inline-flex items-center gap-1 h-3 select-none pointer-events-none">
+                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-45"></span>
+                          </span>
+                        ) : (
+                          `₹${value.toLocaleString('en-IN')}`
+                        )}
                       </p>
                     </div>
                   </div>

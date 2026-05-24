@@ -101,6 +101,16 @@ export function AppProvider({ children }) {
   const [onboardingDone, setOnboardingDoneState] = useState(null) // null = loading, false = needed, true = done
   const [email, setEmailState] = useState('')
   const [phone, setPhoneState] = useState('')
+  const [balanceHidden, setBalanceHiddenState] = useState(
+    () => localStorage.getItem('mf_balance_hidden') === 'true'
+  )
+  const setBalanceHidden = useCallback((val) => {
+    setBalanceHiddenState(h => {
+      const nextVal = typeof val === 'function' ? val(h) : val
+      localStorage.setItem('mf_balance_hidden', String(nextVal))
+      return nextVal
+    })
+  }, [])
 
   // ── Group Expenses state ──
   const [groups, setGroups] = useState([])
@@ -923,7 +933,7 @@ export function AppProvider({ children }) {
   // ── True Balance (Opening Balance + all transactions) ──
   const getTrueBalance = () => {
     const { totalCredit, totalDebit } = getSummary()
-    return openingBalance + totalCredit - totalDebit
+    return Math.max(0, openingBalance + totalCredit - totalDebit)
   }
 
   // ── Net Worth History — month-by-month cumulative balance (memoized) ──
@@ -1316,6 +1326,7 @@ RESPOND WITH ONLY valid JSON, no markdown, no explanation:
     updateProfileDetails,
     profilePhoto, updateProfilePhoto,
     darkMode, setDarkMode,
+    balanceHidden, setBalanceHidden,
     transactions, loading, error,
     savingsGoal, setSavingsGoal,
     activeTab, setActiveTab,
