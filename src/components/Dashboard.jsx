@@ -489,13 +489,13 @@ export default function Dashboard({ onAddWithType }) {
 
   const recent = useMemo(() => transactions.slice(0, 5), [transactions])
 
-  if (loading && transactions.length === 0) return <DashboardSkeleton />
-
   const catBreakdown = useMemo(() => {
     return transactions
       .filter(t => t.type === 'debit')
       .reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + Number(t.amount); return acc }, {})
   }, [transactions])
+
+  if (loading && transactions.length === 0) return <DashboardSkeleton />
   const totalDebit = summary.totalDebit || 1
 
   const topGoal = goals?.length > 0
@@ -525,7 +525,7 @@ export default function Dashboard({ onAddWithType }) {
         {/* Left Column: Account Summary, Timeline, Recent Ledger */}
         <div className="lg:col-span-7 space-y-6">
           {/* ═══ 1. BALANCE HERO CARD ═══════════════════ */}
-          <div className="rounded-[20px] p-6 relative" style={{ background: 'linear-gradient(145deg, var(--mf-hero-from) 0%, var(--mf-hero-to) 100%)', border: '1px solid var(--mf-border)', boxShadow: 'var(--mf-shadow-lg)' }}>
+          <div className="rounded-[20px] p-6 relative tour-balance-card" style={{ background: 'linear-gradient(145deg, var(--mf-hero-from) 0%, var(--mf-hero-to) 100%)', border: '1px solid var(--mf-border)', boxShadow: 'var(--mf-shadow-lg)' }}>
             {/* Subtle accent glow */}
             <div className="absolute inset-0 overflow-hidden rounded-[20px] pointer-events-none">
               <div style={{
@@ -631,12 +631,12 @@ export default function Dashboard({ onAddWithType }) {
         {/* Right Column: Quick Links, Analytics, AI Predictors */}
         <div className="lg:col-span-5 space-y-6">
           {/* ═══ 5. QUICK ACTIONS ═════════════════════════════════════ */}
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 tour-quick-actions">
             {[primaryActions, secondaryActions].map((row, ri) => (
               <div key={ri} className="grid grid-cols-3 gap-2.5">
                 {row.map(({ label, icon: QIcon, color, bg, action }) => (
                   <button key={label} onClick={action}
-                    className="flex flex-col items-center gap-2 py-3.5 rounded-2xl active:scale-[0.97] transition-all duration-150"
+                    className={`flex flex-col items-center gap-2 py-3.5 rounded-2xl active:scale-[0.97] transition-all duration-150 ${label === 'AI Chat' ? 'tour-ai-btn' : ''}`}
                     style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}>
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center"
                       style={{ background: bg }}>

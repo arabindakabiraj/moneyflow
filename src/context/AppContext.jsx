@@ -9,8 +9,8 @@ import {
   addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { db, auth } from '../firebase'
-import { onAuthStateChanged } from 'firebase/auth'
-import { getSession, clearSession, saveSession, logoutUser } from '../authUtils'
+import { onAuthStateChanged, updateEmail as authUpdateEmail } from 'firebase/auth'
+import { getSession, clearSession, saveSession, logoutUser, normalizePhone } from '../authUtils'
 import {
   DEFAULT_CATEGORIES,
   OPERATING_CATS, INVESTING_CATS, FINANCING_CATS,
@@ -99,6 +99,8 @@ export function AppProvider({ children }) {
   const [openingDate, setOpeningDateState] = useState('')
   const [gstSettings, setGstSettingsState] = useState({ gstRate: 18, registered: false })
   const [onboardingDone, setOnboardingDoneState] = useState(null) // null = loading, false = needed, true = done
+  const [email, setEmailState] = useState('')
+  const [phone, setPhoneState] = useState('')
 
   // ── Group Expenses state ──
   const [groups, setGroups] = useState([])
@@ -141,10 +143,13 @@ export function AppProvider({ children }) {
   // Passwordless Email sign-in checks are removed in favor of FastAPI OTP verification.
 
 
-  // Load username + photo from Firestore when uid changes (localStorage is primary cache)
+  // Load username + photo + email + phone from Firestore when uid changes (localStorage is primary cache)
   useEffect(() => {
     if (!uid) {
-      setUsername(''); setProfilePhoto(null)
+      setUsername('')
+      setProfilePhoto(null)
+      setEmailState('')
+      setPhoneState('')
       localStorage.removeItem('mf_username')
       localStorage.removeItem('mf_profile_photo')
       return
@@ -154,8 +159,12 @@ export function AppProvider({ children }) {
         if (snap.exists()) {
           const name = snap.data().username || ''
           const photo = snap.data().photoURL || null
+          const emailVal = snap.data().email || ''
+          const phoneVal = snap.data().phone || ''
           setUsername(name)
           setProfilePhoto(photo)
+          setEmailState(emailVal)
+          setPhoneState(phoneVal)
           // Cache locally for instant load next time
           if (name) localStorage.setItem('mf_username', name)
           if (photo) localStorage.setItem('mf_profile_photo', photo)
@@ -172,6 +181,209 @@ export function AppProvider({ children }) {
     localStorage.setItem('mf_username', trimmed)
     await setDoc(doc(db, 'users', uid, 'profile', 'info'), { username: trimmed }, { merge: true })
   }
+
+  const updateEmail = async (newEmail) => {
+    if (!uid) throw new Error("No user logged in")
+    const currentUser = auth.currentUser
+    if (!currentUser) throw new Error("Authentication state is invalid")
+
+    const cleanEmail = newEmail.trim().toLowerCase()
+    if (!cleanEmail) {
+      throw new Error("Email address cannot be empty")
+    }
+
+    if (cleanEmail === email) return
+
+    if (cleanEmail.endsWith('@moneyflow.local')) {
+      throw new Error("Invalid email domain")
+    }
+
+    try {
+      await authUpdateEmail(currentUser, cleanEmail)
+    } catch (authErr) {
+      console.error("Auth update email failed:", authErr)
+      if (authErr.code === 'auth/requires-recent-login') {
+        throw new Error("For security, you must log out and log back in before changing your email.")
+      }
+      if (authErr.code === 'auth/email-already-in-use') {
+        throw new Error("This email is already in use by another account.")
+      }
+      throw new Error(authErr.message || "Failed to update email in authentication.")
+    }
+
+    if (phone) {
+      await setDoc(doc(db, 'phoneIndex', phone), {
+        uid,
+        email: cleanEmail,
+        createdAt: serverTimestamp()
+      }, { merge: true })
+    }
+
+    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
+      email: cleanEmail,
+      updatedAt: serverTimestamp()
+    }, { merge: true })
+
+    setEmailState(cleanEmail)
+  }
+
+  const updatePhone = async (newPhone) => {
+    if (!uid) throw new Error("No user logged in")
+    const cleanPhone = newPhone ? normalizePhone(newPhone) : ''
+    if (cleanPhone === phone) return
+
+    if (cleanPhone) {
+      const phoneSnap = await getDoc(doc(db, 'phoneIndex', cleanPhone))
+      if (phoneSnap.exists() && phoneSnap.data().uid !== uid) {
+        throw new Error("This phone number is already registered to another account.")
+      }
+    }
+
+    let targetEmail = email
+    let authEmailChanged = false
+    
+    if (email && email.endsWith('@moneyflow.local')) {
+      if (cleanPhone) {
+        const newSyntheticEmail = `phone_${cleanPhone.replace('+', '')}@moneyflow.local`
+        if (newSyntheticEmail !== email) {
+          targetEmail = newSyntheticEmail
+          authEmailChanged = true
+        }
+      } else {
+        throw new Error("You must add a valid email address before removing your phone number.")
+      }
+    }
+
+    if (authEmailChanged) {
+      const currentUser = auth.currentUser
+      if (!currentUser) throw new Error("Authentication state is invalid")
+      try {
+        await authUpdateEmail(currentUser, targetEmail)
+      } catch (authErr) {
+        console.error("Auth update email failed for synthetic email update:", authErr)
+        if (authErr.code === 'auth/requires-recent-login') {
+          throw new Error("For security, you must log out and log back in before changing your phone number.")
+        }
+        throw new Error(authErr.message || "Failed to update internal email reference.")
+      }
+    }
+
+    const oldPhone = phone
+    if (oldPhone) {
+      try {
+        await deleteDoc(doc(db, 'phoneIndex', oldPhone))
+      } catch (e) {
+        console.warn("Failed to delete old phone index:", e)
+      }
+    }
+
+    if (cleanPhone) {
+      await setDoc(doc(db, 'phoneIndex', cleanPhone), {
+        uid,
+        email: targetEmail,
+        createdAt: serverTimestamp()
+      })
+    }
+
+    await setDoc(doc(db, 'users', uid, 'profile', 'info'), {
+      phone: cleanPhone,
+      email: targetEmail,
+      updatedAt: serverTimestamp()
+    }, { merge: true })
+
+    setPhoneState(cleanPhone)
+    if (authEmailChanged) {
+      setEmailState(targetEmail)
+    }
+  }
+
+  const updateProfileDetails = async (newName, newEmail, newPhone) => {
+    if (!uid) throw new Error("No user logged in")
+    const currentUser = auth.currentUser
+    if (!currentUser) throw new Error("Authentication state is invalid")
+
+    const cleanName = newName.trim()
+    const cleanEmail = newEmail.trim().toLowerCase()
+    const cleanPhone = newPhone ? normalizePhone(newPhone) : ''
+
+    if (!cleanName) throw new Error("Name cannot be empty")
+
+    // Determine the email to set
+    let targetEmail = cleanEmail
+    if (!targetEmail) {
+      if (email && email.endsWith('@moneyflow.local')) {
+        if (cleanPhone) {
+          targetEmail = `phone_${cleanPhone.replace('+', '')}@moneyflow.local`
+        } else {
+          throw new Error("You must provide either an email address or a phone number.")
+        }
+      } else {
+        targetEmail = email
+      }
+    }
+
+    if (!targetEmail) {
+      throw new Error("You must provide either an email address or a phone number.")
+    }
+
+    const emailChanged = targetEmail !== email
+    const oldPhone = phone
+    const phoneChanged = cleanPhone !== oldPhone
+
+    if (phoneChanged && cleanPhone) {
+      const phoneSnap = await getDoc(doc(db, 'phoneIndex', cleanPhone))
+      if (phoneSnap.exists() && phoneSnap.data().uid !== uid) {
+        throw new Error("This phone number is already registered to another account.")
+      }
+    }
+
+    if (emailChanged) {
+      try {
+        await authUpdateEmail(currentUser, targetEmail)
+      } catch (authErr) {
+        console.error("Auth update email failed:", authErr)
+        if (authErr.code === 'auth/requires-recent-login') {
+          throw new Error("For security, you must log out and log back in before changing your email.")
+        }
+        if (authErr.code === 'auth/email-already-in-use') {
+          throw new Error("This email is already in use by another account.")
+        }
+        throw new Error(authErr.message || "Failed to update email in authentication.")
+      }
+    }
+
+    if (phoneChanged || emailChanged) {
+      if (oldPhone) {
+        try {
+          await deleteDoc(doc(db, 'phoneIndex', oldPhone))
+        } catch (e) {
+          console.warn("Failed to delete old phone index:", e)
+        }
+      }
+
+      if (cleanPhone) {
+        await setDoc(doc(db, 'phoneIndex', cleanPhone), {
+          uid,
+          email: targetEmail,
+          createdAt: serverTimestamp()
+        })
+      }
+    }
+
+    const updatedProfile = {
+      username: cleanName,
+      email: targetEmail,
+      phone: cleanPhone,
+      updatedAt: serverTimestamp()
+    }
+    await setDoc(doc(db, 'users', uid, 'profile', 'info'), updatedProfile, { merge: true })
+
+    setUsername(cleanName)
+    localStorage.setItem('mf_username', cleanName)
+    setEmailState(targetEmail)
+    setPhoneState(cleanPhone)
+  }
+
 
   // Update profile photo — stores compressed base64 in Firestore + localStorage cache
   const updateProfilePhoto = async (base64) => {
@@ -1097,8 +1309,11 @@ RESPOND WITH ONLY valid JSON, no markdown, no explanation:
 
   const value = {
     uid, setUid, logout,
-    user: uid ? { phoneNumber: uid } : null,
+    user: uid ? { uid } : null,
     username, updateUsername,
+    email, updateEmail,
+    phone, updatePhone,
+    updateProfileDetails,
     profilePhoto, updateProfilePhoto,
     darkMode, setDarkMode,
     transactions, loading, error,

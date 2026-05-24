@@ -1,13 +1,15 @@
 /**
  * Settings.jsx — Clean, modern profile & settings page
+ * v2.2: Fixed light-mode profile card, removed UID display, modal fixes
  */
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert, Users, Heart, MessageSquare, Smartphone, FileText } from 'lucide-react'
+import { Target, LogOut, User, CheckCircle, Lock, Plus, Trash2, AlertTriangle, Pencil, X, ChevronRight, Camera, Shield, Tag, Wallet, Info, Moon, Sun, RefreshCw, Bell, TrendingUp, TrendingDown, Download, BarChart3, Calculator, Scissors, Share2, Fingerprint, Clock, ShieldAlert, Users, Heart, MessageSquare, Smartphone, FileText, UserX, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 // ThemeContext import removed — Accent Theme section removed
 import { setupPin, clearPin, isPinSet, isBiometricCapable, isBiometricEnabled, checkPlatformAuthenticator, registerBiometric, clearBiometric, getAutoLockMinutes, setAutoLockMinutes } from './AppLock'
 import { exportToCSV } from '../utils/csvExport'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
+import { deactivateAccount, scheduleAccountDeletion } from '../authUtils'
 
 /* ── Section header ── */
 const SectionHeader = ({ children, icon: Icon, iconBg, iconColor }) => (
@@ -41,7 +43,7 @@ const SettingsRow = ({ icon: Icon, iconBg, iconColor, label, desc, right, onClic
 export default function Settings() {
   const { savingsGoal, setSavingsGoal, user, logout, customCategories, addCategory,
     budgets, saveBudget, removeBudget, getBudgetAlerts,
-    username, updateUsername, profilePhoto, updateProfilePhoto,
+    username, updateUsername, email, phone, updateProfileDetails, profilePhoto, updateProfilePhoto,
     darkMode, setDarkMode, transactions, setActiveTab,
     requestNotificationPermission, familySettings,
     openingBalance, openingDate, setOpeningBalance,
@@ -58,6 +60,68 @@ export default function Settings() {
   const [nameInput, setNameInput] = useState('')
   const [nameSaved, setNameSaved] = useState(false)
 
+  // Personal Details form states
+  const [detailsName, setDetailsName] = useState('')
+  const [detailsEmail, setDetailsEmail] = useState('')
+  const [detailsPhone, setDetailsPhone] = useState('')
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [detailsError, setDetailsError] = useState('')
+  const [detailsSaved, setDetailsSaved] = useState(false)
+
+  // Sync state values when context loads
+  useEffect(() => {
+    setDetailsName(username || '')
+    if (email && email.endsWith('@moneyflow.local')) {
+      setDetailsEmail('')
+    } else {
+      setDetailsEmail(email || '')
+    }
+    setDetailsPhone(phone || '')
+  }, [username, email, phone])
+
+  const cleanMobileInput = (val) => {
+    let clean = val.replace(/\D/g, '')
+    if (clean.length === 12 && clean.startsWith('91')) {
+      clean = clean.slice(2)
+    } else if (clean.length === 11 && clean.startsWith('0')) {
+      clean = clean.slice(1)
+    }
+    return clean.slice(0, 10)
+  }
+
+  const isValidMobile = (phone) => {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length !== 10) return false
+    if (!/^[6-9]/.test(digits)) return false
+    if (/^(\d)\1{9}$/.test(digits)) return false
+    return true
+  }
+
+  const handleSaveDetails = async () => {
+    setDetailsLoading(true)
+    setDetailsError('')
+    setDetailsSaved(false)
+
+    if (detailsPhone) {
+      if (!isValidMobile(detailsPhone)) {
+        setDetailsError('Enter a valid 10-digit mobile number starting with 6-9. Repeated digits like 1111111111 are invalid.')
+        setDetailsLoading(false)
+        return
+      }
+    }
+
+    try {
+      await updateProfileDetails(detailsName, detailsEmail, detailsPhone)
+      setDetailsSaved(true)
+      setTimeout(() => setDetailsSaved(false), 3000)
+    } catch (err) {
+      console.error(err)
+      setDetailsError(err.message || 'Failed to update profile details')
+    } finally {
+      setDetailsLoading(false)
+    }
+  }
+
   // PIN state
   const [pinStep, setPinStep] = useState('idle')
   const [pin1, setPin1] = useState('')
@@ -70,6 +134,9 @@ export default function Settings() {
   const [bioLoading, setBioLoading] = useState(false)
   const [autoLock, setAutoLock] = useState(getAutoLockMinutes())
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  // Account Management modal states
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   // Budget state
   const [budgetCat, setBudgetCat] = useState('')
@@ -181,20 +248,28 @@ export default function Settings() {
     <div className="space-y-6 animate-fade-in pb-8">
 
       {/* ═══════════ 1. PROFILE HERO CARD ═══════════ */}
-      <div className="relative overflow-hidden rounded-3xl shadow-[0_8px_24px_rgba(0,0,0,0.6)]" style={{ background: 'linear-gradient(145deg, #1E1E22 0%, #16161A 100%)', border: '1px solid var(--mf-border)' }}>
+      <div className="relative overflow-hidden rounded-3xl"
+        style={{
+          background: darkMode
+            ? 'linear-gradient(145deg, #1E1E22 0%, #16161A 100%)'
+            : 'linear-gradient(145deg, #f0f4ff 0%, #e8f0fe 100%)',
+          border: darkMode ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(79,142,247,0.18)',
+          boxShadow: darkMode ? '0 8px 24px rgba(0,0,0,0.6)' : '0 4px 20px rgba(79,142,247,0.12)',
+        }}
+      >
         {/* decorative accents */}
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full" style={{ background: 'radial-gradient(circle, rgba(79,142,247,0.12) 0%, transparent 70%)' }} />
         <div className="pointer-events-none absolute -left-8 -bottom-8 h-28 w-28 rounded-full" style={{ background: 'radial-gradient(circle, rgba(52,211,153,0.08) 0%, transparent 70%)' }} />
         <div className="pointer-events-none absolute right-12 bottom-6 h-16 w-16 rounded-full" style={{ background: 'radial-gradient(circle, rgba(79,142,247,0.06) 0%, transparent 70%)' }} />
 
-        <div className="relative px-6 pt-8 pb-6 flex flex-col items-center text-white">
+        <div className="relative px-6 pt-8 pb-6 flex flex-col items-center" style={{ color: darkMode ? 'white' : '#1a1a2e' }}>
           {/* Avatar */}
           <button onClick={() => fileRef.current?.click()} disabled={photoUploading} className="group relative mb-4">
             <div className={`w-24 h-24 rounded-full ring-4 ring-white/10 overflow-hidden flex items-center justify-center shadow-2xl transition-transform group-active:scale-95 ${photoUploading ? 'animate-pulse' : ''}`} style={{ background: 'var(--mf-surface-2)' }}>
               {profilePhoto ? (
                 <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-3xl font-display font-bold text-gray-800 dark:text-white/90">{initials}</span>
+                <span className="text-3xl font-display font-bold" style={{ color: darkMode ? 'rgba(255,255,255,0.9)' : '#1a1a2e' }}>{initials}</span>
               )}
             </div>
             <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full shadow-lg flex items-center justify-center group-active:scale-90 transition-transform" style={{ background: '#4F8EF7' }}>
@@ -221,37 +296,46 @@ export default function Settings() {
                   }
                   if (e.key === 'Escape') setEditingName(false)
                 }}
-                className="flex-1 bg-gray-100 dark:bg-[#222226] rounded-xl px-3 py-2.5 text-white placeholder-white/30 text-sm font-semibold outline-none border border-white/[0.10] focus:border-[#4F8EF7] text-center"
+                style={{
+                  background: darkMode ? '#222226' : 'rgba(255,255,255,0.6)',
+                  color: darkMode ? 'white' : '#1a1a2e',
+                  border: darkMode ? '1px solid rgba(255,255,255,0.10)' : '1px solid rgba(79,142,247,0.25)',
+                }}
+                className="flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[#4F8EF7] text-center"
                 placeholder="Your name…"
               />
               <button onClick={() => { if (nameInput.trim()) { updateUsername(nameInput); setEditingName(false); setNameSaved(true); setTimeout(() => setNameSaved(false), 2000) } }}
-                className="w-9 h-9 rounded-xl bg-[#4F8EF7] flex items-center justify-center hover:bg-[#4F8EF7]/80 transition-colors">
+                className="w-9 h-9 rounded-xl bg-[#4F8EF7] flex items-center justify-center hover:bg-[#4F8EF7]/80 transition-colors text-white">
                 <CheckCircle size={16} />
               </button>
               <button onClick={() => setEditingName(false)}
-                className="w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center hover:bg-white/[0.10] transition-colors">
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                style={{ background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', color: darkMode ? 'rgba(255,255,255,0.7)' : '#555' }}>
                 <X size={16} />
               </button>
             </div>
           ) : (
             <div className="text-center mb-1">
               <div className="flex items-center justify-center gap-2">
-                <h2 className="font-display font-bold text-xl leading-tight">
+                <h2 className="font-display font-bold text-xl leading-tight" style={{ color: 'inherit' }}>
                   {nameSaved ? '✅ Saved!' : username || 'MoneyFlow User'}
                 </h2>
                 <button onClick={() => { setNameInput(username); setEditingName(true) }}
-                  className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center hover:bg-white/[0.14] transition-colors active:scale-90">
+                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors active:scale-90"
+                  style={{ background: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(79,142,247,0.12)', color: darkMode ? 'rgba(255,255,255,0.7)' : '#4F8EF7' }}>
                   <Pencil size={12} />
                 </button>
               </div>
-              {user?.phoneNumber && (
-                <p className="text-gray-500 dark:text-white/50 text-xs font-mono mt-1">{user.phoneNumber}</p>
-              )}
+              {/* ✅ FIX: Do NOT show user.phoneNumber — it contains the raw UID, not a phone number */}
             </div>
           )}
 
           {/* Personality badge */}
-          <span className="mt-2 text-[11px] font-bold px-3 py-1 rounded-full" style={{ background: 'rgba(79,142,247,0.15)', color: '#4F8EF7' }}>
+          <span className="mt-2 text-[11px] font-bold px-3 py-1 rounded-full"
+            style={{
+              background: darkMode ? 'rgba(79,142,247,0.15)' : 'rgba(79,142,247,0.12)',
+              color: '#4F8EF7',
+            }}>
             {personality.emoji} {personality.label}
           </span>
         </div>
@@ -307,7 +391,7 @@ export default function Settings() {
                 <p className={`font-semibold text-sm ${a.exceeded ? 'text-[#FF6B6B]' : 'text-[#FBBF24]'}`}>
                   {a.category} budget {a.exceeded ? 'exceeded' : 'almost full'}
                 </p>
-                <div className="h-1.5 bg-white/[0.06] rounded-full mt-2 overflow-hidden">
+                <div className="h-1.5 rounded-full mt-2 overflow-hidden" style={{ background: darkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)' }}>
                   <div className={`h-full rounded-full transition-all ${a.exceeded ? 'bg-rose-500' : 'bg-amber-500'}`}
                     style={{ width: `${Math.min(a.pct, 100)}%` }} />
                 </div>
@@ -318,10 +402,88 @@ export default function Settings() {
             </div>
           ))}
         </div>
-      )}
+      )}      {/* ═══════════ PERSONAL DETAILS ═══════════ */}
+      <div>
+        <SectionHeader icon={User} iconBg="bg-[#4F8EF7]/15" iconColor="text-[#4F8EF7]">
+          Personal Details
+        </SectionHeader>
+        <div className="rounded-2xl bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] p-4 space-y-4">
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 dark:text-white/35 mb-1.5 uppercase tracking-wide">
+              Full Name
+            </label>
+            <input
+              type="text"
+              value={detailsName}
+              onChange={e => {
+                setDetailsName(e.target.value)
+                setDetailsError('')
+                setDetailsSaved(false)
+              }}
+              placeholder="Your name"
+              className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-[#222226] border border-black/[0.08] dark:border-white/[0.08] text-gray-900 dark:text-white/95 text-sm outline-none focus:ring-2 focus:ring-[#4F8EF7]/50 transition font-medium"
+            />
+          </div>
 
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 dark:text-white/35 mb-1.5 uppercase tracking-wide">
+              Email Address
+            </label>
+            <input
+              type="email"
+              value={detailsEmail}
+              onChange={e => {
+                setDetailsEmail(e.target.value)
+                setDetailsError('')
+                setDetailsSaved(false)
+              }}
+              placeholder="Email address"
+              className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-[#222226] border border-black/[0.08] dark:border-white/[0.08] text-gray-900 dark:text-white/95 text-sm outline-none focus:ring-2 focus:ring-[#4F8EF7]/50 transition font-medium"
+            />
+          </div>
 
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 dark:text-white/35 mb-1.5 uppercase tracking-wide">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              value={detailsPhone}
+              onChange={e => {
+                setDetailsPhone(cleanMobileInput(e.target.value))
+                setDetailsError('')
+                setDetailsSaved(false)
+              }}
+              placeholder="Phone number"
+              className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-[#222226] border border-black/[0.08] dark:border-white/[0.08] text-gray-900 dark:text-white/95 text-sm outline-none focus:ring-2 focus:ring-[#4F8EF7]/50 transition font-mono font-medium"
+            />
+          </div>
 
+          {detailsError && (
+            <p className="flex items-center gap-1.5 text-xs text-rose-500 font-semibold mt-1">
+              <AlertCircle size={14} /> {detailsError}
+            </p>
+          )}
+
+          {detailsSaved && (
+            <p className="flex items-center gap-1.5 text-xs text-emerald-500 font-semibold mt-1">
+              <CheckCircle size={14} /> Profile details updated successfully!
+            </p>
+          )}
+
+          <button
+            onClick={handleSaveDetails}
+            disabled={detailsLoading}
+            className="w-full py-3 rounded-xl text-sm font-semibold bg-[#4F8EF7] text-white active:scale-[0.98] disabled:opacity-60 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#4F8EF7]/20 border-none cursor-pointer"
+          >
+            {detailsLoading ? (
+              <RefreshCw size={15} className="animate-spin" />
+            ) : (
+              'Save Details'
+            )}
+          </button>
+        </div>
+      </div>
 
       <div>
         <SectionHeader icon={Sun} iconBg="bg-[#FBBF24]/15" iconColor="text-amber-500">
@@ -711,7 +873,28 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* ═══════════ 9. ABOUT & ACCOUNT ═══════════ */}
+      {/* ═══════════ 9. ACCOUNT MANAGEMENT ═══════════ */}
+      <div>
+        <SectionHeader icon={UserX} iconBg="bg-[#FF6B6B]/15" iconColor="text-red-400">
+          Account Management
+        </SectionHeader>
+        <div className="rounded-2xl bg-white dark:bg-[#1A1A1D] border border-black/[0.08] dark:border-white/[0.08] overflow-hidden divide-y divide-black/[0.06] dark:divide-white/[0.06]">
+          <SettingsRow
+            icon={UserX} iconBg="bg-amber-500/15" iconColor="text-amber-500"
+            label="Deactivate Account"
+            desc="Temporarily hide your account — reactivate anytime"
+            onClick={() => setShowDeactivateModal(true)}
+          />
+          <SettingsRow
+            icon={Trash2} iconBg="bg-[#FF6B6B]/15" iconColor="text-[#FF6B6B]"
+            label="Delete Account" danger
+            desc="Permanently delete your data after 30 days"
+            onClick={() => setShowDeleteModal(true)}
+          />
+        </div>
+      </div>
+
+      {/* ═══════════ 10. ABOUT & ACCOUNT ═══════════ */}
       <div>
         <SectionHeader icon={Info} iconBg="bg-gray-100 dark:bg-[#222226]" iconColor="text-gray-400 dark:text-white/40">
           About
@@ -725,7 +908,7 @@ export default function Settings() {
               <p className="text-sm font-semibold text-gray-900 dark:text-white/95">MoneyFlow</p>
               <p className="text-[11px] text-gray-400 dark:text-white/35">React + Firebase + Gemini AI</p>
             </div>
-            <span className="text-xs font-mono text-gray-400 dark:text-white/35 bg-gray-100 dark:bg-[#222226] px-2.5 py-1 rounded-lg">v2.0</span>
+            <span className="text-xs font-mono text-gray-400 dark:text-white/35 bg-gray-100 dark:bg-[#222226] px-2.5 py-1 rounded-lg">v2.1</span>
           </div>
           <SettingsRow
             icon={Shield} iconBg="bg-[#34D399]/15" iconColor="text-[#34D399]"
@@ -792,9 +975,316 @@ export default function Settings() {
         </div>
       )}
 
+      {/* ═══════ DEACTIVATE MODAL ═══════ */}
+      {showDeactivateModal && (
+        <DeactivateModal
+          uid={user?.uid}
+          onClose={() => setShowDeactivateModal(false)}
+          onDeactivated={() => {
+            setShowDeactivateModal(false)
+            // Clear local state and sign out (deactivateAccount already calls logoutUser)
+            logout()
+          }}
+        />
+      )}
+
+      {/* ═══════ DELETE MODAL ═══════ */}
+      {showDeleteModal && (
+        <DeleteModal
+          uid={user?.uid}
+          onClose={() => setShowDeleteModal(false)}
+          onDeleted={() => {
+            setShowDeleteModal(false)
+            // scheduleAccountDeletion already calls logoutUser
+            logout()
+          }}
+        />
+      )}
+
       {/* Bottom safe area */}
       <div className="h-4" />
     </div>
   )
 }
 
+/* ════════════════════════════════════════════════════════
+   DEACTIVATE ACCOUNT MODAL
+   Like Instagram — data preserved, user can reactivate by logging back in
+   ════════════════════════════════════════════════════════ */
+function DeactivateModal({ uid, onClose, onDeactivated }) {
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleDeactivate = async () => {
+    if (!password || password.length < 8) {
+      setError('Please enter your current password to confirm')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      await deactivateAccount(uid, password)
+      onDeactivated()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}>
+      <div className="w-full max-w-sm mx-4 mb-6 sm:mb-0 rounded-3xl shadow-2xl overflow-hidden animate-slide-up"
+        style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/15 flex items-center justify-center mx-auto mb-4">
+            <UserX size={28} className="text-amber-500" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white/95 mb-1">Deactivate Account?</h3>
+          <p className="text-sm text-gray-400 dark:text-white/40 leading-relaxed">
+            Your account will be hidden from others. Your data stays safe — just log back in to reactivate.
+          </p>
+        </div>
+
+        {/* What happens */}
+        <div className="px-6 pb-4 space-y-2.5">
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <UserX size={16} className="text-amber-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-600 dark:text-amber-400">Your <strong>profile &amp; activity</strong> will be hidden from others</p>
+          </div>
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#34D399]/10 border border-[#34D399]/20">
+            <CheckCircle size={16} className="text-[#34D399] mt-0.5 shrink-0" />
+            <p className="text-xs text-[#34D399]">All your <strong>transactions &amp; data</strong> remain completely safe</p>
+          </div>
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#4F8EF7]/10 border border-[#4F8EF7]/20">
+            <CheckCircle size={16} className="text-[#4F8EF7] mt-0.5 shrink-0" />
+            <p className="text-xs text-[#4F8EF7]">Reactivate anytime by simply <strong>logging in again</strong></p>
+          </div>
+        </div>
+
+        {/* Password confirm */}
+        <div className="px-6 pb-4">
+          <label className="block text-xs font-semibold text-gray-400 dark:text-white/40 mb-2 uppercase tracking-wide">Confirm with your password</label>
+          <div className="flex items-center rounded-xl overflow-hidden" style={{ background: 'var(--mf-surface-2)', border: '1.5px solid var(--mf-border)' }}>
+            <input
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError('') }}
+              placeholder="Enter your password"
+              className="flex-1 bg-transparent px-4 py-3 text-sm outline-none border-none focus:outline-none"
+              style={{ color: 'var(--mf-text-primary)' }}
+              autoComplete="current-password"
+            />
+            <button type="button" onClick={() => setShowPw(p => !p)} className="pr-4 text-gray-400 dark:text-white/30">
+              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {error && (
+            <p className="flex items-center gap-1 text-[11px] font-medium mt-1.5 text-[#FF6B6B] animate-fade-in">
+              <AlertCircle size={11} /> {error}
+            </p>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 pb-6 flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-gray-100 dark:bg-[#222226] text-gray-600 dark:text-white/60 active:scale-[0.98] transition-transform border-none cursor-pointer">
+            Cancel
+          </button>
+          <button
+            onClick={handleDeactivate}
+            disabled={loading}
+            className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-amber-500 text-white active:scale-[0.98] transition-transform shadow-sm shadow-amber-500/20 border-none cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5">
+            {loading ? <RefreshCw size={15} className="animate-spin" /> : 'Deactivate'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════
+   DELETE ACCOUNT MODAL — 3-step wizard
+   Step 1: Sobering warning
+   Step 2: Type DELETE to confirm
+   Step 3: Enter password + fire
+   ════════════════════════════════════════════════════════ */
+function DeleteModal({ uid, onClose, onDeleted }) {
+  const [step, setStep] = useState(1)
+  const [confirmText, setConfirmText] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleScheduleDeletion = async () => {
+    if (!password || password.length < 8) {
+      setError('Please enter your current password')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      await scheduleAccountDeletion(uid, password)
+      onDeleted()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const deletionDate = new Date()
+  deletionDate.setDate(deletionDate.getDate() + 30)
+  const formattedDate = deletionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+      onClick={step === 1 ? onClose : undefined}>
+      <div className="w-full max-w-sm mx-4 mb-6 sm:mb-0 rounded-3xl shadow-2xl overflow-hidden animate-slide-up"
+        style={{ background: 'var(--mf-surface)', border: '1px solid rgba(255,107,107,0.20)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* ── STEP 1: Warning ── */}
+        {step === 1 && (
+          <>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-[#FF6B6B]/15 flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={28} className="text-[#FF6B6B]" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white/95 mb-1">Delete Account?</h3>
+              <p className="text-sm text-gray-400 dark:text-white/40 leading-relaxed">
+                This is <strong className="text-[#FF6B6B]">permanent and irreversible</strong>. Please read carefully before proceeding.
+              </p>
+            </div>
+            <div className="px-6 pb-4 space-y-2.5">
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#FF6B6B]/10 border border-[#FF6B6B]/20">
+                <AlertTriangle size={16} className="text-[#FF6B6B] mt-0.5 shrink-0" />
+                <p className="text-xs text-[#FF6B6B]">All <strong>transactions, budgets, goals</strong> will be permanently erased</p>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#FF6B6B]/10 border border-[#FF6B6B]/20">
+                <AlertTriangle size={16} className="text-[#FF6B6B] mt-0.5 shrink-0" />
+                <p className="text-xs text-[#FF6B6B]">Your <strong>Firebase Auth account</strong> will be permanently deleted</p>
+              </div>
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-[#FBBF24]/10 border border-[#FBBF24]/20">
+                <Clock size={16} className="text-[#FBBF24] mt-0.5 shrink-0" />
+                <p className="text-xs text-[#FBBF24]">You have a <strong>30-day grace period</strong> — log back in to cancel before {formattedDate}</p>
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={onClose}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-gray-100 dark:bg-[#222226] text-gray-600 dark:text-white/60 active:scale-[0.98] transition-transform border-none cursor-pointer">
+                Keep Account
+              </button>
+              <button onClick={() => setStep(2)}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-[#FF6B6B]/15 text-[#FF6B6B] border border-[#FF6B6B]/30 active:scale-[0.98] transition-transform cursor-pointer">
+                Continue →
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── STEP 2: Type DELETE ── */}
+        {step === 2 && (
+          <>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-10 h-10 rounded-xl bg-[#FF6B6B]/15 flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-black text-[#FF6B6B]">2/3</span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white/95 mb-1">Confirm Deletion</h3>
+              <p className="text-sm text-gray-400 dark:text-white/40">
+                Type <strong className="text-[#FF6B6B] font-mono">DELETE</strong> in the box below to continue
+              </p>
+            </div>
+            <div className="px-6 pb-4">
+              <input
+                autoFocus
+                type="text"
+                value={confirmText}
+                onChange={e => setConfirmText(e.target.value.toUpperCase())}
+                placeholder="Type DELETE here"
+                className="w-full px-4 py-3.5 rounded-2xl text-sm font-mono font-bold text-center outline-none border-none focus:outline-none"
+                style={{
+                  background: 'var(--mf-surface-2)',
+                  border: `2px solid ${confirmText === 'DELETE' ? '#FF6B6B' : 'var(--mf-border)'}`,
+                  color: confirmText === 'DELETE' ? '#FF6B6B' : 'var(--mf-text-primary)',
+                  letterSpacing: '0.15em',
+                  transition: 'border-color 0.2s, color 0.2s',
+                }}
+              />
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={() => setStep(1)}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-gray-100 dark:bg-[#222226] text-gray-600 dark:text-white/60 active:scale-[0.98] transition-transform border-none cursor-pointer">
+                ← Back
+              </button>
+              <button
+                onClick={() => confirmText === 'DELETE' && setStep(3)}
+                disabled={confirmText !== 'DELETE'}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-[#FF6B6B] text-white active:scale-[0.98] transition-transform border-none cursor-pointer disabled:opacity-40">
+                Next →
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── STEP 3: Enter password ── */}
+        {step === 3 && (
+          <>
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-10 h-10 rounded-xl bg-[#FF6B6B]/15 flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-black text-[#FF6B6B]">3/3</span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white/95 mb-1">Final Step</h3>
+              <p className="text-sm text-gray-400 dark:text-white/40">
+                Enter your password to schedule deletion.
+                Your account will be deleted on <strong style={{ color: '#FF6B6B' }}>{formattedDate}</strong>.
+              </p>
+            </div>
+            <div className="px-6 pb-4">
+              <div className="flex items-center rounded-xl overflow-hidden" style={{ background: 'var(--mf-surface-2)', border: '1.5px solid var(--mf-border)' }}>
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setError('') }}
+                  placeholder="Your current password"
+                  autoFocus
+                  className="flex-1 bg-transparent px-4 py-3 text-sm outline-none border-none focus:outline-none"
+                  style={{ color: 'var(--mf-text-primary)' }}
+                  autoComplete="current-password"
+                />
+                <button type="button" onClick={() => setShowPw(p => !p)} className="pr-4 text-gray-400 dark:text-white/30">
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {error && (
+                <p className="flex items-center gap-1 text-[11px] font-medium mt-1.5 text-[#FF6B6B] animate-fade-in">
+                  <AlertCircle size={11} /> {error}
+                </p>
+              )}
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={() => { setStep(2); setError('') }}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-gray-100 dark:bg-[#222226] text-gray-600 dark:text-white/60 active:scale-[0.98] transition-transform border-none cursor-pointer">
+                ← Back
+              </button>
+              <button
+                onClick={handleScheduleDeletion}
+                disabled={loading}
+                className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-[#FF6B6B] text-white active:scale-[0.98] transition-transform border-none cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5 shadow-sm shadow-red-500/25">
+                {loading ? <RefreshCw size={15} className="animate-spin" /> : '🗑️ Schedule Deletion'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}

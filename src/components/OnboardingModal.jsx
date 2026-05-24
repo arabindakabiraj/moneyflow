@@ -1,79 +1,24 @@
 /**
- * OnboardingModal.jsx — Full-screen onboarding (slides + setup wizard)
- * Uses the app's theme system (--mf-* CSS variables) for light/dark mode support
+ * OnboardingModal.jsx — Premium, interactive spotlight product tour + setup wizard
+ * Highlights key Dashboard components dynamically with glassmorphic tooltip card controllers
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
+import { ArrowRight, Sparkles, Check, Play, SkipForward, ArrowLeft, Brain, Wallet, Zap, MessageCircle, RefreshCw, AlertCircle } from 'lucide-react'
 
-/* ─── Ambient orb background (theme-aware) ─── */
-function LiquidBg() {
-  return (
-    <>
-      <div className="pointer-events-none absolute -right-[10%] -top-[10%] w-80 h-80 rounded-full blur-[40px] opacity-30 dark:opacity-100"
-        style={{ background: 'radial-gradient(circle, rgba(34,197,94,0.22) 0%, transparent 70%)' }} />
-      <div className="pointer-events-none absolute bottom-[10%] -left-[15%] w-64 h-64 rounded-full blur-[36px] opacity-30 dark:opacity-100"
-        style={{ background: 'radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 70%)' }} />
-      <div className="pointer-events-none absolute top-[40%] right-[5%] w-44 h-44 rounded-full blur-[28px] opacity-25 dark:opacity-100"
-        style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 70%)' }} />
-    </>
-  )
-}
+export default function OnboardingModal({ onComplete }) {
+  const { 
+    darkMode, 
+    openingBalance, 
+    setOpeningBalance, 
+    gstSettings, 
+    updateGstSettings 
+  } = useApp()
 
-/* ─── Slide data ─── */
-const SLIDES = [
-  {
-    id: 'track',
-    gradient: 'linear-gradient(145deg, #064e3b 0%, #065f46 40%, #047857 100%)',
-    glowColor: 'rgba(16,185,129,0.55)',
-    orbColor: 'rgba(52,211,153,0.30)',
-    iconBg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    iconGlow: 'rgba(16,185,129,0.50)',
-    emoji: '💰',
-    title: 'Track Every Rupee',
-    subtitle: 'Log income & expenses in seconds. Smart categories, tags, and GST support built right in.',
-    badge: '🇮🇳 Made for India',
-  },
-  {
-    id: 'ai',
-    gradient: 'linear-gradient(145deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%)',
-    glowColor: 'rgba(99,102,241,0.55)',
-    orbColor: 'rgba(129,140,248,0.28)',
-    iconBg: 'linear-gradient(135deg, #818cf8 0%, #6366f1 100%)',
-    iconGlow: 'rgba(99,102,241,0.50)',
-    emoji: '🧠',
-    title: 'AI-Powered Insights',
-    subtitle: 'Predict next month\'s spending, get smart alerts, and chat with your personal finance AI.',
-    badge: '⚡ Powered by AI',
-  },
-  {
-    id: 'split',
-    gradient: 'linear-gradient(145deg, #0c1a3a 0%, #1e3a8a 40%, #1d4ed8 100%)',
-    glowColor: 'rgba(59,130,246,0.55)',
-    orbColor: 'rgba(96,165,250,0.28)',
-    iconBg: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
-    iconGlow: 'rgba(59,130,246,0.50)',
-    emoji: '🎯',
-    title: 'Goals & Group Splits',
-    subtitle: 'Set savings goals, track debts, and split bills with friends — with PDF export.',
-    badge: '🤝 Split Made Easy',
-  },
-]
-
-/* ─── Setup steps ─── */
-const SETUP_STEPS = ['balance', 'gst']
-
-export default function OnboardingModal({
-  onComplete,
-  openingBalance = 0,
-  setOpeningBalance,
-  gstSettings,
-  updateGstSettings,
-}) {
-  const { darkMode } = useApp()
-  const [phase, setPhase] = useState('slides') // 'slides' | 'setup'
-  const [slideIdx, setSlideIdx] = useState(0)
-  const [setupStep, setSetupStep] = useState(0)
-
+  const [step, setStep] = useState(0) // 0: Welcome, 1: Balance Card, 2: Logger Quick Actions, 3: AI Chat, 4: Quick Setup Form
+  const [coords, setCoords] = useState(null)
+  
+  // Setup fields
   const [amount, setAmount] = useState(openingBalance > 0 ? String(openingBalance) : '')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [gstRate, setGstRate] = useState(gstSettings?.gstRate ?? 18)
@@ -81,449 +26,333 @@ export default function OnboardingModal({
   const [saving, setSaving] = useState(false)
   const [visible, setVisible] = useState(false)
 
-  /* animation fade-in */
-  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
-
-  /* touch / drag */
-  const touchStartX = useRef(null)
-  const dragDelta = useRef(0)
-  const [dragging, setDragging] = useState(false)
-  const [dragOffset, setDragOffset] = useState(0)
-  const amountRef = useRef(null)
-
+  // Fade-in animation on mount
   useEffect(() => {
-    if (phase === 'setup' && setupStep === 0) {
-      setTimeout(() => amountRef.current?.focus(), 400)
-    }
-  }, [phase, setupStep])
-
-  const goNext = useCallback(() => {
-    if (slideIdx < SLIDES.length - 1) setSlideIdx(i => i + 1)
-    else setPhase('setup')
-  }, [slideIdx])
-
-  const goPrev = useCallback(() => {
-    setSlideIdx(i => Math.max(0, i - 1))
+    requestAnimationFrame(() => setVisible(true))
   }, [])
 
-  /* touch handlers */
-  const onTouchStart = (e) => {
-    touchStartX.current = e.touches[0].clientX
-    dragDelta.current = 0
-    setDragging(true)
-  }
-  const onTouchMove = (e) => {
-    if (!dragging) return
-    const d = e.touches[0].clientX - touchStartX.current
-    dragDelta.current = d
-    setDragOffset(d)
-  }
-  const onTouchEnd = () => {
-    setDragging(false)
-    setDragOffset(0)
-    if (dragDelta.current < -50) goNext()
-    else if (dragDelta.current > 50) goPrev()
+  // Measure and align the spotlight on the target element
+  const updateSpotlight = useCallback(() => {
+    if (step === 0 || step === 4) {
+      setCoords(null)
+      return
+    }
+
+    let selector = ''
+    if (step === 1) selector = '.tour-balance-card'
+    else if (step === 2) selector = '.tour-quick-actions'
+    else if (step === 3) selector = '.tour-ai-btn'
+
+    const el = document.querySelector(selector)
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      // Scroll into view if element is out of bounds
+      if (rect.top < 0 || rect.bottom > window.innerHeight) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      
+      // Short delay for smooth scrolling animation to finish
+      setTimeout(() => {
+        const freshRect = el.getBoundingClientRect()
+        setCoords({
+          top: freshRect.top,
+          left: freshRect.left,
+          width: freshRect.width,
+          height: freshRect.height,
+        })
+      }, 150)
+    } else {
+      setCoords(null)
+    }
+  }, [step])
+
+  useEffect(() => {
+    updateSpotlight()
+    window.addEventListener('resize', updateSpotlight)
+    
+    // Listen for general scroll changes to adjust spotlight positioning
+    const handleScroll = (e) => {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+        updateSpotlight()
+      }
+    }
+    window.addEventListener('scroll', handleScroll, true)
+    
+    return () => {
+      window.removeEventListener('resize', updateSpotlight)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [step, updateSpotlight])
+
+  const handleNext = () => {
+    if (step < 4) {
+      setStep(s => s + 1)
+    } else {
+      handleFinish()
+    }
   }
 
-  /* mouse drag */
-  const mouseStartX = useRef(null)
-  const onMouseDown = (e) => { mouseStartX.current = e.clientX; setDragging(true) }
-  const onMouseMove = (e) => {
-    if (!dragging || mouseStartX.current === null) return
-    const d = e.clientX - mouseStartX.current
-    dragDelta.current = d
-    setDragOffset(d)
-  }
-  const onMouseUp = () => {
-    if (!dragging) return
-    setDragging(false)
-    setDragOffset(0)
-    if (dragDelta.current < -60) goNext()
-    else if (dragDelta.current > 60) goPrev()
-    mouseStartX.current = null
+  const handleBack = () => {
+    if (step > 0) {
+      setStep(s => s - 1)
+    }
   }
 
-  const skip = () => { setVisible(false); setTimeout(onComplete, 350) }
+  const handleSkip = () => {
+    setVisible(false)
+    setTimeout(onComplete, 300)
+  }
 
-  const finish = async () => {
+  const handleFinish = async () => {
     setSaving(true)
     try {
-      if (setOpeningBalance) await setOpeningBalance(Number(amount) || 0, date)
-      if (updateGstSettings) await updateGstSettings({ gstRate, registered })
-    } catch (e) { console.error(e) }
+      if (setOpeningBalance) {
+        await setOpeningBalance(Number(amount) || 0, date)
+      }
+      if (updateGstSettings) {
+        await updateGstSettings({ gstRate, registered })
+      }
+    } catch (e) {
+      console.error('Onboarding save error:', e)
+    }
     setSaving(false)
     setVisible(false)
-    setTimeout(onComplete, 350)
+    setTimeout(onComplete, 300)
   }
 
-  const slide = SLIDES[slideIdx]
+  const getTooltipStyle = () => {
+    if (!coords) {
+      return {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '90%',
+        maxWidth: '420px',
+        zIndex: 10000,
+        transition: 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)',
+      }
+    }
 
-  /* ════════════════ SLIDES PHASE ════════════════ */
-  if (phase === 'slides') {
-    return (
-      <div
-        className={`fixed inset-0 z-[9999] flex flex-col select-none transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}
-        style={{ background: 'var(--mf-bg)' }}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
-      >
-        <LiquidBg />
+    const isBelow = coords.top < window.innerHeight / 2
+    const tooltipWidth = 340
+    let leftVal = coords.left + coords.width / 2 - tooltipWidth / 2
+    leftVal = Math.max(16, Math.min(window.innerWidth - tooltipWidth - 16, leftVal))
 
-        {/* ── Skip ── */}
-        <div className="absolute top-12 right-5 z-20">
-          <button
-            onClick={skip}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all active:scale-95"
-            style={{ background: 'var(--mf-surface-2)', color: 'var(--mf-text-secondary)', border: '1px solid var(--mf-border)' }}
-          >
-            Skip
-          </button>
-        </div>
-
-        {/* ── Logo / brand ── */}
-        <div className="relative z-10 flex flex-col items-center pt-16 pb-4">
-          <div className="w-14 h-14 rounded-[18px] flex items-center justify-center mb-3 shadow-2xl"
-            style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', boxShadow: '0 12px 36px rgba(34,197,94,0.40)' }}>
-            <span className="text-white font-black text-2xl">₹</span>
-          </div>
-          <span className="font-black text-xl tracking-tight" style={{ fontFamily: 'system-ui', color: 'var(--mf-text-primary)' }}>MoneyFlow</span>
-          <span className="text-xs mt-0.5" style={{ color: 'var(--mf-text-muted)' }}>Your Smart Money Tracker</span>
-        </div>
-
-        {/* ── Carousel ── */}
-        <div
-          className="flex-1 flex items-center justify-center relative z-10 overflow-hidden"
-          style={{ cursor: dragging ? 'grabbing' : 'grab' }}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onMouseDown={onMouseDown}
-        >
-          <div className="relative w-full flex items-center justify-center" style={{ height: 320 }}>
-            {SLIDES.map((s, i) => {
-              const rel = i - slideIdx
-              const active = rel === 0
-              const prev = rel === -1
-              const next = rel === 1
-              if (!active && !prev && !next) return null
-
-              const baseX = rel * 85
-              const dragPct = (dragOffset / window.innerWidth) * 80
-              const totalX = `calc(${baseX + dragPct}%)`
-              const scale = active ? 1 : 0.80
-              const opacity = active ? 1 : 0.45
-
-              return (
-                <div
-                  key={s.id}
-                  onClick={() => { if (!dragging) setSlideIdx(i) }}
-                  style={{
-                    position: 'absolute',
-                    width: '76%',
-                    maxWidth: 320,
-                    height: 310,
-                    transform: `translateX(${totalX}) scale(${scale})`,
-                    transformOrigin: 'center center',
-                    transition: dragging ? 'none' : 'transform 0.42s cubic-bezier(0.25,1,0.5,1), opacity 0.42s ease',
-                    opacity,
-                    zIndex: active ? 10 : 1,
-                    borderRadius: 28,
-                  }}
-                >
-                  {/* Card */}
-                  <div
-                    className="w-full h-full flex flex-col items-center justify-center gap-4 p-7 relative overflow-hidden"
-                    style={{
-                      background: s.gradient,
-                      borderRadius: 28,
-                      boxShadow: active
-                        ? `0 28px 70px ${s.glowColor}, 0 8px 30px rgba(0,0,0,0.4)`
-                        : '0 8px 24px rgba(0,0,0,0.25)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                    }}
-                  >
-                    {/* Card ambient glow */}
-                    <div style={{
-                      position: 'absolute', top: '-30%', right: '-20%',
-                      width: 200, height: 200, borderRadius: '50%',
-                      background: `radial-gradient(circle, ${s.orbColor} 0%, transparent 70%)`,
-                      filter: 'blur(20px)', pointerEvents: 'none',
-                    }} />
-
-                    {/* Sparkle dots */}
-                    <div className="absolute top-5 left-6 w-1 h-1 rounded-full bg-white opacity-60" />
-                    <div className="absolute top-12 left-14 w-0.5 h-0.5 rounded-full bg-white opacity-35" />
-                    <div className="absolute bottom-10 right-8 w-1 h-1 rounded-full bg-white opacity-30" />
-
-                    {/* Triple-ring icon */}
-                    <div className="relative flex items-center justify-center" style={{ width: 100, height: 100 }}>
-                      {/* outer ring */}
-                      <div className="absolute inset-0 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }} />
-                      {/* mid ring */}
-                      <div className="absolute rounded-full" style={{ inset: 10, background: 'rgba(255,255,255,0.09)' }} />
-                      {/* icon bg */}
-                      <div
-                        className="absolute rounded-full flex items-center justify-center"
-                        style={{ inset: 20, background: s.iconBg, boxShadow: `0 8px 24px ${s.iconGlow}` }}
-                      >
-                        <span style={{ fontSize: 22 }}>{s.emoji}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-center relative z-10">
-                      <h2 className="text-white font-black text-xl leading-tight mb-2" style={{ letterSpacing: '-0.01em' }}>
-                        {s.title}
-                      </h2>
-                      <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.72)', maxWidth: 230 }}>
-                        {s.subtitle}
-                      </p>
-                    </div>
-
-                    {/* Badge pill */}
-                    <div className="px-3 py-1.5 rounded-full relative z-10"
-                      style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.20)' }}>
-                      <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.80)' }}>{s.badge}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* ── Bottom section ── */}
-        <div className="relative z-10 px-6 pb-10 pt-2 flex flex-col items-center gap-4">
-          {/* Dot indicators */}
-          <div className="flex items-center gap-2">
-            {SLIDES.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setSlideIdx(i)}
-                style={{
-                  width: slideIdx === i ? 28 : 8,
-                  height: 8,
-                  borderRadius: 4,
-                  background: slideIdx === i ? '#22c55e' : 'var(--mf-surface-3)',
-                  transition: 'all 0.3s cubic-bezier(0.25,1,0.5,1)',
-                  boxShadow: slideIdx === i ? '0 0 10px rgba(34,197,94,0.50)' : 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              />
-            ))}
-          </div>
-
-          {/* CTA */}
-          <button
-            onClick={goNext}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-full font-bold text-base active:scale-95 transition-all duration-150"
-            style={{
-              background: 'linear-gradient(135deg, rgba(34,197,94,0.85) 0%, rgba(16,163,74,0.85) 100%)',
-              boxShadow: '0 8px 28px rgba(34,197,94,0.40)',
-              border: '1.5px solid rgba(34,197,94,0.40)',
-              color: 'white',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-            }}
-          >
-            {slideIdx < SLIDES.length - 1 ? (
-              <>Next <span style={{ opacity: 0.85 }}>›</span></>
-            ) : (
-              <>Set Up My Account <span style={{ opacity: 0.85 }}>›</span></>
-            )}
-          </button>
-
-          {/* Home indicator */}
-          <div className="w-28 h-1 rounded-full" style={{ background: 'var(--mf-surface-3)' }} />
-        </div>
-      </div>
-    )
+    return {
+      position: 'fixed',
+      top: isBelow ? `${coords.top + coords.height + 16}px` : undefined,
+      bottom: !isBelow ? `${window.innerHeight - coords.top + 16}px` : undefined,
+      left: `${leftVal}px`,
+      width: `${tooltipWidth}px`,
+      zIndex: 10000,
+      transition: 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)',
+    }
   }
 
-  /* ════════════════ SETUP PHASE ════════════════ */
   return (
-    <div
-      className={`fixed inset-0 z-[9999] flex flex-col select-none transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}
-      style={{ background: 'var(--mf-bg)' }}
-    >
-      <LiquidBg />
+    <div className={`fixed inset-0 z-[9998] transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}>
+      
+      {/* ── Spotlight Frame Overlay ── */}
+      {coords ? (
+        <div
+          style={{
+            position: 'fixed',
+            top: coords.top - 8,
+            left: coords.left - 8,
+            width: coords.width + 16,
+            height: coords.height + 16,
+            borderRadius: '24px',
+            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.75)',
+            border: '2.5px solid #4F8EF7',
+            transition: 'all 0.3s cubic-bezier(0.25, 1, 0.5, 1)',
+            pointerEvents: 'none',
+            zIndex: 9999,
+          }}
+        />
+      ) : (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+          style={{ zIndex: 9999 }}
+          onClick={handleSkip}
+        />
+      )}
 
-      {/* ── Header ── */}
-      <div className="relative z-10 flex items-center justify-between px-5 pt-14 pb-6">
-        {/* Back */}
-        {setupStep === 0 ? (
-          <button
-            onClick={() => setPhase('slides')}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-90"
-            style={{ background: 'var(--mf-surface-2)', border: '1px solid var(--mf-border)' }}
-          >
-            <span style={{ color: 'var(--mf-text-primary)' }} className="text-base">‹</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => setSetupStep(s => s - 1)}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-90"
-            style={{ background: 'var(--mf-surface-2)', border: '1px solid var(--mf-border)' }}
-          >
-            <span style={{ color: 'var(--mf-text-primary)' }} className="text-base">‹</span>
-          </button>
+      {/* ── Glassmorphic Tooltip / Welcome Modal Card ── */}
+      <div
+        className="rounded-[32px] overflow-hidden transition-all duration-300"
+        style={{
+          ...getTooltipStyle(),
+          background: darkMode ? 'rgba(26, 26, 29, 0.85)' : 'rgba(255, 255, 255, 0.90)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: darkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
+        }}
+      >
+        {/* Step Progress Line */}
+        {step > 0 && (
+          <div className="w-full h-1 bg-black/10 dark:bg-white/10">
+            <div 
+              className="h-full bg-[#4F8EF7] transition-all duration-300"
+              style={{ width: `${(step / 4) * 100}%` }}
+            />
+          </div>
         )}
 
-        {/* Step dots */}
-        <div className="flex items-center gap-2">
-          {SETUP_STEPS.map((_, i) => (
-            <div
-              key={i}
-              className="rounded-full transition-all duration-300"
-              style={{
-                width: setupStep === i ? 28 : 8,
-                height: 8,
-                background: setupStep === i ? '#22c55e' : 'var(--mf-surface-3)',
-                boxShadow: setupStep === i ? '0 0 10px rgba(34,197,94,0.50)' : 'none',
-              }}
-            />
-          ))}
-        </div>
-
-        <button
-          onClick={skip}
-          className="text-xs font-semibold px-3 py-1.5 rounded-full"
-          style={{ background: 'var(--mf-surface-2)', color: 'var(--mf-text-secondary)', border: '1px solid var(--mf-border)' }}
-        >
-          Skip
-        </button>
-      </div>
-
-      {/* ── Content ── */}
-      <div className="relative z-10 flex-1 flex flex-col px-5 overflow-y-auto">
-
-        {/* ── Step 1: Opening Balance ── */}
-        {setupStep === 0 && (
-          <div className="flex flex-col gap-5 max-w-sm mx-auto w-full">
-            {/* Icon */}
-            <div className="flex flex-col items-center text-center pt-2 pb-4">
-              <div
-                className="w-20 h-20 rounded-3xl flex items-center justify-center mb-4 shadow-2xl"
-                style={{
-                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                  boxShadow: '0 16px 48px rgba(34,197,94,0.45)',
-                }}
-              >
-                <span style={{ fontSize: 32 }}>🏦</span>
+        {/* ── Welcome Screen ── */}
+        {step === 0 && (
+          <div className="p-8 text-center flex flex-col items-center">
+            <div className="relative mb-6">
+              <div className="absolute inset-0 rounded-[24px] bg-[#22c55e]/30 blur-xl animate-pulse" />
+              <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-[#22c55e] to-[#16a34a] flex items-center justify-center relative shadow-lg">
+                <span className="text-white text-3xl font-black font-display">₹</span>
               </div>
-              <h1 className="font-black text-2xl mb-1" style={{ letterSpacing: '-0.02em', color: 'var(--mf-text-primary)' }}>Opening Balance</h1>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--mf-text-secondary)', maxWidth: 260 }}>
-                How much money did you have before starting MoneyFlow?
-              </p>
             </div>
 
-            {/* Amount input */}
-            <div
-              className="rounded-3xl p-4 flex flex-col gap-4"
-              style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}
-            >
-              {/* Amount */}
+            <h2 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white mb-2 font-display">
+              Welcome to MoneyFlow
+            </h2>
+            <p className="text-sm leading-relaxed text-gray-500 dark:text-white/60 mb-8 max-w-[280px]">
+              Track expenses, split bills, and grow your net worth in a professional financial cockpit.
+            </p>
+
+            <div className="w-full space-y-3">
+              <button
+                onClick={handleNext}
+                className="w-full py-4 rounded-2xl bg-[#4F8EF7] text-white font-bold text-sm hover:bg-[#4F8EF7]/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border-none cursor-pointer shadow-md shadow-[#4F8EF7]/20"
+              >
+                <Play size={14} className="fill-current" /> Take a Tour
+              </button>
+              <button
+                onClick={handleSkip}
+                className="w-full py-4 rounded-2xl bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-white/50 font-bold text-sm hover:bg-gray-200 dark:hover:bg-white/10 active:scale-[0.98] transition-all border-none cursor-pointer"
+              >
+                Skip & Setup Later
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 1: Balance Hero Card ── */}
+        {step === 1 && (
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0">
+                <Wallet size={18} className="text-indigo-400" />
+              </div>
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: 'var(--mf-text-muted)' }}>
-                  Amount
+                <span className="text-[10px] font-bold text-[#4F8EF7] uppercase tracking-wider block">Step 1 of 4</span>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Financial Summary</h3>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-white/60 leading-relaxed mb-6">
+              This is your primary balance cockpit. Track your Net Worth, total monthly Income, and daily Expenses in real-time with count-up animations.
+            </p>
+            {renderTourControls()}
+          </div>
+        )}
+
+        {/* ── Step 2: Quick Actions Grid ── */}
+        {step === 2 && (
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                <Zap size={18} className="text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-[#4F8EF7] uppercase tracking-wider block">Step 2 of 4</span>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Smart Transaction Logger</h3>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-white/60 leading-relaxed mb-6">
+              Add income or expenses instantly. You can also use **Smart Add** to type transactions in plain language (e.g., *'spent 120 on pizza yesterday'*) and let our AI parser extract the details automatically.
+            </p>
+            {renderTourControls()}
+          </div>
+        )}
+
+        {/* ── Step 3: AI Chat Spotlight ── */}
+        {step === 3 && (
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
+                <MessageCircle size={18} className="text-purple-400" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-[#4F8EF7] uppercase tracking-wider block">Step 3 of 4</span>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">AI Financial Advisor</h3>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-white/60 leading-relaxed mb-6">
+              Get customized budget alerts, spending insights, and anomaly detection. Click **AI Chat** to talk to your Gemini-powered assistant anytime.
+            </p>
+            {renderTourControls()}
+          </div>
+        )}
+
+        {/* ── Step 4: Quick Setup Form ── */}
+        {step === 4 && (
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Brain size={18} className="text-amber-400" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-[#4F8EF7] uppercase tracking-wider block">Step 4 of 4</span>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Quick Setup</h3>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500 dark:text-white/60 leading-relaxed mb-4">
+              Customize your dashboard. Enter your opening balance and GST configuration to complete your profile setup.
+            </p>
+
+            {/* Inputs */}
+            <div className="space-y-3 mb-6 bg-black/5 dark:bg-white/5 p-3.5 rounded-2xl">
+              <div>
+                <label className="block text-[9px] font-bold text-gray-400 dark:text-white/35 uppercase mb-1">
+                  Opening Balance
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold" style={{ color: 'var(--mf-text-muted)' }}>₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">₹</span>
                   <input
-                    ref={amountRef}
                     type="number"
-                    inputMode="decimal"
-                    placeholder="0"
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && setSetupStep(1)}
-                    className="w-full pl-10 pr-4 py-4 rounded-2xl text-2xl font-black font-mono outline-none"
-                    style={{
-                      background: 'var(--mf-surface-2)',
-                      border: '1.5px solid var(--mf-border)',
-                      color: 'var(--mf-text-primary)',
-                      colorScheme: darkMode ? 'dark' : 'light',
-                    }}
+                    placeholder="0"
+                    className="w-full pl-7 pr-3 py-2 rounded-xl bg-white dark:bg-[#222226] border border-black/[0.08] dark:border-white/[0.08] text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#4F8EF7]/50 font-mono font-bold"
                   />
                 </div>
               </div>
 
-              {/* Date */}
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: 'var(--mf-text-muted)' }}>
+                <label className="block text-[9px] font-bold text-gray-400 dark:text-white/35 uppercase mb-1">
                   As of Date
                 </label>
                 <input
                   type="date"
                   value={date}
                   onChange={e => setDate(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-2xl text-sm outline-none"
-                  style={{
-                    background: 'var(--mf-surface-2)',
-                    border: '1.5px solid var(--mf-border)',
-                    color: 'var(--mf-text-primary)',
-                    colorScheme: darkMode ? 'dark' : 'light',
-                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#222226] border border-black/[0.08] dark:border-white/[0.08] text-xs text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-[#4F8EF7]/50 font-medium"
                 />
               </div>
-            </div>
 
-            {/* Tip */}
-            <div
-              className="flex gap-3 px-4 py-3.5 rounded-2xl"
-              style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.20)' }}
-            >
-              <span className="text-lg shrink-0">💡</span>
-              <p className="text-xs leading-relaxed" style={{ color: 'rgba(34,197,94,0.80)' }}>
-                This ensures your Balance Sheet and Net Worth are accurate from day one.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Step 2: GST ── */}
-        {setupStep === 1 && (
-          <div className="flex flex-col gap-5 max-w-sm mx-auto w-full">
-            {/* Icon */}
-            <div className="flex flex-col items-center text-center pt-2 pb-4">
-              <div
-                className="w-20 h-20 rounded-3xl flex items-center justify-center mb-4 shadow-2xl"
-                style={{
-                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                  boxShadow: '0 16px 48px rgba(251,191,36,0.40)',
-                }}
-              >
-                <span style={{ fontSize: 32 }}>🧾</span>
-              </div>
-              <h1 className="font-black text-2xl mb-1" style={{ letterSpacing: '-0.02em', color: 'var(--mf-text-primary)' }}>GST Setup</h1>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--mf-text-secondary)', maxWidth: 260 }}>
-                Optional — for tax-deductible expense tracking
-              </p>
-            </div>
-
-            {/* GST Rate */}
-            <div
-              className="rounded-3xl p-4 flex flex-col gap-4"
-              style={{ background: 'var(--mf-surface)', border: '1px solid var(--mf-border)' }}
-            >
+              {/* GST rate */}
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest mb-3 block" style={{ color: 'var(--mf-text-muted)' }}>
-                  Your GST Rate
+                <label className="block text-[9px] font-bold text-gray-400 dark:text-white/35 uppercase mb-1">
+                  Tax Rate (GST)
                 </label>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-1">
                   {[0, 5, 12, 18, 28].map(r => (
                     <button
                       key={r}
                       onClick={() => setGstRate(r)}
-                      className="py-3 rounded-2xl text-sm font-bold transition-all active:scale-95"
-                      style={{
-                        background: gstRate === r ? 'rgba(251,191,36,0.90)' : 'var(--mf-surface-2)',
-                        color: gstRate === r ? '#000' : 'var(--mf-text-secondary)',
-                        border: gstRate === r ? '1px solid #fbbf24' : '1px solid var(--mf-border)',
-                        boxShadow: gstRate === r ? '0 4px 14px rgba(251,191,36,0.35)' : 'none',
-                      }}
+                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all border-none cursor-pointer ${
+                        gstRate === r 
+                          ? 'bg-[#4F8EF7] text-white shadow-sm shadow-[#4F8EF7]/20' 
+                          : 'bg-white dark:bg-[#222226] text-gray-500 dark:text-white/40 border border-black/[0.08] dark:border-white/[0.08]'
+                      }`}
                     >
                       {r}%
                     </button>
@@ -531,73 +360,73 @@ export default function OnboardingModal({
                 </div>
               </div>
 
-              {/* GST Registered toggle */}
-              <div
-                className="flex items-center justify-between px-4 py-4 rounded-2xl"
-                style={{ background: 'var(--mf-surface-2)', border: '1px solid var(--mf-border)' }}
-              >
+              {/* GST toggle */}
+              <div className="flex items-center justify-between pt-1">
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--mf-text-primary)' }}>I am GST Registered</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--mf-text-muted)' }}>Track GST input credit on expenses</p>
+                  <span className="text-[10px] font-bold text-gray-800 dark:text-white/80 block">GST Registered</span>
+                  <span className="text-[9px] text-gray-400 dark:text-white/30 block">Track input credit on expenses</span>
                 </div>
                 <button
-                  onClick={() => setRegistered(r => !r)}
-                  className="relative w-14 h-7 rounded-full transition-all duration-300 shrink-0"
+                  onClick={() => setRegistered(!registered)}
+                  className="relative w-10 h-5.5 rounded-full transition-all duration-200 shrink-0 border-none cursor-pointer"
                   style={{ background: registered ? '#22c55e' : 'var(--mf-surface-3)' }}
                 >
-                  <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300 ${registered ? 'left-7' : 'left-0.5'}`} />
+                  <div className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow-md transition-all duration-200 ${registered ? 'left-5' : 'left-0.5'}`} />
                 </button>
               </div>
             </div>
 
-            {/* Tip */}
-            <div
-              className="flex gap-3 px-4 py-3.5 rounded-2xl"
-              style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)' }}
-            >
-              <span className="text-lg shrink-0">💡</span>
-              <p className="text-xs leading-relaxed" style={{ color: 'rgba(251,191,36,0.75)' }}>
-                You can always update GST settings later from the Settings page.
-              </p>
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleBack}
+                className="px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-white/50 font-bold text-xs hover:bg-gray-200 dark:hover:bg-white/10 active:scale-[0.98] transition-all flex items-center justify-center border-none cursor-pointer"
+              >
+                <ArrowLeft size={14} />
+              </button>
+              <button
+                onClick={handleFinish}
+                disabled={saving}
+                className="flex-1 py-3.5 rounded-xl bg-[#22c55e] text-white font-bold text-xs hover:bg-emerald-600 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 border-none cursor-pointer shadow-md shadow-[#22c55e]/20"
+              >
+                {saving ? (
+                  <RefreshCw size={13} className="animate-spin" />
+                ) : (
+                  <>Ready, Let's Go! <Check size={14} /></>
+                )}
+              </button>
             </div>
           </div>
         )}
       </div>
-
-      {/* ── Footer CTA ── */}
-      <div className="relative z-10 px-5 py-6 max-w-sm mx-auto w-full">
-        {setupStep < SETUP_STEPS.length - 1 ? (
-          <button
-            onClick={() => setSetupStep(s => s + 1)}
-            className="w-full py-4 rounded-full font-bold text-base text-white flex items-center justify-center gap-2 active:scale-95 transition-all"
-            style={{
-              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-              boxShadow: '0 8px 28px rgba(34,197,94,0.40)',
-            }}
-          >
-            Continue <span style={{ opacity: 0.85 }}>›</span>
-          </button>
-        ) : (
-          <button
-            onClick={finish}
-            disabled={saving}
-            className="w-full py-4 rounded-full font-bold text-base text-white flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
-            style={{
-              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-              boxShadow: '0 8px 28px rgba(34,197,94,0.40)',
-            }}
-          >
-            {saving
-              ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Saving...</>
-              : <>✅ Finish Setup</>}
-          </button>
-        )}
-
-        {/* Home indicator */}
-        <div className="flex justify-center mt-4">
-          <div className="w-28 h-1 rounded-full" style={{ background: 'var(--mf-surface-3)' }} />
-        </div>
-      </div>
     </div>
   )
+
+  function renderTourControls() {
+    return (
+      <div className="flex items-center justify-between pt-2">
+        <button
+          onClick={handleSkip}
+          className="text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-white/80 active:scale-95 transition-all border-none bg-transparent cursor-pointer"
+        >
+          Skip Tour
+        </button>
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleBack}
+            className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-white/60 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-white/10 active:scale-95 transition-all border-none cursor-pointer"
+          >
+            <ArrowLeft size={14} />
+          </button>
+          <button
+            onClick={handleNext}
+            className="px-4 py-2.5 rounded-xl bg-[#4F8EF7] text-white font-bold text-xs flex items-center gap-1 hover:bg-[#4F8EF7]/90 active:scale-95 transition-all border-none cursor-pointer shadow-sm shadow-[#4F8EF7]/20"
+          >
+            Next <ArrowRight size={13} />
+          </button>
+        </div>
+      </div>
+    )
+  }
 }

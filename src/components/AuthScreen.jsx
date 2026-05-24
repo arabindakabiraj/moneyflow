@@ -1,16 +1,21 @@
 /**
- * AuthScreen.jsx — Simplified Premium Auth (No OTP)
- * Sign Up: name + email + phone + password
- * Login: single input (email or phone) + password → instant
+ * AuthScreen.jsx — Premium Auth V.2.1
+ * Tabs: login | register | forgot
+ * Post-login screens: deactivated | deletion-scheduled
  */
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import {
   RefreshCw, UserPlus, LogIn, User, Eye, EyeOff,
-  CheckCircle2, AlertCircle, Sparkles, Mail, Lock, Phone
+  CheckCircle2, AlertCircle, Sparkles, Mail, Lock, Phone,
+  KeyRound, ArrowLeft, UserX, Trash2, Clock, ShieldAlert,
 } from 'lucide-react'
-import { registerUser, loginUser, isEmail, isPhone } from '../authUtils'
+import {
+  registerUser, loginUser, resetPassword,
+  isEmail, isPhone,
+  reactivateAccount, cancelAccountDeletion,
+} from '../authUtils'
 
-/* ═══════ Floating Label Input — Refined ═══════ */
+/* ═══════ Floating Label Input ═══════ */
 function FloatingInput({
   icon: Icon,
   iconColor = 'var(--mf-text-muted)',
@@ -112,7 +117,6 @@ function SuccessAnimation({ message }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}>
       <div className="text-center" style={{ animation: 'successPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275) both' }}>
-        {/* Animated rings */}
         <div className="relative w-24 h-24 mx-auto mb-5">
           <div className="absolute inset-0 rounded-full" style={{
             border: '2px solid rgba(52,211,153,0.15)',
@@ -140,14 +144,310 @@ function SuccessAnimation({ message }) {
   )
 }
 
+/* ═══════ Deactivated Account Screen ═══════ */
+function DeactivatedScreen({ uid, username, onReactivate, onBack }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleReactivate = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      await reactivateAccount(uid)
+      onReactivate(uid)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in" style={{ background: 'var(--mf-bg)' }}>
+      <div className="w-full max-w-sm">
+        <div className="rounded-3xl overflow-hidden text-center" style={{
+          background: 'var(--mf-surface)',
+          border: '1px solid var(--mf-border)',
+          boxShadow: 'var(--mf-shadow-lg)',
+        }}>
+          <div className="px-7 pt-8 pb-6">
+            {/* Icon */}
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+              style={{ background: 'rgba(251,191,36,0.12)', border: '1.5px solid rgba(251,191,36,0.25)' }}>
+              <UserX size={28} style={{ color: '#FBBF24' }} />
+            </div>
+
+            <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--mf-text-primary)' }}>
+              Account Deactivated
+            </h2>
+            <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--mf-text-muted)' }}>
+              Hey{username ? ` ${username}` : ''}! Your account is currently deactivated.
+              Your data is safe — reactivate anytime to pick up right where you left off.
+            </p>
+
+            {error && (
+              <div className="flex items-center gap-2 text-xs font-semibold py-2.5 px-3.5 rounded-xl mb-4 text-left"
+                style={{ background: 'rgba(255,107,107,0.10)', border: '1px solid rgba(255,107,107,0.20)', color: '#FF6B6B' }}>
+                <AlertCircle size={13} /> {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleReactivate}
+              disabled={loading}
+              className="w-full py-4 rounded-2xl font-bold text-base text-white flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] border-none outline-none cursor-pointer mb-3 disabled:opacity-60"
+              style={{
+                background: 'linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)',
+                boxShadow: '0 8px 28px rgba(20,184,166,0.30)',
+              }}
+            >
+              {loading ? <RefreshCw size={18} className="animate-spin" /> : <><CheckCircle2 size={17} /> Reactivate My Account</>}
+            </button>
+
+            <button
+              onClick={onBack}
+              className="w-full py-3 rounded-2xl text-sm font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer"
+              style={{ color: 'var(--mf-text-muted)' }}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <ArrowLeft size={14} /> Back to Login
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════ Deletion Scheduled Screen ═══════ */
+function DeletionScheduledScreen({ uid, scheduledDeletionAt, onCancelDeletion, onBack }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  // Format the deletion date
+  const deletionDate = scheduledDeletionAt?.toDate
+    ? scheduledDeletionAt.toDate()
+    : scheduledDeletionAt instanceof Date
+      ? scheduledDeletionAt
+      : null
+
+  const formattedDate = deletionDate
+    ? deletionDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '30 days from request'
+
+  // Days remaining
+  const daysLeft = deletionDate
+    ? Math.max(0, Math.ceil((deletionDate - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 30
+
+  const handleCancel = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      await cancelAccountDeletion(uid)
+      onCancelDeletion(uid)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in" style={{ background: 'var(--mf-bg)' }}>
+      <div className="w-full max-w-sm">
+        <div className="rounded-3xl overflow-hidden text-center" style={{
+          background: 'var(--mf-surface)',
+          border: '1px solid var(--mf-border)',
+          boxShadow: 'var(--mf-shadow-lg)',
+        }}>
+          <div className="px-7 pt-8 pb-6">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+              style={{ background: 'rgba(255,107,107,0.12)', border: '1.5px solid rgba(255,107,107,0.25)' }}>
+              <Trash2 size={28} style={{ color: '#FF6B6B' }} />
+            </div>
+
+            <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--mf-text-primary)' }}>
+              Account Deletion Scheduled
+            </h2>
+
+            {/* Countdown badge */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full mb-4"
+              style={{ background: 'rgba(255,107,107,0.12)', border: '1px solid rgba(255,107,107,0.25)' }}>
+              <Clock size={12} style={{ color: '#FF6B6B' }} />
+              <span className="text-xs font-bold" style={{ color: '#FF6B6B' }}>
+                {daysLeft} {daysLeft === 1 ? 'day' : 'days'} remaining
+              </span>
+            </div>
+
+            <p className="text-sm leading-relaxed mb-2" style={{ color: 'var(--mf-text-muted)' }}>
+              Your account is scheduled to be permanently deleted on:
+            </p>
+            <p className="text-base font-bold mb-5" style={{ color: 'var(--mf-text-primary)' }}>
+              📅 {formattedDate}
+            </p>
+            <p className="text-xs leading-relaxed mb-6" style={{ color: 'var(--mf-text-muted)' }}>
+              Changed your mind? Cancel the deletion and your account will be fully restored.
+            </p>
+
+            {error && (
+              <div className="flex items-center gap-2 text-xs font-semibold py-2.5 px-3.5 rounded-xl mb-4 text-left"
+                style={{ background: 'rgba(255,107,107,0.10)', border: '1px solid rgba(255,107,107,0.20)', color: '#FF6B6B' }}>
+                <AlertCircle size={13} /> {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleCancel}
+              disabled={loading}
+              className="w-full py-4 rounded-2xl font-bold text-base text-white flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] border-none outline-none cursor-pointer mb-3 disabled:opacity-60"
+              style={{
+                background: 'linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)',
+                boxShadow: '0 8px 28px rgba(20,184,166,0.30)',
+              }}
+            >
+              {loading ? <RefreshCw size={18} className="animate-spin" /> : <><ShieldAlert size={17} /> Cancel Deletion</>}
+            </button>
+
+            <button
+              onClick={onBack}
+              className="w-full py-3 rounded-2xl text-sm font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer"
+              style={{ color: 'var(--mf-text-muted)' }}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <ArrowLeft size={14} /> Back to Login
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════ Forgot Password Panel ═══════ */
+function ForgotPasswordPanel({ onBack }) {
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [sent, setSent] = useState(false)
+  const submittingRef = useRef(false)
+
+  const validateEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+
+  const handleReset = async () => {
+    if (submittingRef.current) return
+    setError('')
+
+    const trimmed = email.trim()
+    if (!trimmed || !validateEmail(trimmed)) {
+      setError('Please enter a valid email address')
+      return
+    }
+
+    submittingRef.current = true
+    setLoading(true)
+    try {
+      await resetPassword(trimmed)
+      setSent(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+      submittingRef.current = false
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="p-5 pt-3 flex-1 flex flex-col items-center justify-center text-center space-y-4 animate-fade-in">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
+          style={{ background: 'rgba(52,211,153,0.12)', border: '1.5px solid rgba(52,211,153,0.25)' }}>
+          <CheckCircle2 size={28} style={{ color: '#34D399' }} />
+        </div>
+        <div>
+          <p className="text-base font-bold mb-1" style={{ color: 'var(--mf-text-primary)' }}>Check your inbox! 📬</p>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--mf-text-muted)' }}>
+            We sent a password reset link to<br />
+            <strong style={{ color: 'var(--mf-text-primary)' }}>{email}</strong>
+          </p>
+          <p className="text-xs mt-2" style={{ color: 'var(--mf-text-muted)' }}>
+            Didn't receive it? Check your spam folder.
+          </p>
+        </div>
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer"
+          style={{ color: '#14B8A6' }}
+        >
+          <ArrowLeft size={14} /> Back to Login
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <form
+      className="p-5 pt-3 flex-1 flex flex-col"
+      onSubmit={(e) => { e.preventDefault(); handleReset() }}
+    >
+      <div className="space-y-4">
+        <div className="animate-fade-in">
+          <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--mf-text-muted)' }}>
+            Enter the email address linked to your account. We'll send you a reset link right away.
+          </p>
+        </div>
+
+        <FloatingInput
+          icon={Mail}
+          type="email"
+          label="Your account email address"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          error={error}
+          autoComplete="email"
+          autoFocus
+          delay={50}
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="auth-cta-btn w-full py-4 rounded-2xl font-bold text-base text-white flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] border-none outline-none focus:outline-none cursor-pointer mt-2 disabled:opacity-60"
+          style={{
+            background: 'linear-gradient(135deg, #14B8A6 0%, #0D9488 50%, #0F766E 100%)',
+            boxShadow: '0 8px 28px rgba(20,184,166,0.30)',
+          }}
+        >
+          {loading ? <RefreshCw size={18} className="animate-spin" /> : <><KeyRound size={17} /> Send Reset Link</>}
+        </button>
+
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-full py-3 rounded-2xl text-sm font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer flex items-center justify-center gap-1.5"
+          style={{ color: 'var(--mf-text-muted)' }}
+        >
+          <ArrowLeft size={14} /> Back to Login
+        </button>
+      </div>
+    </form>
+  )
+}
+
 /* ═══════════════════════════════════════════════════
-   MAIN AUTH SCREEN — Simplified V.2 (No OTP)
+   MAIN AUTH SCREEN — V.2.1
    ═══════════════════════════════════════════════════ */
 export default function AuthScreen({ onAuth }) {
-  const [tab, setTab] = useState('login') // 'login' | 'register'
+  const [tab, setTab] = useState('login') // 'login' | 'register' | 'forgot'
+
+  // Post-login state: when user is deactivated or scheduled for deletion
+  const [deactivatedState, setDeactivatedState] = useState(null) // { uid, username }
+  const [deletionState, setDeletionState] = useState(null)       // { uid, scheduledDeletionAt }
 
   // Login fields
-  const [identifier, setIdentifier] = useState('') // email or phone
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
@@ -163,7 +463,6 @@ export default function AuthScreen({ onAuth }) {
   const [fieldErrors, setFieldErrors] = useState({})
   const [showSuccess, setShowSuccess] = useState(false)
 
-  // Prevent double-submit
   const submittingRef = useRef(false)
 
   const reset = useCallback(() => {
@@ -176,12 +475,42 @@ export default function AuthScreen({ onAuth }) {
     reset()
   }, [reset])
 
+  const cleanMobileInput = (val) => {
+    let clean = val.replace(/\D/g, '')
+    if (clean.length === 12 && clean.startsWith('91')) {
+      clean = clean.slice(2)
+    } else if (clean.length === 11 && clean.startsWith('0')) {
+      clean = clean.slice(1)
+    }
+    return clean.slice(0, 10)
+  }
+
   // ── Smart identifier icon ──
   const identifierIcon = isEmail(identifier) ? Mail : isPhone(identifier) ? Phone : Mail
 
   // ── Validation helpers ──
   const validateEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
   const validatePhone = (val) => !val || /^\+?[1-9]\d{6,14}$/.test(val)
+
+  const isValidMobile = (phone) => {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length !== 10) return false
+    if (!/^[6-9]/.test(digits)) return false
+    if (/^(\d)\1{9}$/.test(digits)) return false
+    return true
+  }
+
+  const validatePasswordStrength = (pw) => {
+    if (pw.length < 8) {
+      return 'Password must be at least 8 characters long.'
+    }
+    const hasCapital = /[A-Z]/.test(pw)
+    const hasSpacer = /[!@#$%^&*(),.?":{}|<> _\-+=~`[\]\\/;\s]/.test(pw)
+    if (!hasCapital || !hasSpacer) {
+      return 'Please use a spacer char and a capital letter.'
+    }
+    return null
+  }
 
   // ── Handle Login ──
   const handleLogin = async () => {
@@ -193,9 +522,17 @@ export default function AuthScreen({ onAuth }) {
       setFieldErrors({ identifier: 'Enter your email or phone number' })
       return
     }
-    if (!isEmail(trimmed) && !isPhone(trimmed)) {
-      setFieldErrors({ identifier: 'Enter a valid email or phone number' })
-      return
+    const looksLikePhone = /^\d+$/.test(trimmed) || (trimmed.startsWith('+') && /^\d+$/.test(trimmed.slice(1)))
+    if (looksLikePhone) {
+      if (!isValidMobile(trimmed)) {
+        setFieldErrors({ identifier: 'Enter a valid 10-digit mobile number. Repeated digits are invalid.' })
+        return
+      }
+    } else {
+      if (!isEmail(trimmed)) {
+        setFieldErrors({ identifier: 'Enter a valid email address' })
+        return
+      }
     }
     if (!password || password.length < 8) {
       setFieldErrors({ password: 'Password must be at least 8 characters' })
@@ -205,7 +542,22 @@ export default function AuthScreen({ onAuth }) {
     submittingRef.current = true
     setLoading(true)
     try {
-      const user = await loginUser(trimmed, password)
+      // loginUser now returns { user, profile }
+      const { user, profile } = await loginUser(trimmed, password)
+
+      // Check if account is deactivated → show reactivation screen
+      if (profile.deactivated) {
+        setDeactivatedState({ uid: user.uid, username: profile.username })
+        return
+      }
+
+      // Check if account is scheduled for deletion → show cancellation screen
+      if (profile.deletionScheduled) {
+        setDeletionState({ uid: user.uid, scheduledDeletionAt: profile.scheduledDeletionAt })
+        return
+      }
+
+      // Normal login success
       setShowSuccess(true)
       setTimeout(() => onAuth(user.uid), 1000)
     } catch (err) {
@@ -221,27 +573,39 @@ export default function AuthScreen({ onAuth }) {
     if (submittingRef.current) return
     reset()
 
-    if (!regName.trim() || regName.trim().length < 2) {
+    const nameVal = regName.trim()
+    const emailVal = regEmail.trim()
+    const phoneVal = regPhone.trim()
+    const passwordVal = regPassword
+
+    if (!nameVal || nameVal.length < 2) {
       setFieldErrors({ name: 'Enter your full name (min 2 characters)' })
       return
     }
-    if (!regEmail.trim() || !validateEmail(regEmail)) {
+    if (!emailVal && !phoneVal) {
+      setFieldErrors({ email: 'Email address or phone number is required' })
+      return
+    }
+    if (emailVal && !validateEmail(emailVal)) {
       setFieldErrors({ email: 'Enter a valid email address' })
       return
     }
-    if (regPhone.trim() && !validatePhone(regPhone.trim())) {
-      setFieldErrors({ phone: 'Enter a valid phone number (e.g. +919876543210)' })
-      return
+    if (phoneVal) {
+      if (!isValidMobile(phoneVal)) {
+        setFieldErrors({ phone: 'Enter a valid 10-digit mobile number. Repeated digits are invalid.' })
+        return
+      }
     }
-    if (!regPassword || regPassword.length < 8) {
-      setFieldErrors({ password: 'Password must be at least 8 characters' })
+    const pwError = validatePasswordStrength(passwordVal)
+    if (pwError) {
+      setFieldErrors({ password: pwError })
       return
     }
 
     submittingRef.current = true
     setLoading(true)
     try {
-      const user = await registerUser(regName.trim(), regEmail.trim(), regPassword, regPhone.trim())
+      const user = await registerUser(nameVal, emailVal, passwordVal, phoneVal)
       setShowSuccess(true)
       setTimeout(() => onAuth(user.uid), 1000)
     } catch (err) {
@@ -254,6 +618,43 @@ export default function AuthScreen({ onAuth }) {
 
   const handleSubmit = tab === 'login' ? handleLogin : handleRegister
 
+  /* ── Special post-login screens ── */
+  if (deactivatedState) {
+    return (
+      <DeactivatedScreen
+        uid={deactivatedState.uid}
+        username={deactivatedState.username}
+        onReactivate={(uid) => {
+          setDeactivatedState(null)
+          setShowSuccess(true)
+          setTimeout(() => onAuth(uid), 1000)
+        }}
+        onBack={() => {
+          setDeactivatedState(null)
+          setPassword('')
+        }}
+      />
+    )
+  }
+
+  if (deletionState) {
+    return (
+      <DeletionScheduledScreen
+        uid={deletionState.uid}
+        scheduledDeletionAt={deletionState.scheduledDeletionAt}
+        onCancelDeletion={(uid) => {
+          setDeletionState(null)
+          setShowSuccess(true)
+          setTimeout(() => onAuth(uid), 1000)
+        }}
+        onBack={() => {
+          setDeletionState(null)
+          setPassword('')
+        }}
+      />
+    )
+  }
+
   /* Success overlay */
   if (showSuccess) {
     return <SuccessAnimation message={tab === 'register' ? `Welcome, ${regName || 'User'}! 🎉` : 'Welcome back! 👋'} />
@@ -262,7 +663,7 @@ export default function AuthScreen({ onAuth }) {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden animate-fade-in" style={{ background: 'var(--mf-bg)' }}>
 
-      {/* Decorative subtle ambient glows */}
+      {/* Decorative ambient glows */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div style={{
           position: 'absolute', top: '-15%', left: '-15%', width: '350px', height: '350px',
@@ -363,8 +764,8 @@ export default function AuthScreen({ onAuth }) {
 
         {/* Bottom trust */}
         <div className="relative z-10 pt-6 border-t border-white/[0.05] flex items-center justify-between">
-          <span className="text-[9px] font-semibold text-white/30 uppercase tracking-wider">🔒 SECURE & AES-256 ENCRYPTED</span>
-          <span className="text-[9px] font-bold text-emerald-400/80">Loved by 50k+ users</span>
+          <span className="text-[9px] font-semibold text-white/30 uppercase tracking-wider">🔒 SECURE &amp; AES-256 ENCRYPTED</span>
+          <span className="text-[9px] font-bold text-emerald-400/80">Design By Arabinda Kabiraj</span>
         </div>
       </div>
 
@@ -399,176 +800,211 @@ export default function AuthScreen({ onAuth }) {
             maxWidth: 440,
           }}
         >
-          {/* Header */}
+          {/* Card Header */}
           <div className="flex flex-col items-center text-center pt-6 pb-2 px-5 stagger-item">
             <div className="w-12 h-12 rounded-2xl bg-[#14B8A6]/10 border border-[#14B8A6]/20 flex items-center justify-center mb-3 relative overflow-hidden shadow-md shadow-[#14B8A6]/5">
               <div className="absolute inset-0 bg-gradient-to-tr from-[#14B8A6]/5 to-[#0D9488]/5" />
               <span className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-tr from-[#14B8A6] to-[#2DD4BF] relative z-10 select-none">₹</span>
             </div>
             <p className="text-base font-bold mb-0.5" style={{ color: 'var(--mf-text-primary)' }}>
-              {tab === 'login' ? 'Welcome back 👋' : 'Create your account 🚀'}
+              {tab === 'login' ? 'Welcome back 👋' : tab === 'register' ? 'Create your account 🚀' : 'Reset your password 🔑'}
             </p>
             <p className="text-xs px-2" style={{ color: 'var(--mf-text-muted)' }}>
               {tab === 'login'
                 ? 'Sign in with your email or phone number'
-                : 'Start tracking your money securely'}
+                : tab === 'register'
+                  ? 'Start tracking your money securely'
+                  : 'Enter your email to receive a reset link'}
             </p>
           </div>
 
-          {/* Tab Switcher */}
-          <div className="px-5 py-2">
-            <div className="relative flex p-1 rounded-2xl" style={{ background: 'var(--mf-surface-2)' }}>
-              <div
-                className="absolute top-1 bottom-1 rounded-xl transition-all duration-300"
-                style={{
-                  width: 'calc(50% - 4px)',
-                  left: tab === 'login' ? '4px' : 'calc(50% + 0px)',
-                  background: '#14B8A6',
-                  boxShadow: '0 4px 16px rgba(20,184,166,0.30)',
-                }}
-              />
-              {[
-                { id: 'login', label: 'Sign In', Icon: LogIn },
-                { id: 'register', label: 'Sign Up', Icon: UserPlus },
-              ].map(({ id, label, Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => switchTab(id)}
-                  className="relative z-10 flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold transition-all duration-300 active:scale-95 border-none bg-transparent outline-none focus:outline-none cursor-pointer"
-                  style={tab === id ? { color: 'white' } : { color: 'var(--mf-text-muted)' }}
-                >
-                  <Icon size={14} style={{ transition: 'transform 0.2s', transform: tab === id ? 'scale(1.1)' : 'scale(1)' }} /> {label}
-                </button>
-              ))}
+          {/* Tab Switcher — only for login/register, not forgot */}
+          {tab !== 'forgot' && (
+            <div className="px-5 py-2">
+              <div className="relative flex p-1 rounded-2xl" style={{ background: 'var(--mf-surface-2)' }}>
+                <div
+                  className="absolute top-1 bottom-1 rounded-xl transition-all duration-300"
+                  style={{
+                    width: 'calc(50% - 4px)',
+                    left: tab === 'login' ? '4px' : 'calc(50% + 0px)',
+                    background: '#14B8A6',
+                    boxShadow: '0 4px 16px rgba(20,184,166,0.30)',
+                  }}
+                />
+                {[
+                  { id: 'login', label: 'Sign In', Icon: LogIn },
+                  { id: 'register', label: 'Sign Up', Icon: UserPlus },
+                ].map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => switchTab(id)}
+                    className="relative z-10 flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold transition-all duration-300 active:scale-95 border-none bg-transparent outline-none focus:outline-none cursor-pointer"
+                    style={tab === id ? { color: 'white' } : { color: 'var(--mf-text-muted)' }}
+                  >
+                    <Icon size={14} style={{ transition: 'transform 0.2s', transform: tab === id ? 'scale(1.1)' : 'scale(1)' }} /> {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Form */}
-          <form
-            className="p-5 pt-3 flex-1 flex flex-col"
-            onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
-          >
-            <div className="space-y-4">
-              {tab === 'register' ? (
-                /* ──── REGISTER FORM ──── */
-                <>
-                  <FloatingInput
-                    icon={User}
-                    label="Your full name"
-                    value={regName}
-                    onChange={e => setRegName(e.target.value)}
-                    error={fieldErrors.name}
-                    autoComplete="name"
-                    autoFocus
-                    delay={50}
-                  />
-                  <FloatingInput
-                    icon={Mail}
-                    type="email"
-                    label="Email address"
-                    value={regEmail}
-                    onChange={e => setRegEmail(e.target.value)}
-                    error={fieldErrors.email}
-                    autoComplete="email"
-                    delay={100}
-                  />
-                  <FloatingInput
-                    icon={Phone}
-                    type="tel"
-                    label="Mobile number (e.g. +919876543210)"
-                    value={regPhone}
-                    onChange={e => setRegPhone(e.target.value)}
-                    error={fieldErrors.phone}
-                    autoComplete="tel"
-                    inputMode="tel"
-                    delay={150}
-                  />
-                  <FloatingInput
-                    icon={Lock}
-                    type={showRegPassword ? 'text' : 'password'}
-                    label="Create a password"
-                    value={regPassword}
-                    onChange={e => setRegPassword(e.target.value)}
-                    error={fieldErrors.password}
-                    autoComplete="new-password"
-                    delay={200}
-                    right={
-                      <button
-                        type="button"
-                        onClick={() => setShowRegPassword(p => !p)}
-                        className="p-1 text-white/30 hover:text-white/60 transition-colors"
-                        tabIndex={-1}
-                        aria-label={showRegPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    }
-                  />
-                </>
-              ) : (
-                /* ──── LOGIN FORM ──── */
-                <>
-                  <FloatingInput
-                    icon={identifierIcon}
-                    label="Email or phone number"
-                    value={identifier}
-                    onChange={e => setIdentifier(e.target.value)}
-                    error={fieldErrors.identifier}
-                    autoComplete="username"
-                    autoFocus
-                    delay={50}
-                  />
-                  <FloatingInput
-                    icon={Lock}
-                    type={showPassword ? 'text' : 'password'}
-                    label="Password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    error={fieldErrors.password}
-                    autoComplete="current-password"
-                    delay={100}
-                    right={
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(p => !p)}
-                        className="p-1 text-white/30 hover:text-white/60 transition-colors"
-                        tabIndex={-1}
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    }
-                  />
-                </>
-              )}
+          {/* ── FORGOT PASSWORD PANEL ── */}
+          {tab === 'forgot' && (
+            <ForgotPasswordPanel onBack={() => switchTab('login')} />
+          )}
 
-              {/* Error Banner */}
-              {error && (
-                <div className="flex items-center gap-1.5 text-xs font-semibold py-2 px-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[#FF6B6B] animate-fade-in">
-                  <AlertCircle size={13} /> <span>{error}</span>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="auth-cta-btn w-full py-4 rounded-2xl font-bold text-base text-white flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] border-none outline-none focus:outline-none cursor-pointer mt-2 disabled:opacity-60"
-                style={{
-                  background: 'linear-gradient(135deg, #14B8A6 0%, #0D9488 50%, #0F766E 100%)',
-                  boxShadow: '0 8px 28px rgba(20,184,166,0.30)',
-                }}
-              >
-                {loading ? (
-                  <RefreshCw size={18} className="animate-spin" />
-                ) : tab === 'login' ? (
-                  <><LogIn size={17} /> Log In</>
+          {/* ── LOGIN / REGISTER FORM ── */}
+          {tab !== 'forgot' && (
+            <form
+              className="p-5 pt-3 flex-1 flex flex-col"
+              onSubmit={(e) => { e.preventDefault(); handleSubmit() }}
+            >
+              <div className="space-y-4">
+                {tab === 'register' ? (
+                  /* ──── REGISTER FORM ──── */
+                  <>
+                    <FloatingInput
+                      icon={User}
+                      label="Your full name"
+                      value={regName}
+                      onChange={e => setRegName(e.target.value)}
+                      error={fieldErrors.name}
+                      autoComplete="name"
+                      autoFocus
+                      delay={50}
+                    />
+                    <FloatingInput
+                      icon={Mail}
+                      type="email"
+                      label="Email address (optional)"
+                      value={regEmail}
+                      onChange={e => setRegEmail(e.target.value)}
+                      error={fieldErrors.email}
+                      autoComplete="email"
+                      delay={100}
+                    />
+                    <FloatingInput
+                      icon={Phone}
+                      type="tel"
+                      label="Mobile number (10-digit)"
+                      value={regPhone}
+                      onChange={e => setRegPhone(cleanMobileInput(e.target.value))}
+                      error={fieldErrors.phone}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      delay={150}
+                    />
+                    <FloatingInput
+                      icon={Lock}
+                      type={showRegPassword ? 'text' : 'password'}
+                      label="Create a password"
+                      value={regPassword}
+                      onChange={e => setRegPassword(e.target.value)}
+                      error={fieldErrors.password}
+                      autoComplete="new-password"
+                      delay={200}
+                      right={
+                        <button
+                          type="button"
+                          onClick={() => setShowRegPassword(p => !p)}
+                          className="p-1 text-white/30 hover:text-white/60 transition-colors"
+                          tabIndex={-1}
+                          aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      }
+                    />
+                  </>
                 ) : (
-                  <><UserPlus size={17} /> Create Account</>
+                  /* ──── LOGIN FORM ──── */
+                  <>
+                    <FloatingInput
+                      icon={identifierIcon}
+                      label="Email or phone number"
+                      value={identifier}
+                      onChange={e => {
+                        const val = e.target.value
+                        if (/^\+?\d*$/.test(val)) {
+                          if (val === '+') {
+                            setIdentifier('+')
+                          } else {
+                            setIdentifier(cleanMobileInput(val))
+                          }
+                        } else {
+                          setIdentifier(val)
+                        }
+                      }}
+                      error={fieldErrors.identifier}
+                      autoComplete="username"
+                      autoFocus
+                      delay={50}
+                    />
+                    <div>
+                      <FloatingInput
+                        icon={Lock}
+                        type={showPassword ? 'text' : 'password'}
+                        label="Password"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        error={fieldErrors.password}
+                        autoComplete="current-password"
+                        delay={100}
+                        right={
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(p => !p)}
+                            className="p-1 text-white/30 hover:text-white/60 transition-colors"
+                            tabIndex={-1}
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          >
+                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        }
+                      />
+                      {/* ✨ Forgot Password link */}
+                      <div className="flex justify-end mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => switchTab('forgot')}
+                          className="text-xs font-semibold transition-colors border-none bg-transparent outline-none cursor-pointer"
+                          style={{ color: '#14B8A6' }}
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
-              </button>
-            </div>
-          </form>
+
+                {/* Error Banner */}
+                {error && (
+                  <div className="flex items-start gap-1.5 text-xs font-semibold py-2.5 px-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[#FF6B6B] animate-fade-in">
+                    <AlertCircle size={13} className="mt-0.5 shrink-0" /> <span>{error}</span>
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="auth-cta-btn w-full py-4 rounded-2xl font-bold text-base text-white flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] border-none outline-none focus:outline-none cursor-pointer mt-2 disabled:opacity-60"
+                  style={{
+                    background: 'linear-gradient(135deg, #14B8A6 0%, #0D9488 50%, #0F766E 100%)',
+                    boxShadow: '0 8px 28px rgba(20,184,166,0.30)',
+                  }}
+                >
+                  {loading ? (
+                    <RefreshCw size={18} className="animate-spin" />
+                  ) : tab === 'login' ? (
+                    <><LogIn size={17} /> Log In</>
+                  ) : (
+                    <><UserPlus size={17} /> Create Account</>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

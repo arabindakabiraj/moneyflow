@@ -423,8 +423,12 @@ html.dark {
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.10);
+  background: var(--mf-text-muted);
   border-radius: 9999px;
+}
+/* Light mode scrollbar — darker thumb so it's visible */
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.18);
 }
 
 /* Safe area */
@@ -539,6 +543,12 @@ html.dark {
   transform: translateY(0);
   opacity: 1;
 }
+
+/* Light mode nav label — ensure it’s readable, not invisible */
+html:not(.dark) .liquid-nav-label { color: rgba(0,0,0,0.45); }
+html:not(.dark) .liquid-nav-item.is-active .liquid-nav-label { color: #0f9689; }
+html:not(.dark) .liquid-nav-icon { color: rgba(0,0,0,0.40); }
+html:not(.dark) .liquid-nav-item.is-active .liquid-nav-icon { color: #0f9689; }
 
 /* Active glow — subtle dot */
 .liquid-icon-glow {
